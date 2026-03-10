@@ -14,6 +14,7 @@ class DerivativeSymbols:
     ce_symbol: str
     pe_symbol: str
     atm_strike: int
+    lot_size: int | None = None  # From instrument when available (stocks)
 
 
 class InstrumentResolver:
@@ -36,11 +37,14 @@ class InstrumentResolver:
         if not fut or not ce or not pe:
             raise RuntimeError("Unable to resolve required derivatives symbols from NFO instruments.")
 
+        lot_size = int(fut.get("lot_size", 0) or ce.get("lot_size", 0) or 0) or None
+
         return DerivativeSymbols(
             fut_symbol=f"NFO:{fut['tradingsymbol']}",
             ce_symbol=f"NFO:{ce['tradingsymbol']}",
             pe_symbol=f"NFO:{pe['tradingsymbol']}",
             atm_strike=atm_strike,
+            lot_size=lot_size,
         )
 
     @staticmethod

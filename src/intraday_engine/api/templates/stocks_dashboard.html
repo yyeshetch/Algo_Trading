@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>F&O Stock Signals | 15-Min</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c0c0f;
+      --surface: #16161a;
+      --surface-hover: #1c1c21;
+      --border: #2a2a30;
+      --text: #e8e8ed;
+      --text-muted: #8b8b95;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --buy: #10b981;
+      --buy-dim: #059669;
+      --sell: #ef4444;
+      --sell-dim: #dc2626;
+      --neutral: #6b7280;
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .layout {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+    .nav a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .nav .sep { color: var(--border); }
+    .header {
+      margin-bottom: 1.5rem;
+    }
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.35rem;
+    }
+    .header .sub {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .toolbar {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .btn {
+      font-family: inherit;
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    .status.ok { color: var(--buy); }
+    .status.err { color: var(--sell); }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .panel-head {
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+      font-size: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel.buy .panel-head { color: var(--buy); }
+    .panel.sell .panel-head { color: var(--sell); }
+    .panel-body {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: rgba(0,0,0,0.2);
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    tr:hover { background: var(--surface-hover); }
+    .stock { font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+    .sig-buy { color: var(--buy); font-weight: 600; }
+    .sig-sell { color: var(--sell); font-weight: 600; }
+    .sig-no { color: var(--neutral); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
+    .conf-high { color: var(--buy); }
+    .conf-mid { color: var(--text-muted); }
+    .ts { font-size: 0.8rem; color: var(--text-muted); }
+    .reasons { font-size: 0.75rem; color: var(--text-muted); max-width: 220px; line-height: 1.4; }
+    .empty {
+      padding: 3rem 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .empty a { color: var(--accent); }
+    .loading {
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .limit-row { display: flex; align-items: center; gap: 0.5rem; }
+    .limit-row input {
+      width: 4rem;
+      padding: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .tab { padding: 0.6rem 1.2rem; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .chk { display: flex; align-items: center; gap: 0.5rem; }
+    .chk input { accent-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="nav">
+      <a href="/">← Index Signals</a>
+      <span class="sep">|</span>
+      <span>F&O Stock Signals</span>
+    </nav>
+    <header class="header">
+      <h1>F&O Stock Signals</h1>
+      <p class="sub">15-min timeframe • Spot + Futures (options when available) • 15-min ORB (0.2% variation)</p>
+    </header>
+    <div class="tabs">
+      <button class="tab active" data-tab="signals">15-min Signals</button>
+      <button class="tab" data-tab="orb">15-min ORB</button>
+      <button class="tab" data-tab="pinbar">Pinbars</button>
+    </div>
+    <div id="panel-signals" class="tab-panel active">
+      <div class="toolbar">
+        <button class="btn btn-primary" id="btnRefresh">Refresh (Fetch & Generate)</button>
+        <div class="limit-row">
+          <label for="limit">Limit:</label>
+          <input type="number" id="limit" value="50" min="10" max="200">
+        </div>
+        <span class="status" id="status"></span>
+      </div>
+      <div id="content">
+      <div class="loading" id="loading">Loading stored signals…</div>
+      <div id="results" class="grid" style="display:none;">
+        <div class="panel buy">
+          <div class="panel-head">▲ BUY Signals</div>
+          <div class="panel-body">
+            <table id="buyTable">
+              <thead><tr><th>Stock</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Reasons</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="empty" id="buyEmpty" style="display:none;">No BUY signals. Click Refresh to fetch 15-min data.</div>
+          </div>
+        </div>
+        <div class="panel sell">
+          <div class="panel-head">▼ SELL Signals</div>
+          <div class="panel-body">
+            <table id="sellTable">
+              <thead><tr><th>Stock</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Reasons</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="empty" id="sellEmpty" style="display:none;">No SELL signals. Click Refresh to fetch 15-min data.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    <div id="panel-orb" class="tab-panel">
+      <div class="toolbar">
+        <button class="btn btn-primary" id="btnOrb">Scan ORB</button>
+        <div class="limit-row">
+          <label for="orbLimit">Limit:</label>
+          <input type="number" id="orbLimit" value="200" min="50" max="500">
+        </div>
+        <label class="chk"><input type="checkbox" id="orbCached" checked> Use cached OR (9:15–9:30)</label>
+        <span class="status" id="orbStatus"></span>
+      </div>
+      <div id="orbContent">
+        <div class="loading" id="orbLoading">Click Scan ORB to run (uses latest 15-min candle close vs OR)</div>
+        <div id="orbResults" class="grid" style="display:none;">
+          <div class="panel buy">
+            <div class="panel-head">▲ ORB BUY (latest candle close ≥ OR high − 0.2%)</div>
+            <div class="panel-body">
+              <table id="orbBuyTable">
+                <thead><tr><th>Stock</th><th>Close</th><th>OR High</th><th>Upper Break</th><th>OI</th><th>Time</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="empty" id="orbBuyEmpty" style="display:none;">No ORB BUY signals.</div>
+            </div>
+          </div>
+          <div class="panel sell">
+            <div class="panel-head">▼ ORB SELL (latest candle close ≤ OR low + 0.2%)</div>
+            <div class="panel-body">
+              <table id="orbSellTable">
+                <thead><tr><th>Stock</th><th>Close</th><th>OR Low</th><th>Lower Break</th><th>OI</th><th>Time</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="empty" id="orbSellEmpty" style="display:none;">No ORB SELL signals.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="panel-pinbar" class="tab-panel">
+      <div class="toolbar">
+        <button class="btn btn-primary" id="btnPinbar">Scan Pinbars</button>
+        <div class="limit-row">
+          <label for="pinbarLimit">Limit:</label>
+          <input type="number" id="pinbarLimit" value="200" min="50" max="500">
+        </div>
+        <span class="status" id="pinbarStatus"></span>
+      </div>
+      <div id="pinbarContent">
+        <div class="loading" id="pinbarLoading">Click Scan Pinbars to find bullish/bearish pinbars on 15-min</div>
+        <div id="pinbarResults" class="grid" style="display:none;">
+          <div class="panel buy">
+            <div class="panel-head">▲ Bullish Pinbar (long lower wick, rejection at low)</div>
+            <div class="panel-body">
+              <table id="pinbarBullTable">
+                <thead><tr><th>Stock</th><th>O</th><th>H</th><th>L</th><th>C</th><th>OI</th><th>Time</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="empty" id="pinbarBullEmpty" style="display:none;">No bullish pinbars.</div>
+            </div>
+          </div>
+          <div class="panel sell">
+            <div class="panel-head">▼ Bearish Pinbar (long upper wick, rejection at high)</div>
+            <div class="panel-body">
+              <table id="pinbarBearTable">
+                <thead><tr><th>Stock</th><th>O</th><th>H</th><th>L</th><th>C</th><th>OI</th><th>Time</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="empty" id="pinbarBearEmpty" style="display:none;">No bearish pinbars.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const btnRefresh = document.getElementById('btnRefresh');
+    const limitInput = document.getElementById('limit');
+    const status = document.getElementById('status');
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const buyTbody = document.querySelector('#buyTable tbody');
+    const sellTbody = document.querySelector('#sellTable tbody');
+    const buyEmpty = document.getElementById('buyEmpty');
+    const sellEmpty = document.getElementById('sellEmpty');
+
+    function fmt(v) {
+      if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
+      return String(v);
+    }
+    function confClass(c) {
+      const v = parseFloat(c);
+      if (v >= 0.7) return 'conf-high';
+      return 'conf-mid';
+    }
+    function shortTs(ts) {
+      if (!ts) return '—';
+      const m = ts.match(/T(\d{2}:\d{2})/);
+      return m ? m[1] : ts.slice(-8, -3);
+    }
+
+    function renderRow(s, isBuy) {
+      const conf = (s.confidence != null ? parseFloat(s.confidence) : 0);
+      return `<tr>
+        <td class="stock">${fmt(s.stock)}</td>
+        <td class="num">${fmt(s.entry)}</td>
+        <td class="num">${fmt(s.target)}</td>
+        <td class="num">${fmt(s.stop_loss)}</td>
+        <td class="num ${confClass(conf)}">${conf ? (conf * 100).toFixed(0) + '%' : '—'}</td>
+        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
+        <td class="reasons">${fmt(s.reasons) || '—'}</td>
+      </tr>`;
+    }
+
+    async function loadSignals() {
+      loading.style.display = 'block';
+      loading.textContent = 'Loading stored signals…';
+      results.style.display = 'none';
+      setStatus('', null);
+      try {
+        const r = await fetch('/api/stocks/signals');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'Failed');
+        const buy = d.buy || [];
+        const sell = d.sell || [];
+        buyTbody.innerHTML = buy.map(s => renderRow(s, true)).join('');
+        sellTbody.innerHTML = sell.map(s => renderRow(s, false)).join('');
+        buyEmpty.style.display = buy.length ? 'none' : 'block';
+        sellEmpty.style.display = sell.length ? 'none' : 'block';
+        loading.style.display = 'none';
+        results.style.display = 'grid';
+        setStatus(`${buy.length} BUY, ${sell.length} SELL from stored data.`, true);
+      } catch (e) {
+        loading.textContent = 'No stored signals. Click Refresh to fetch 15-min data.';
+        loading.style.display = 'block';
+        setStatus('Error: ' + e.message, false);
+      }
+    }
+
+    btnRefresh.addEventListener('click', async () => {
+      btnRefresh.disabled = true;
+      setStatus('Fetching 15-min data for all F&O stocks…', null);
+      try {
+        const limit = parseInt(limitInput.value, 10) || 50;
+        const r = await fetch('/api/stocks/refresh?limit=' + limit, { method: 'POST' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'Refresh failed');
+        setStatus(`Processed ${d.count || 0} stocks.`, true);
+        await loadSignals();
+      } catch (e) {
+        setStatus('Error: ' + e.message, false);
+      } finally {
+        btnRefresh.disabled = false;
+      }
+    });
+
+    function setStatus(msg, ok) {
+      status.textContent = msg;
+      status.className = 'status ' + (ok === true ? 'ok' : ok === false ? 'err' : '');
+    }
+
+    loadSignals();
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+      });
+    });
+
+    // ORB
+    const btnOrb = document.getElementById('btnOrb');
+    const orbLimit = document.getElementById('orbLimit');
+    const orbCached = document.getElementById('orbCached');
+    const orbStatus = document.getElementById('orbStatus');
+    const orbLoading = document.getElementById('orbLoading');
+    const orbResults = document.getElementById('orbResults');
+    const orbBuyTbody = document.querySelector('#orbBuyTable tbody');
+    const orbSellTbody = document.querySelector('#orbSellTable tbody');
+    const orbBuyEmpty = document.getElementById('orbBuyEmpty');
+    const orbSellEmpty = document.getElementById('orbSellEmpty');
+
+    function renderOrbRow(s, isBuy) {
+      const ts = fmt(s.timestamp);
+      const shortTs = ts.match(/T(\d{2}:\d{2})/) ? ts.match(/T(\d{2}:\d{2})/)[1] : (ts.slice(-8, -3) || '—');
+      if (isBuy) {
+        return `<tr>
+          <td class="stock">${fmt(s.stock)}</td>
+          <td class="num">${fmt(s.price)}</td>
+          <td class="num">${fmt(s.or_high)}</td>
+          <td class="num">${fmt(s.upper_break)}</td>
+          <td class="num">${fmt(s.oi)}</td>
+          <td class="ts">${shortTs}</td>
+        </tr>`;
+      }
+      return `<tr>
+        <td class="stock">${fmt(s.stock)}</td>
+        <td class="num">${fmt(s.price)}</td>
+        <td class="num">${fmt(s.or_low)}</td>
+        <td class="num">${fmt(s.lower_break)}</td>
+        <td class="num">${fmt(s.oi)}</td>
+        <td class="ts">${shortTs}</td>
+      </tr>`;
+    }
+
+    // Pinbar
+    const btnPinbar = document.getElementById('btnPinbar');
+    const pinbarLimit = document.getElementById('pinbarLimit');
+    const pinbarStatus = document.getElementById('pinbarStatus');
+    const pinbarLoading = document.getElementById('pinbarLoading');
+    const pinbarResults = document.getElementById('pinbarResults');
+    const pinbarBullTbody = document.querySelector('#pinbarBullTable tbody');
+    const pinbarBearTbody = document.querySelector('#pinbarBearTable tbody');
+    const pinbarBullEmpty = document.getElementById('pinbarBullEmpty');
+    const pinbarBearEmpty = document.getElementById('pinbarBearEmpty');
+
+    function renderPinbarRow(s, isBull) {
+      const ts = fmt(s.timestamp);
+      const shortTs = ts.match(/T(\d{2}:\d{2})/) ? ts.match(/T(\d{2}:\d{2})/)[1] : (ts.slice(-8, -3) || '—');
+      return `<tr>
+        <td class="stock">${fmt(s.stock)}</td>
+        <td class="num">${fmt(s.open)}</td>
+        <td class="num">${fmt(s.high)}</td>
+        <td class="num">${fmt(s.low)}</td>
+        <td class="num">${fmt(s.close)}</td>
+        <td class="num">${fmt(s.oi)}</td>
+        <td class="ts">${shortTs}</td>
+      </tr>`;
+    }
+
+    btnPinbar.addEventListener('click', async () => {
+      btnPinbar.disabled = true;
+      pinbarLoading.style.display = 'block';
+      pinbarLoading.textContent = 'Scanning pinbars (parallel fetch)…';
+      pinbarResults.style.display = 'none';
+      pinbarStatus.textContent = '';
+      try {
+        const limit = parseInt(pinbarLimit.value, 10) || 200;
+        const r = await fetch('/api/stocks/pinbar?limit=' + limit);
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'Pinbar scan failed');
+        const bull = d.bullish || [];
+        const bear = d.bearish || [];
+        pinbarBullTbody.innerHTML = bull.map(s => renderPinbarRow(s, true)).join('');
+        pinbarBearTbody.innerHTML = bear.map(s => renderPinbarRow(s, false)).join('');
+        pinbarBullEmpty.style.display = bull.length ? 'none' : 'block';
+        pinbarBearEmpty.style.display = bear.length ? 'none' : 'block';
+        pinbarLoading.style.display = 'none';
+        pinbarResults.style.display = 'grid';
+        pinbarStatus.textContent = `${bull.length} bullish, ${bear.length} bearish pinbars`;
+        pinbarStatus.className = 'status ok';
+      } catch (e) {
+        pinbarLoading.textContent = 'Click Scan Pinbars to run';
+        pinbarLoading.style.display = 'block';
+        pinbarStatus.textContent = 'Error: ' + e.message;
+        pinbarStatus.className = 'status err';
+      } finally {
+        btnPinbar.disabled = false;
+      }
+    });
+
+    btnOrb.addEventListener('click', async () => {
+      btnOrb.disabled = true;
+      orbLoading.style.display = 'block';
+      orbLoading.textContent = 'Scanning ORB (bulk quote + OR ranges)…';
+      orbResults.style.display = 'none';
+      orbStatus.textContent = '';
+      try {
+        const limit = parseInt(orbLimit.value, 10) || 200;
+        const useCached = orbCached.checked;
+        const r = await fetch('/api/stocks/orb?limit=' + limit + '&use_cached=' + useCached);
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'ORB scan failed');
+        const buy = d.buy || [];
+        const sell = d.sell || [];
+        orbBuyTbody.innerHTML = buy.map(s => renderOrbRow(s, true)).join('');
+        orbSellTbody.innerHTML = sell.map(s => renderOrbRow(s, false)).join('');
+        orbBuyEmpty.style.display = buy.length ? 'none' : 'block';
+        orbSellEmpty.style.display = sell.length ? 'none' : 'block';
+        orbLoading.style.display = 'none';
+        orbResults.style.display = 'grid';
+        orbStatus.textContent = `${buy.length} BUY, ${sell.length} SELL (latest candle close vs OR)`;
+        orbStatus.className = 'status ok';
+      } catch (e) {
+        orbLoading.textContent = 'Click Scan ORB to run';
+        orbLoading.style.display = 'block';
+        orbStatus.textContent = 'Error: ' + e.message;
+        orbStatus.className = 'status err';
+      } finally {
+        btnOrb.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

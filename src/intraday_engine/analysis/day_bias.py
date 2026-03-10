@@ -17,10 +17,11 @@ def probable_day_bias(features: Dict[str, float]) -> str:
     elif features["fut_strength_pct"] < -0.03:
         bearish += 1
 
-    if features["call_change_pct"] > 0 and features["put_change_pct"] < 0:
-        bullish += 1
-    elif features["put_change_pct"] > 0 and features["call_change_pct"] < 0:
-        bearish += 1
+    if features.get("options_available", True):
+        if features["call_change_pct"] > 0 and features["put_change_pct"] < 0:
+            bullish += 1
+        elif features["put_change_pct"] > 0 and features["call_change_pct"] < 0:
+            bearish += 1
 
     if bullish > bearish:
         return "BULLISH_DAY"

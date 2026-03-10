@@ -47,15 +47,16 @@ def score_signal(
         bearish += WEIGHTS["fut_strength"]
         reasons.append("Futures are weaker than spot.")
 
-    if features["call_change_pct"] > 0 and features["put_change_pct"] < 0:
-        bullish += WEIGHTS["options_expansion_decay"]
-        reasons.append("ATM call is expanding while ATM put is decaying.")
-    elif features["put_change_pct"] > 0 and features["call_change_pct"] < 0:
-        bearish += WEIGHTS["options_expansion_decay"]
-        reasons.append("ATM put is expanding while ATM call is decaying.")
-    else:
-        no_trade_penalty += 0.08
-        reasons.append("Options behavior is conflicting.")
+    if features.get("options_available", True):
+        if features["call_change_pct"] > 0 and features["put_change_pct"] < 0:
+            bullish += WEIGHTS["options_expansion_decay"]
+            reasons.append("ATM call is expanding while ATM put is decaying.")
+        elif features["put_change_pct"] > 0 and features["call_change_pct"] < 0:
+            bearish += WEIGHTS["options_expansion_decay"]
+            reasons.append("ATM put is expanding while ATM call is decaying.")
+        else:
+            no_trade_penalty += 0.08
+            reasons.append("Options behavior is conflicting.")
 
     if is_breakout and follow_through:
         bullish += WEIGHTS["breakout_follow_through"]

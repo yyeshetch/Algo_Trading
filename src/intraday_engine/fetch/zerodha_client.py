@@ -205,3 +205,16 @@ class ZerodhaClient:
         self._cache_refreshed_at = now
         return records
 
+    def fno_stock_names(self) -> List[str]:
+        """Return sorted list of F&O stock underlying names (excludes indices NIFTY, BANKNIFTY)."""
+        indices = {"NIFTY", "BANKNIFTY"}
+        names: set[str] = set()
+        for r in self.nfo_instruments():
+            if not isinstance(r, dict):
+                continue
+            name = r.get("name")
+            inst_type = r.get("instrument_type")
+            if name and inst_type == "FUT" and name not in indices:
+                names.add(str(name).strip())
+        return sorted(names)
+

@@ -7,6 +7,8 @@ import logging
 import math
 import os
 import sys
+
+import pandas as pd
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -18,19 +20,38 @@ from pydantic import BaseModel
 from kiteconnect import exceptions as kite_exceptions
 
 from intraday_engine.core.config import Settings
-from intraday_engine.core.underlyings import list_underlyings
+from intraday_engine.core.underlyings import list_index_underlyings
 from intraday_engine.engine import DirectionEngine
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.market_data import MarketDataFetcher
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.storage import DataStore
 from intraday_engine.analysis.summary_builder import build_analysis_summaries
+from intraday_engine.engine.stock_cycle_runner import run_stocks_15min_cycle
+from intraday_engine.orb.orb_scanner import run_orb_scan, run_pinbar_scan
 from intraday_engine.storage.position_sl_store import get_auto_trail_positions, get_sl as get_sl_record, set_sl as store_sl, update_sl_trigger as store_update_sl, set_auto_trail as store_auto_trail
 from intraday_engine.utils.logging_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
 _auto_trail_task: asyncio.Task | None = None
+
+
+def _auto_trail_underlyings() -> list[str]:
+    """Underlyings to check for auto-trail: indices + any with data subdirs."""
+    base = list_index_underlyings()
+    try:
+        settings = _get_settings("NIFTY")
+        data_path = settings.data_dir
+        if data_path.exists():
+            for d in data_path.iterdir():
+                if d.is_dir() and not d.name.startswith("."):
+                    u = d.name.upper()
+                    if u not in base:
+                        base.append(u)
+    except Exception:
+        pass
+    return base
 
 
 async def _run_auto_trail_cycle():
@@ -40,7 +61,7 @@ async def _run_auto_trail_cycle():
         to_dt = now.replace(second=0, microsecond=0)
         from_dt = to_dt - timedelta(minutes=5)
         loop = asyncio.get_event_loop()
-        for u in list_underlyings():
+        for u in _auto_trail_underlyings():
             try:
                 store = _get_store(u)
                 client = _get_client(u)
@@ -155,6 +176,15 @@ async def dashboard():
     return HTMLResponse(path.read_text(encoding="utf-8"))
 
 
+@app.get("/stocks", response_class=HTMLResponse)
+async def stocks_dashboard():
+    """F&O stocks scanner dashboard (15-min timeframe)."""
+    path = _templates_dir() / "stocks_dashboard.html"
+    if not path.exists():
+        raise HTTPException(status_code=500, detail="Stocks dashboard template not found.")
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
 def _json_safe(val):
     """Convert value to JSON-serializable form (NaN -> None)."""
     if val is None:
@@ -182,9 +212,115 @@ def _sanitize_for_json(obj):
     return _json_safe(obj)
 
 
+def _load_stored_stock_signals() -> list[dict]:
+    """Load latest 15-min signals from data/{stock}/signals.csv for today."""
+    settings = Settings.from_env(underlying="NIFTY")
+    data_dir = settings.data_dir
+    today_str = date.today().isoformat()
+    all_signals: list[dict] = []
+    index_lower = {u.lower() for u in list_index_underlyings()}
+    for d in data_dir.iterdir():
+        if not d.is_dir() or d.name.startswith(".") or d.name.lower() in index_lower:
+            continue
+        sig_csv = d / "signals.csv"
+        if not sig_csv.exists():
+            continue
+        try:
+            df = pd.read_csv(sig_csv)
+            if df.empty or "timestamp" not in df.columns:
+                continue
+            df = df[df["timestamp"].astype(str).str.startswith(today_str)]
+            if df.empty:
+                continue
+            df = df.sort_values(by="timestamp", ascending=False)
+            row = df.iloc[0].to_dict()
+            row["stock"] = d.name.upper()
+            all_signals.append(row)
+        except Exception:
+            continue
+    return all_signals
+
+
+@app.get("/api/stocks/signals")
+async def api_stocks_signals():
+    """Return stored 15-min signals for all F&O stocks (from scheduled cycle)."""
+    try:
+        signals = _load_stored_stock_signals()
+        buy = sorted([s for s in signals if str(s.get("signal")) == "BUY"], key=lambda x: float(x.get("confidence") or 0), reverse=True)
+        sell = sorted([s for s in signals if str(s.get("signal")) == "SELL"], key=lambda x: float(x.get("confidence") or 0), reverse=True)
+        no_trade = [s for s in signals if str(s.get("signal")) not in ("BUY", "SELL")]
+        return {
+            "signals": [_sanitize_for_json(s) for s in signals],
+            "buy": [_sanitize_for_json(s) for s in buy],
+            "sell": [_sanitize_for_json(s) for s in sell],
+            "no_trade": [_sanitize_for_json(s) for s in no_trade],
+        }
+    except Exception as e:
+        logger.exception("Load stock signals failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/orb")
+async def api_stocks_orb(limit: int = 200, use_cached: bool = True):
+    """15-min ORB signals (0.2% variation). Uses bulk quote for prices."""
+    try:
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: run_orb_scan(trade_date=date.today(), stock_limit=limit, use_cached_or=use_cached),
+        )
+        buy = [s for s in results if s["signal"] == "BUY"]
+        sell = [s for s in results if s["signal"] == "SELL"]
+        return {
+            "signals": [_sanitize_for_json(s) for s in results],
+            "buy": [_sanitize_for_json(s) for s in buy],
+            "sell": [_sanitize_for_json(s) for s in sell],
+        }
+    except Exception as e:
+        logger.exception("ORB scan failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/pinbar")
+async def api_stocks_pinbar(limit: int = 200):
+    """Bullish and bearish pinbars on last 15-min candle."""
+    try:
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: run_pinbar_scan(trade_date=date.today(), stock_limit=limit),
+        )
+        bull = [s for s in results if s.get("pattern") == "BULLISH_PINBAR"]
+        bear = [s for s in results if s.get("pattern") == "BEARISH_PINBAR"]
+        return {
+            "signals": [_sanitize_for_json(s) for s in results],
+            "bullish": [_sanitize_for_json(s) for s in bull],
+            "bearish": [_sanitize_for_json(s) for s in bear],
+        }
+    except Exception as e:
+        logger.exception("Pinbar scan failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/refresh")
+async def api_stocks_refresh(limit: int = 50):
+    """Run 15-min data fetch and signal generation for all F&O stocks."""
+    try:
+        loop = asyncio.get_event_loop()
+        n = await loop.run_in_executor(
+            None,
+            lambda: run_stocks_15min_cycle(trade_date=date.today(), stock_limit=limit),
+        )
+        return {"status": "ok", "message": f"Processed {n} stocks.", "count": n}
+    except Exception as e:
+        logger.exception("Stocks refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/underlyings")
 async def get_underlyings_list():
-    return {"underlyings": list_underlyings()}
+    """Return indices only for the main dashboard dropdown. Stocks use /stocks page."""
+    return {"underlyings": list_index_underlyings()}
 
 
 @app.get("/api/signals")
@@ -348,9 +484,15 @@ class AutoTrailRequest(BaseModel):
 def _infer_underlying(tradingsymbol: str) -> str:
     """Infer underlying from option/future tradingsymbol."""
     s = str(tradingsymbol).upper()
-    if "BANKNIFTY" in s or "BANK NIFTY" in s:
+    if s.startswith("BANKNIFTY"):
         return "BANKNIFTY"
-    return "NIFTY"
+    if s.startswith("NIFTY"):
+        return "NIFTY"
+    # For stocks: underlying is the part before first digit (expiry)
+    for i, c in enumerate(s):
+        if c.isdigit():
+            return s[:i] if s[:i] else "NIFTY"
+    return s or "NIFTY"
 
 
 @app.post("/api/execute")
@@ -393,7 +535,20 @@ async def execute(req: ExecuteRequest):
             detail=f"Daily stop loss reached (P&L: ₹{day_pnl:.0f}). No further trades today.",
         )
 
-    quantity = req.lots * settings.lot_size
+    # For F&O stocks, resolve to get actual lot size from instrument
+    lot_size = settings.lot_size
+    try:
+        spot_quote = client.quote([settings.spot_symbol])
+        if spot_quote and settings.spot_symbol in spot_quote:
+            spot_price = float(spot_quote[settings.spot_symbol].get("last_price", 0) or 0)
+            if spot_price > 0:
+                resolver = InstrumentResolver(client, settings)
+                symbols = resolver.resolve(spot_price)
+                if symbols.lot_size:
+                    lot_size = symbols.lot_size
+    except Exception as e:
+        logger.debug("Could not resolve lot size, using settings: %s", e)
+    quantity = req.lots * lot_size
     transaction_type = str(signal.get("signal", "BUY"))
     sym = str(option_symbol).replace("NFO:", "")
     try:

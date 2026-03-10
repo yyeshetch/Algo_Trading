@@ -22,15 +22,17 @@ def compute_features(df: pd.DataFrame) -> Dict[str, float]:
     spot_vwap = float(last["spot_vwap"])
     future_ltp = float(last["future_ltp"])
 
-    call_ltp = float(last["call_ltp"])
-    put_ltp = float(last["put_ltp"])
-    prev_call = float(prev["call_ltp"])
-    prev_put = float(prev["put_ltp"])
+    call_ltp = float(last.get("call_ltp", 0) or 0)
+    put_ltp = float(last.get("put_ltp", 0) or 0)
+    prev_call = float(prev.get("call_ltp", 0) or 0)
+    prev_put = float(prev.get("put_ltp", 0) or 0)
     prev_spot = float(prev["spot_ltp"])
 
     call_change = _safe_pct_change(call_ltp, prev_call)
     put_change = _safe_pct_change(put_ltp, prev_put)
     spot_change = _safe_pct_change(spot_ltp, prev_spot)
+
+    options_available = call_ltp > 0 or put_ltp > 0
 
     return {
         "spot_above_open": 1.0 if spot_ltp > spot_open else 0.0,
@@ -41,6 +43,7 @@ def compute_features(df: pd.DataFrame) -> Dict[str, float]:
         "call_change_pct": call_change,
         "put_change_pct": put_change,
         "spot_change_pct": spot_change,
+        "options_available": options_available,
     }
 
 
