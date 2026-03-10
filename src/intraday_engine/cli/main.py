@@ -5,6 +5,7 @@ import logging
 from datetime import date, datetime
 
 from intraday_engine.core.config import Settings
+from intraday_engine.core.underlyings import list_underlyings
 from intraday_engine.engine import DirectionEngine, run_every_five_minutes
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.market_data import MarketDataFetcher
@@ -15,8 +16,8 @@ from intraday_engine.storage import DataStore
 from intraday_engine.utils.logging_setup import setup_logging
 
 
-def build_engine() -> DirectionEngine:
-    settings = Settings.from_env()
+def build_engine(underlying: str | None = None) -> DirectionEngine:
+    settings = Settings.from_env(underlying=underlying)
     setup_logging(settings.log_level, settings.data_dir)
     logger = logging.getLogger(__name__)
     logger.info("Bootstrapping intraday direction engine for %s.", settings.underlying)
@@ -24,7 +25,7 @@ def build_engine() -> DirectionEngine:
     client = ZerodhaClient(settings)
     resolver = InstrumentResolver(client, settings)
     fetcher = MarketDataFetcher(client, resolver, settings)
-    store = DataStore(settings.data_dir)
+    store = DataStore(settings.data_dir, underlying=settings.underlying)
     return DirectionEngine(fetcher, store, settings)
 
 
@@ -42,14 +43,22 @@ def main() -> None:
         action="store_true",
         help="Scan for gamma blast trades on expiry day (Nifty: Tuesday).",
     )
+    parser.add_argument(
+        "--underlying",
+        type=str,
+        default=None,
+        choices=list_underlyings(),
+        help="Underlying index: NIFTY, BANKNIFTY. Default from UNDERLYING env.",
+    )
     args = parser.parse_args()
     selected_date = _parse_date(args.date) if args.date else None
+    underlying = args.underlying or None
 
     if args.gamma_blast:
-        _run_gamma_blast_scan(selected_date)
+        _run_gamma_blast_scan(selected_date, underlying)
         return
 
-    engine = build_engine()
+    engine = build_engine(underlying=underlying)
     if args.once or selected_date is not None:
         engine.run_cycle(trade_date=selected_date)
         return
@@ -58,9 +67,9 @@ def main() -> None:
     run_every_five_minutes(engine, settings.poll_interval_minutes)
 
 
-def _run_gamma_blast_scan(trade_date: date | None) -> None:
+def _run_gamma_blast_scan(trade_date: date | None, underlying: str | None = None) -> None:
     """Run gamma blast detection for expiry day."""
-    settings = Settings.from_env()
+    settings = Settings.from_env(underlying=underlying)
     setup_logging(settings.log_level, settings.data_dir)
     logger = logging.getLogger(__name__)
 

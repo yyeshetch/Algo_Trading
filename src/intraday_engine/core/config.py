@@ -6,6 +6,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from intraday_engine.core.underlyings import get_underlying_config
+
 
 def _project_root() -> Path:
     """Project root (directory containing src/). Stable regardless of cwd or folder rename."""
@@ -39,18 +41,31 @@ class Settings:
     default_sl_points: float
 
     @staticmethod
-    def from_env() -> "Settings":
+    def from_env(underlying: str | None = None) -> "Settings":
         data_dir_val = os.getenv("DATA_DIR", "data")
         data_dir = Path(data_dir_val)
         if not data_dir.is_absolute():
             data_dir = (_project_root() / data_dir).resolve()
+        underlying_val = (underlying or os.getenv("UNDERLYING", "NIFTY")).strip().upper()
+        underlying_val = underlying_val.replace(" ", "").replace("NIFTYBANK", "BANKNIFTY") or "NIFTY"
+        try:
+            uc = get_underlying_config(underlying_val)
+            env_underlying = os.getenv("UNDERLYING", "NIFTY").strip().upper().replace(" ", "").replace("NIFTYBANK", "BANKNIFTY")
+            use_env = env_underlying and env_underlying == underlying_val
+            spot_symbol = (os.getenv("SPOT_SYMBOL") or uc.spot_symbol) if use_env else uc.spot_symbol
+            option_strike_step = int((os.getenv("OPTION_STRIKE_STEP") or uc.option_strike_step) if use_env else uc.option_strike_step)
+            lot_size = int((os.getenv("LOT_SIZE") or uc.lot_size) if use_env else uc.lot_size)
+        except KeyError:
+            spot_symbol = os.getenv("SPOT_SYMBOL", "NSE:NIFTY 50").strip()
+            option_strike_step = int(os.getenv("OPTION_STRIKE_STEP", "50"))
+            lot_size = int(os.getenv("LOT_SIZE", "50"))
         return Settings(
             kite_api_key=_required("KITE_API_KEY"),
             kite_access_token=_required("KITE_ACCESS_TOKEN"),
-            underlying=os.getenv("UNDERLYING", "NIFTY").strip().upper(),
-            spot_symbol=os.getenv("SPOT_SYMBOL", "NSE:NIFTY 50").strip(),
-            option_strike_step=int(os.getenv("OPTION_STRIKE_STEP", "50")),
-            lot_size=int(os.getenv("LOT_SIZE", "50")),
+            underlying=underlying_val,
+            spot_symbol=spot_symbol.strip(),
+            option_strike_step=option_strike_step,
+            lot_size=lot_size,
             poll_interval_minutes=int(os.getenv("POLL_INTERVAL_MINUTES", "5")),
             lookback_bars=int(os.getenv("LOOKBACK_BARS", "20")),
             min_rr=float(os.getenv("MIN_RR", "1.8")),

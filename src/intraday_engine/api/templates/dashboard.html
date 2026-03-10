@@ -106,6 +106,13 @@
 <body>
   <h1>Intraday Direction Engine</h1>
   <div class="controls">
+    <div class="lots-row">
+      <label for="underlying">Index:</label>
+      <select id="underlying">
+        <option value="NIFTY">NIFTY</option>
+        <option value="BANKNIFTY">NIFTY BANK</option>
+      </select>
+    </div>
     <button class="btn btn-refresh" id="btnRefresh">Refresh</button>
     <div class="lots-row">
       <label for="lots">Lots:</label>
@@ -236,6 +243,17 @@
     const btnRefresh = document.getElementById('btnRefresh');
     const btnExecute = document.getElementById('btnExecute');
     const lotsInput = document.getElementById('lots');
+    const underlyingSelect = document.getElementById('underlying');
+
+    function getUnderlying() {
+      return underlyingSelect ? underlyingSelect.value || 'NIFTY' : 'NIFTY';
+    }
+
+    function apiUrl(path, params = {}) {
+      const u = getUnderlying();
+      const q = new URLSearchParams({ ...params, underlying: u });
+      return path + (path.includes('?') ? '&' : '?') + q.toString();
+    }
 
     function setStatus(msg, ok) {
       status.textContent = msg;
@@ -255,7 +273,7 @@
 
     async function loadSignals() {
       try {
-        const r = await fetch('/api/signals');
+        const r = await fetch(apiUrl('/api/signals'));
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || 'Failed to load');
         const signals = data.signals || [];
@@ -286,7 +304,11 @@
       btnRefresh.disabled = true;
       setStatus('Refreshing...', null);
       try {
-        const r = await fetch('/api/refresh', { method: 'POST' });
+        const r = await fetch('/api/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ underlying: getUnderlying() }),
+        });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Refresh failed');
         setStatus('Refresh complete.', true);
@@ -306,7 +328,7 @@
         const r = await fetch('/api/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lots }),
+          body: JSON.stringify({ lots, underlying: getUnderlying() }),
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Execute failed');
@@ -332,10 +354,18 @@
     });
     document.getElementById('btnRefreshSummary').addEventListener('click', loadTradeSummary);
     document.getElementById('btnRefreshAnalysis').addEventListener('click', () => { loadAnalysis(); });
+    if (underlyingSelect) {
+      underlyingSelect.addEventListener('change', () => {
+        loadSignals();
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab?.dataset.tab === 'trade-summary') loadTradeSummary();
+        if (activeTab?.dataset.tab === 'analysis') loadAnalysis();
+      });
+    }
 
     async function loadTradeSummary() {
       try {
-        const r = await fetch('/api/trade-summary');
+        const r = await fetch(apiUrl('/api/trade-summary'));
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || 'Failed to load');
         const pnlEl = document.getElementById('dayPnl');
@@ -501,13 +531,13 @@
 
     async function loadAnalysis() {
       try {
-        const r = await fetch('/api/analysis-summary');
+        const r = await fetch(apiUrl('/api/analysis-summary'));
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || 'Failed to load');
         const summaries = d.summaries || [];
         renderDayOverview(summaries);
         renderDayTimeline(summaries, (ts) => {
-          fetch('/api/analysis-summary?timestamp=' + encodeURIComponent(ts)).then(r => r.json()).then(data => renderAnalysis(data.selected));
+          fetch(apiUrl('/api/analysis-summary', { timestamp: ts })).then(r => r.json()).then(data => renderAnalysis(data.selected));
         });
         const tbody = document.getElementById('analysisOverviewBody');
         tbody.innerHTML = [...summaries].reverse().map(s => {
@@ -539,7 +569,7 @@
         document.querySelectorAll('.analysis-row').forEach(row => {
           row.onclick = () => {
             const ts = row.dataset.ts;
-            if (ts) fetch('/api/analysis-summary?timestamp=' + encodeURIComponent(ts)).then(r => r.json()).then(data => renderAnalysis(data.selected));
+            if (ts) fetch(apiUrl('/api/analysis-summary', { timestamp: ts })).then(r => r.json()).then(data => renderAnalysis(data.selected));
           };
         });
         renderAnalysis(d.selected);

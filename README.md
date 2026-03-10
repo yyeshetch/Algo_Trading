@@ -1,9 +1,11 @@
 # Intraday Direction Engine (Zerodha Kite)
 
 Production-oriented, explainable, rule-based intraday signal engine that runs every 5 minutes and emits:
-- `data/signals.csv`
-- `data/signals.jsonl`
+- `data/signals.csv` (NIFTY) or `data/{underlying}/signals.csv` (BANKNIFTY)
+- `data/signals.jsonl` or `data/{underlying}/signals.jsonl`
 - terminal output
+
+**Supported underlyings:** NIFTY, NIFTY BANK (BANKNIFTY).
 
 ## What it fetches every 5 minutes
 - Full-day 5-minute candles from market open (09:15) to previous completed 5-minute candle
@@ -32,14 +34,20 @@ cp .env.example .env
 Fill `.env` with valid Kite credentials and symbol settings.
 
 ## Run
-One cycle:
+One cycle (default: NIFTY):
 ```bash
 PYTHONPATH=src python -m intraday_engine.main --once
+```
+
+Specific underlying (NIFTY, BANKNIFTY):
+```bash
+PYTHONPATH=src python -m intraday_engine.main --once --underlying BANKNIFTY
 ```
 
 Specific date backfill (weekly ATM option + monthly future resolution on that date):
 ```bash
 PYTHONPATH=src python -m intraday_engine.main --date 2026-03-09
+PYTHONPATH=src python -m intraday_engine.main --date 2026-03-09 --underlying BANKNIFTY
 ```
 
 Continuous scheduler:
@@ -53,7 +61,8 @@ Web UI to view signals, refresh data, and execute orders:
 PYTHONPATH=src uvicorn intraday_engine.dashboard:app --reload --host 0.0.0.0 --port 8000
 ```
 Open http://localhost:8000
-- **Refresh**: Fetches latest data and generates signals
+- **Index selector**: Switch between NIFTY, NIFTY BANK
+- **Refresh**: Fetches latest data and generates signals for the selected index
 - **Execute**: Places market order on Zerodha for the latest BUY/SELL signal (lots editable, default 2)
 
 ## Folder structure

@@ -11,13 +11,14 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from kiteconnect import exceptions as kite_exceptions
 
 from intraday_engine.core.config import Settings
+from intraday_engine.core.underlyings import list_underlyings
 from intraday_engine.engine import DirectionEngine
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.market_data import MarketDataFetcher
@@ -35,45 +36,48 @@ _auto_trail_task: asyncio.Task | None = None
 async def _run_auto_trail_cycle():
     """Trail SL to prev 1min candle low for positions with auto_trail."""
     try:
-        _get_engine()
-        store = _get_store()
-        client = _get_client()
-        positions = get_auto_trail_positions(store.data_dir)
-        if not positions:
-            return
         now = datetime.now()
         to_dt = now.replace(second=0, microsecond=0)
         from_dt = to_dt - timedelta(minutes=5)
         loop = asyncio.get_event_loop()
-        for rec in positions:
+        for u in list_underlyings():
             try:
-                token = rec.get("instrument_token")
-                if not token:
+                store = _get_store(u)
+                client = _get_client(u)
+                positions = get_auto_trail_positions(store.data_dir)
+                if not positions:
                     continue
-                candles = await loop.run_in_executor(
-                    None,
-                    lambda t=token, f=from_dt, td=to_dt: client.historical_data(int(t), f, td, interval="minute"),
-                )
-                if not candles or len(candles) < 2:
-                    continue
-                prev = candles[-2]
-                low = float(prev.get("low", 0) or 0)
-                if low <= 0:
-                    continue
-                sl_order_id = rec.get("sl_order_id")
-                current_sl = rec.get("sl_trigger")
-                qty = rec.get("quantity", 0)
-                is_long = qty > 0
-                if is_long and low > (current_sl or 0):
-                    await loop.run_in_executor(None, lambda oid=sl_order_id, l=low: client.modify_sl_order(oid, l))
-                    store_update_sl(store.data_dir, rec["tradingsymbol"], qty, low)
-                    logger.info("Auto-trail: %s SL -> %.2f", rec["tradingsymbol"], low)
-                elif not is_long and low < (current_sl or float("inf")):
-                    await loop.run_in_executor(None, lambda oid=sl_order_id, l=low: client.modify_sl_order(oid, l))
-                    store_update_sl(store.data_dir, rec["tradingsymbol"], -qty, low)
-                    logger.info("Auto-trail: %s SL -> %.2f", rec["tradingsymbol"], low)
+                for rec in positions:
+                    try:
+                        token = rec.get("instrument_token")
+                        if not token:
+                            continue
+                        candles = await loop.run_in_executor(
+                            None,
+                            lambda t=token, f=from_dt, td=to_dt: client.historical_data(int(t), f, td, interval="minute"),
+                        )
+                        if not candles or len(candles) < 2:
+                            continue
+                        prev = candles[-2]
+                        low = float(prev.get("low", 0) or 0)
+                        if low <= 0:
+                            continue
+                        sl_order_id = rec.get("sl_order_id")
+                        current_sl = rec.get("sl_trigger")
+                        qty = rec.get("quantity", 0)
+                        is_long = qty > 0
+                        if is_long and low > (current_sl or 0):
+                            await loop.run_in_executor(None, lambda oid=sl_order_id, l=low: client.modify_sl_order(oid, l))
+                            store_update_sl(store.data_dir, rec["tradingsymbol"], qty, low)
+                            logger.info("Auto-trail: %s SL -> %.2f", rec["tradingsymbol"], low)
+                        elif not is_long and low < (current_sl or float("inf")):
+                            await loop.run_in_executor(None, lambda oid=sl_order_id, l=low: client.modify_sl_order(oid, l))
+                            store_update_sl(store.data_dir, rec["tradingsymbol"], -qty, low)
+                            logger.info("Auto-trail: %s SL -> %.2f", rec["tradingsymbol"], low)
+                    except Exception as e:
+                        logger.debug("Auto-trail skip %s: %s", rec.get("tradingsymbol"), e)
             except Exception as e:
-                logger.debug("Auto-trail skip %s: %s", rec.get("tradingsymbol"), e)
+                logger.debug("Auto-trail cycle %s: %s", u, e)
     except Exception as e:
         logger.debug("Auto-trail cycle: %s", e)
 
@@ -98,38 +102,45 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Intraday Direction Engine Dashboard", lifespan=_lifespan)
-_engine: DirectionEngine | None = None
-_client: ZerodhaClient | None = None
-_settings: Settings | None = None
+_engines: dict[str, DirectionEngine] = {}
+_clients: dict[str, ZerodhaClient] = {}
+_settings_cache: dict[str, Settings] = {}
 
 
-def _get_engine() -> DirectionEngine:
-    global _engine, _client, _settings
-    if _engine is None:
-        _settings = Settings.from_env()
-        setup_logging(_settings.log_level, _settings.data_dir)
-        _client = ZerodhaClient(_settings)
-        resolver = InstrumentResolver(_client, _settings)
-        fetcher = MarketDataFetcher(_client, resolver, _settings)
-        store = DataStore(_settings.data_dir)
-        _engine = DirectionEngine(fetcher, store, _settings)
-    return _engine
+def _underlying_key(underlying: str | None) -> str:
+    u = (underlying or "").strip().upper().replace(" ", "").replace("NIFTYBANK", "BANKNIFTY")
+    return u or os.getenv("UNDERLYING", "NIFTY").strip().upper()
 
 
-def _get_client() -> ZerodhaClient:
-    _get_engine()
-    assert _client is not None
-    return _client
+def _get_engine(underlying: str | None = None) -> DirectionEngine:
+    key = _underlying_key(underlying)
+    if key not in _engines:
+        settings = Settings.from_env(underlying=key)
+        setup_logging(settings.log_level, settings.data_dir)
+        client = ZerodhaClient(settings)
+        resolver = InstrumentResolver(client, settings)
+        fetcher = MarketDataFetcher(client, resolver, settings)
+        store = DataStore(settings.data_dir, underlying=settings.underlying)
+        _engines[key] = DirectionEngine(fetcher, store, settings)
+        _clients[key] = client
+        _settings_cache[key] = settings
+    return _engines[key]
 
 
-def _get_settings() -> Settings:
-    _get_engine()
-    assert _settings is not None
-    return _settings
+def _get_client(underlying: str | None = None) -> ZerodhaClient:
+    key = _underlying_key(underlying)
+    _get_engine(underlying)
+    return _clients[key]
 
 
-def _get_store() -> DataStore:
-    return _get_engine().store
+def _get_settings(underlying: str | None = None) -> Settings:
+    key = _underlying_key(underlying)
+    _get_engine(underlying)
+    return _settings_cache[key]
+
+
+def _get_store(underlying: str | None = None) -> DataStore:
+    return _get_engine(underlying).store
 
 
 def _templates_dir() -> Path:
@@ -171,9 +182,14 @@ def _sanitize_for_json(obj):
     return _json_safe(obj)
 
 
+@app.get("/api/underlyings")
+async def get_underlyings_list():
+    return {"underlyings": list_underlyings()}
+
+
 @app.get("/api/signals")
-async def get_signals():
-    store = _get_store()
+async def get_signals(underlying: str | None = None):
+    store = _get_store(underlying)
     df = store.load_signals()
     if df.empty:
         return {"signals": [], "latest_actionable": None}
@@ -197,10 +213,10 @@ async def get_signals():
 
 
 @app.get("/api/analysis-summary")
-async def get_analysis_summary(timestamp: str | None = None):
+async def get_analysis_summary(timestamp: str | None = None, underlying: str | None = None):
     """Return price action, futures, and option summary per timestamp. Optional ?timestamp= for specific candle."""
-    store = _get_store()
-    settings = _get_settings()
+    store = _get_store(underlying)
+    settings = _get_settings(underlying)
     snap_df = store.load_snapshots()
     sig_df = store.load_signals()
     if snap_df.empty:
@@ -222,9 +238,9 @@ async def get_analysis_summary(timestamp: str | None = None):
 
 
 @app.get("/api/trade-summary")
-async def get_trade_summary():
-    client = _get_client()
-    settings = _get_settings()
+async def get_trade_summary(underlying: str | None = None):
+    client = _get_client(underlying)
+    settings = _get_settings(underlying)
     data = client.get_trade_summary()
     if data is None:
         return {
@@ -239,11 +255,12 @@ async def get_trade_summary():
     if isinstance(orders, list):
         orders = sorted(orders, key=lambda o: str(o.get("order_timestamp") or o.get("exchange_timestamp") or ""), reverse=True)
     positions = data.get("positions", [])
-    store = _get_store()
     for p in positions:
         qty = int(p.get("quantity", 0))
         sym = str(p.get("tradingsymbol", "")).replace("NFO:", "")
         if qty and sym:
+            pos_underlying = _infer_underlying(sym)
+            store = _get_store(pos_underlying)
             rec = get_sl_record(store.data_dir, sym, qty)
             p["sl_trigger"] = rec.get("sl_trigger") if rec else None
             p["sl_order_id"] = rec.get("sl_order_id") if rec else None
@@ -272,12 +289,20 @@ async def get_trade_summary():
 
 
 @app.post("/api/refresh")
-async def refresh():
+async def refresh(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    underlying = body.get("underlying") or None
     try:
         today = date.today().isoformat()
         project_root = Path(__file__).resolve().parent.parent.parent.parent
+        cmd = [sys.executable, "-m", "intraday_engine.main", "--date", today]
+        if underlying:
+            cmd.extend(["--underlying", underlying])
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-m", "intraday_engine.main", "--date", today,
+            *cmd,
             cwd=project_root,
             env={**os.environ, "PYTHONPATH": "src"},
             stdout=asyncio.subprocess.PIPE,
@@ -297,30 +322,42 @@ async def refresh():
 
 class ExecuteRequest(BaseModel):
     lots: int = 2
+    underlying: str | None = None
 
 
 class UpdateSLRequest(BaseModel):
     tradingsymbol: str
     quantity: int
     sl_trigger: float
+    underlying: str | None = None
 
 
 class ExitRequest(BaseModel):
     tradingsymbol: str
     quantity: int
+    underlying: str | None = None
 
 
 class AutoTrailRequest(BaseModel):
     tradingsymbol: str
     quantity: int
     enabled: bool
+    underlying: str | None = None
+
+
+def _infer_underlying(tradingsymbol: str) -> str:
+    """Infer underlying from option/future tradingsymbol."""
+    s = str(tradingsymbol).upper()
+    if "BANKNIFTY" in s or "BANK NIFTY" in s:
+        return "BANKNIFTY"
+    return "NIFTY"
 
 
 @app.post("/api/execute")
 async def execute(req: ExecuteRequest):
-    store = _get_store()
-    settings = _get_settings()
-    client = _get_client()
+    store = _get_store(req.underlying)
+    settings = _get_settings(req.underlying)
+    client = _get_client(req.underlying)
     signal = store.get_latest_actionable_signal(trade_date=date.today())
     if not signal:
         raise HTTPException(status_code=400, detail="No actionable BUY/SELL signal. Run Refresh first.")
@@ -391,7 +428,7 @@ async def execute(req: ExecuteRequest):
                 trigger_price=sl_trigger,
             )
             inst_token = client.get_instrument_token(str(option_symbol)) or 0
-            store_sl(_get_store().data_dir, sym, quantity if transaction_type == "BUY" else -quantity, sl_order_id, sl_trigger, inst_token)
+            store_sl(_get_store(req.underlying).data_dir, sym, quantity if transaction_type == "BUY" else -quantity, sl_order_id, sl_trigger, inst_token)
         except Exception as sl_err:
             logger.warning("SL order failed (entry placed): %s", sl_err)
         return {"status": "ok", "order_id": order_id, "sl_order_id": sl_order_id, "signal": transaction_type, "quantity": quantity}
@@ -412,7 +449,8 @@ async def execute(req: ExecuteRequest):
 @app.post("/api/position/exit")
 async def exit_position(req: ExitRequest):
     """Exit position at market."""
-    client = _get_client()
+    underlying = req.underlying or _infer_underlying(req.tradingsymbol)
+    client = _get_client(underlying)
     qty = abs(int(req.quantity))
     sym = str(req.tradingsymbol).replace("NFO:", "")
     side = "SELL" if req.quantity > 0 else "BUY"
@@ -424,7 +462,7 @@ async def exit_position(req: ExitRequest):
             quantity=qty,
         )
         from intraday_engine.storage.position_sl_store import remove
-        remove(_get_store().data_dir, sym, req.quantity)
+        remove(_get_store(underlying).data_dir, sym, req.quantity)
         return {"status": "ok", "order_id": order_id}
     except kite_exceptions.KiteException as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -433,8 +471,9 @@ async def exit_position(req: ExitRequest):
 @app.put("/api/position/sl")
 async def update_position_sl(req: UpdateSLRequest):
     """Update SL trigger for a position."""
-    client = _get_client()
-    store = _get_store()
+    underlying = req.underlying or _infer_underlying(req.tradingsymbol)
+    client = _get_client(underlying)
+    store = _get_store(underlying)
     rec = get_sl_record(store.data_dir, req.tradingsymbol, req.quantity)
     if not rec or not rec.get("sl_order_id"):
         raise HTTPException(status_code=400, detail="No SL order found for this position.")
@@ -449,7 +488,8 @@ async def update_position_sl(req: UpdateSLRequest):
 @app.post("/api/position/auto-trail")
 async def toggle_auto_trail(req: AutoTrailRequest):
     """Toggle auto-trail for a position."""
-    store = _get_store()
+    underlying = req.underlying or _infer_underlying(req.tradingsymbol)
+    store = _get_store(underlying)
     rec = get_sl_record(store.data_dir, req.tradingsymbol, req.quantity)
     if not rec:
         raise HTTPException(status_code=400, detail="No SL record for this position.")

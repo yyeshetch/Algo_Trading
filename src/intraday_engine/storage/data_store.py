@@ -9,8 +9,15 @@ import pandas as pd
 
 
 class DataStore:
-    def __init__(self, data_dir: Path) -> None:
-        self.data_dir = data_dir
+    def __init__(self, data_dir: Path, underlying: str | None = None) -> None:
+        self.underlying = (underlying or "NIFTY").strip().upper().replace(" ", "")
+        if self.underlying == "NIFTYBANK":
+            self.underlying = "BANKNIFTY"
+        # NIFTY uses root data_dir for backward compatibility; others use subdirs
+        if self.underlying == "NIFTY":
+            self.data_dir = data_dir
+        else:
+            self.data_dir = data_dir / self.underlying.lower()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.snapshots_csv = self.data_dir / "snapshots.csv"
         self.signals_csv = self.data_dir / "signals.csv"
