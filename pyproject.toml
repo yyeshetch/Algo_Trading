@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intraday-direction-engine"
+version = "0.1.0"
+description = "Rule-based production intraday direction engine for Zerodha Kite."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "kiteconnect>=5.0.1",
+  "pandas>=2.2.2",
+  "python-dotenv>=1.0.1",
+  "tenacity>=8.3.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

@@ -1,0 +1,1 @@
+"""Web API: FastAPI dashboard."""

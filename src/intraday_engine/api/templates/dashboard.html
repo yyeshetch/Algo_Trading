@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intraday Direction Engine</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 1.5rem; background: #0f0f12; color: #e4e4e7; }
+    h1 { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 600; }
+    .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+    .btn-refresh { background: #3b82f6; color: white; }
+    .btn-refresh:hover { background: #2563eb; }
+    .btn-execute { background: #22c55e; color: white; }
+    .btn-execute:hover { background: #16a34a; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .lots-row { display: flex; align-items: center; gap: 0.5rem; }
+    .lots-row input { width: 4rem; padding: 0.5rem; border: 1px solid #3f3f46; border-radius: 6px; background: #18181b; color: #e4e4e7; font-size: 1rem; }
+    .status { padding: 0.5rem 0; font-size: 0.875rem; color: #a1a1aa; }
+    .status.err { color: #f87171; }
+    .status.ok { color: #4ade80; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #27272a; }
+    th { background: #18181b; color: #a1a1aa; font-weight: 500; }
+    tr:hover { background: #18181b; }
+    .sig-buy { color: #4ade80; }
+    .sig-sell { color: #f87171; }
+    .sig-no { color: #71717a; }
+    .latest-badge { background: #3b82f6; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; }
+    .card { background: #18181b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .card h2 { margin: 0 0 0.75rem; font-size: 1rem; font-weight: 600; }
+    .tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 1px solid #27272a; }
+    .tab { padding: 0.6rem 1.2rem; background: transparent; border: none; color: #a1a1aa; cursor: pointer; font-size: 0.9rem; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab:hover { color: #e4e4e7; }
+    .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .pnl-positive { color: #4ade80; }
+    .pnl-negative { color: #f87171; }
+    .order-status { font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; }
+    .order-status.COMPLETE { background: #166534; color: #bbf7d0; }
+    .order-status.OPEN { background: #1e3a8a; color: #93c5fd; }
+    .order-status.REJECTED { background: #7f1d1d; color: #fecaca; }
+    .order-status.CANCELLED { background: #44403c; color: #d6d3d1; }
+    .order-status.TRIGGER_PENDING { background: #713f12; color: #fde68a; }
+    .pos-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .pos-actions .btn { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+    .pos-actions input { width: 4rem; padding: 0.25rem; font-size: 0.8rem; background: #27272a; border: 1px solid #3f3f46; border-radius: 4px; color: #e4e4e7; }
+    .btn-exit { background: #dc2626; color: white; }
+    .btn-exit:hover { background: #b91c1c; }
+    .btn-trail { background: #7c3aed; color: white; }
+    .btn-trail:hover { background: #6d28d9; }
+    .btn-trail.on { background: #059669; }
+    .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 900px) { .analysis-grid { grid-template-columns: 1fr; } }
+    .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+    .badge-bull { background: #14532d; color: #86efac; }
+    .badge-bear { background: #7f1d1d; color: #fecaca; }
+    .badge-neutral { background: #44403c; color: #d6d3d1; }
+    .range-bar { height: 8px; background: #27272a; border-radius: 4px; position: relative; margin: 0.5rem 0; }
+    .range-bar .marker { position: absolute; width: 4px; height: 14px; top: -3px; background: #3b82f6; border-radius: 2px; transform: translateX(-50%); }
+    .range-bar .marker.open { background: #a1a1aa; }
+    .range-bar .marker.vwap { background: #f59e0b; }
+    .gauge { height: 6px; background: #27272a; border-radius: 3px; overflow: hidden; }
+    .gauge-fill { height: 100%; border-radius: 3px; transition: width 0.2s; }
+    .gauge-fill.bull { background: linear-gradient(90deg, #14532d, #22c55e); }
+    .gauge-fill.bear { background: linear-gradient(90deg, #22c55e, #7f1d1d); }
+    .analysis-table th { white-space: nowrap; }
+    .analysis-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .analysis-table .ind-yes { color: #4ade80; }
+    .analysis-table .ind-no { color: #71717a; }
+    .opt-row { display: flex; gap: 1rem; align-items: stretch; }
+    .opt-box { flex: 1; padding: 0.75rem; border-radius: 6px; border: 1px solid #27272a; }
+    .opt-box.call { border-left: 3px solid #3b82f6; }
+    .opt-box.put { border-left: 3px solid #f59e0b; }
+    .opt-box .label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; margin-bottom: 0.25rem; }
+    .opt-box .val { font-size: 1.1rem; font-weight: 600; }
+    .summary-table { font-size: 0.8rem; }
+    .summary-table td { padding: 0.4rem 0.6rem; }
+    .analysis-row:hover { background: #27272a !important; }
+    .day-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .day-card { background: #27272a; border-radius: 8px; padding: 0.9rem; text-align: center; }
+    .day-card .label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; }
+    .day-card .val { font-size: 1.2rem; font-weight: 600; }
+    .day-card .val.small { font-size: 1rem; }
+    .day-timeline { display: flex; gap: 2px; flex-wrap: wrap; margin: 1rem 0; }
+    .day-timeline .candle-block { width: 12px; height: 24px; border-radius: 3px; cursor: pointer; transition: transform 0.15s; }
+    .day-timeline .candle-block:hover { transform: scale(1.15); }
+    .day-timeline .candle-block.buy { background: #22c55e; }
+    .day-timeline .candle-block.sell { background: #ef4444; }
+    .day-timeline .candle-block.no { background: #3f3f46; }
+    .day-timeline .candle-block.selected { box-shadow: 0 0 0 2px #3b82f6; }
+    .analysis-row.selected { background: #1e3a8a !important; }
+    .day-range-bar { height: 16px; background: #27272a; border-radius: 8px; position: relative; margin: 0.75rem 0; }
+    .day-range-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #ef4444, #22c55e); border-radius: 8px; opacity: 0.4; }
+    .day-range-bar .marker { position: absolute; width: 6px; height: 22px; top: -3px; background: #e4e4e7; border-radius: 3px; transform: translateX(-50%); box-shadow: 0 0 0 2px #0f0f12; }
+    .day-range-bar .marker.open { background: #a1a1aa; }
+    .signal-counts { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    .signal-counts span { padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; }
+    .signal-counts .buy { background: #14532d; color: #86efac; }
+    .signal-counts .sell { background: #7f1d1d; color: #fecaca; }
+    .signal-counts .no { background: #3f3f46; color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <h1>Intraday Direction Engine</h1>
+  <div class="controls">
+    <button class="btn btn-refresh" id="btnRefresh">Refresh</button>
+    <div class="lots-row">
+      <label for="lots">Lots:</label>
+      <input type="number" id="lots" min="1" max="100" value="2">
+    </div>
+    <button class="btn btn-execute" id="btnExecute">Execute</button>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="signals">Signals</button>
+    <button class="tab" data-tab="trade-summary">Trade Summary</button>
+    <button class="tab" data-tab="analysis">Analysis</button>
+  </div>
+  <div id="panel-signals" class="tab-panel active">
+    <div class="card">
+      <h2>Signals (latest 100)</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Signal</th>
+              <th>Entry</th>
+              <th>Target</th>
+              <th>Stop</th>
+              <th>RR</th>
+              <th>Conf</th>
+              <th>Bias</th>
+              <th>Strike</th>
+              <th>Option</th>
+              <th>Opt Entry</th>
+              <th>Opt SL</th>
+              <th>Opt Target</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div id="panel-trade-summary" class="tab-panel">
+    <div class="card" style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <h2 style="margin: 0 0 0.5rem;">Day Points</h2>
+        <p id="dayPnl" style="font-size: 1.5rem; margin: 0.5rem 0;">—</p>
+        <p id="slStatus" style="font-size: 0.875rem; color: #a1a1aa; margin: 0;">Daily SL: ₹4,000</p>
+      </div>
+      <button class="btn btn-refresh" id="btnRefreshSummary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Refresh</button>
+    </div>
+    <div class="card">
+      <h2>Today's Orders</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Status</th>
+              <th>Order ID</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Positions</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Qty</th>
+              <th>Avg</th>
+              <th>LTP</th>
+              <th>Points</th>
+              <th>SL</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="positionsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div id="panel-analysis" class="tab-panel">
+    <div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h2 style="margin: 0;">Day at a Glance</h2>
+      <button class="btn btn-refresh" id="btnRefreshAnalysis" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Refresh</button>
+    </div>
+    <div id="dayOverview" class="card" style="margin-bottom: 1rem;"></div>
+    <div class="card" style="margin-bottom: 1rem;">
+      <h3 style="margin: 0 0 0.5rem; font-size: 0.95rem;">Signal timeline — click a block to drill down</h3>
+      <div id="dayTimeline" class="day-timeline"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin: 0 0 0.75rem; font-size: 0.95rem;">Candle-by-candle (click row for detail)</h3>
+      <div style="overflow-x: auto;">
+        <table class="summary-table" id="analysisOverviewTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Signal</th>
+              <th>Spot</th>
+              <th>S</th>
+              <th>R</th>
+              <th>Range</th>
+              <th>Fut%</th>
+              <th>Call%</th>
+              <th>Put%</th>
+              <th>P/C</th>
+              <th>Score</th>
+              <th>Bias</th>
+              <th>Mom</th>
+            </tr>
+          </thead>
+          <tbody id="analysisOverviewBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="analysisContent" class="card" style="margin-top: 1rem;"></div>
+  </div>
+  <script>
+    const status = document.getElementById('status');
+    const tbody = document.getElementById('tbody');
+    const btnRefresh = document.getElementById('btnRefresh');
+    const btnExecute = document.getElementById('btnExecute');
+    const lotsInput = document.getElementById('lots');
+
+    function setStatus(msg, ok) {
+      status.textContent = msg;
+      status.className = 'status ' + (ok === true ? 'ok' : ok === false ? 'err' : '');
+    }
+
+    function sigClass(s) {
+      if (s === 'BUY') return 'sig-buy';
+      if (s === 'SELL') return 'sig-sell';
+      return 'sig-no';
+    }
+
+    function fmt(v) {
+      if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
+      return String(v);
+    }
+
+    async function loadSignals() {
+      try {
+        const r = await fetch('/api/signals');
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || 'Failed to load');
+        const signals = data.signals || [];
+        tbody.innerHTML = signals.map((s, i) => `
+          <tr>
+            <td>${fmt(s.timestamp)}</td>
+            <td class="${sigClass(s.signal)}">${fmt(s.signal)}</td>
+            <td>${fmt(s.entry)}</td>
+            <td>${fmt(s.target)}</td>
+            <td>${fmt(s.stop_loss)}</td>
+            <td>${fmt(s.rr)}</td>
+            <td>${fmt(s.confidence)}</td>
+            <td>${fmt(s.bias)}</td>
+            <td>${fmt(s.strike_price)}</td>
+            <td>${fmt(s.option_type)}</td>
+            <td>${fmt(s.option_entry)}</td>
+            <td>${fmt(s.option_sl)}</td>
+            <td>${fmt(s.option_target)}</td>
+          </tr>
+        `).join('');
+        setStatus('Loaded ' + signals.length + ' signals.', null);
+      } catch (e) {
+        setStatus('Error: ' + e.message, false);
+      }
+    }
+
+    btnRefresh.addEventListener('click', async () => {
+      btnRefresh.disabled = true;
+      setStatus('Refreshing...', null);
+      try {
+        const r = await fetch('/api/refresh', { method: 'POST' });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || 'Refresh failed');
+        setStatus('Refresh complete.', true);
+        await loadSignals();
+      } catch (e) {
+        setStatus('Error: ' + e.message, false);
+      } finally {
+        btnRefresh.disabled = false;
+      }
+    });
+
+    btnExecute.addEventListener('click', async () => {
+      const lots = parseInt(lotsInput.value, 10) || 2;
+      btnExecute.disabled = true;
+      setStatus('Placing order...', null);
+      try {
+        const r = await fetch('/api/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lots }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || 'Execute failed');
+        setStatus('Order placed: ' + data.order_id, true);
+      } catch (e) {
+        setStatus('Error: ' + e.message, false);
+      } finally {
+        btnExecute.disabled = false;
+      }
+    });
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        const id = 'panel-' + t.dataset.tab;
+        document.getElementById(id).classList.add('active');
+        if (t.dataset.tab === 'trade-summary') loadTradeSummary();
+        if (t.dataset.tab === 'analysis') loadAnalysis();
+      });
+    });
+    document.getElementById('btnRefreshSummary').addEventListener('click', loadTradeSummary);
+    document.getElementById('btnRefreshAnalysis').addEventListener('click', () => { loadAnalysis(); });
+
+    async function loadTradeSummary() {
+      try {
+        const r = await fetch('/api/trade-summary');
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'Failed to load');
+        const pnlEl = document.getElementById('dayPnl');
+        const slEl = document.getElementById('slStatus');
+        pnlEl.textContent = d.day_pnl_msg || '—';
+        pnlEl.className = '';
+        if (d.day_pnl != null) {
+          pnlEl.classList.add(d.day_pnl >= 0 ? 'pnl-positive' : 'pnl-negative');
+        }
+        slEl.textContent = `Daily SL: ₹${(d.daily_sl || 4000).toLocaleString()}${d.sl_reached ? ' (REACHED — no further trades)' : ''}`;
+        const orders = d.orders || [];
+        document.getElementById('ordersBody').innerHTML = orders.map(o => {
+          const t = o.order_timestamp || o.exchange_timestamp || o.created_at || '—';
+          const ts = typeof t === 'string' ? t.replace('T', ' ').slice(0, 19) : (t && t.toISOString ? t.toISOString().slice(0, 19).replace('T', ' ') : '—');
+          const status = (o.status || '').toUpperCase().replace(/\s+/g, '_');
+          return `<tr>
+            <td>${ts}</td>
+            <td>${fmt(o.tradingsymbol)}</td>
+            <td class="${o.transaction_type === 'BUY' ? 'sig-buy' : 'sig-sell'}">${fmt(o.transaction_type)}</td>
+            <td>${fmt(o.quantity)}</td>
+            <td><span class="order-status ${status}">${status}</span></td>
+            <td>${fmt(o.order_id)}</td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="6">No orders today</td></tr>';
+        const positions = d.positions || [];
+        document.getElementById('positionsBody').innerHTML = positions.map(p => {
+          const pts = p.points != null ? parseFloat(p.points) : null;
+          const cls = pts != null && pts >= 0 ? 'pnl-positive' : pts != null ? 'pnl-negative' : '';
+          const qty = p.quantity != null ? parseInt(p.quantity, 10) : 0;
+          const sym = fmt(p.tradingsymbol);
+          const slVal = p.sl_trigger != null ? parseFloat(p.sl_trigger) : null;
+          const hasSl = p.sl_order_id != null;
+          const autoTrail = p.auto_trail === true;
+          const trailCls = autoTrail ? 'btn-trail on' : 'btn-trail';
+          return `<tr data-sym="${sym}" data-qty="${qty}">
+            <td>${sym}</td>
+            <td>${fmt(p.quantity)}</td>
+            <td>${fmt(p.average_price)}</td>
+            <td>${fmt(p.last_price)}</td>
+            <td class="${cls}">${pts != null ? (pts >= 0 ? '+' : '') + pts.toFixed(1) + ' pts' : '—'}</td>
+            <td class="sl-cell">
+              ${hasSl ? `<input type="number" step="0.01" value="${slVal != null ? slVal : ''}" placeholder="SL" class="sl-input">
+                <button class="btn btn-refresh save-sl" style="padding:0.25rem 0.5rem;font-size:0.7rem;">Save</button>` : '—'}
+            </td>
+            <td>
+              <div class="pos-actions">
+                <button class="btn btn-exit exit-btn" data-sym="${sym}" data-qty="${qty}">Exit</button>
+                ${hasSl ? `<button class="btn ${trailCls} trail-btn" data-sym="${sym}" data-qty="${qty}" data-on="${autoTrail}">${autoTrail ? 'Trail ON' : 'Auto Trail'}</button>` : ''}
+              </div>
+            </td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="7">No open positions</td></tr>';
+        bindPositionActions();
+      } catch (e) {
+        document.getElementById('dayPnl').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    function badgeClass(v) {
+      if (v === 'BULLISH_DAY' || v === 'UP' || v === 'above' || v === 'premium' || v === 'call_heavy') return 'badge-bull';
+      if (v === 'BEARISH_DAY' || v === 'DOWN' || v === 'below' || v === 'discount' || v === 'put_heavy') return 'badge-bear';
+      return 'badge-neutral';
+    }
+
+    function rangeBarPct(support, resistance, spot) {
+      if (!support || !resistance || support >= resistance) return 50;
+      return Math.max(0, Math.min(100, ((spot - support) / (resistance - support)) * 100));
+    }
+
+    function renderDayOverview(summaries) {
+      const el = document.getElementById('dayOverview');
+      if (!summaries || summaries.length === 0) {
+        el.innerHTML = '<p style="color:#71717a;">No data. Run Refresh first.</p>';
+        return;
+      }
+      const first = summaries[0];
+      const last = summaries[summaries.length - 1];
+      const paFirst = first.price_action || {};
+      const paLast = last.price_action || {};
+      const sessionHigh = paLast.session_high ?? paLast.high ?? paLast.spot;
+      const sessionLow = paLast.session_low ?? paLast.low ?? paLast.spot;
+      const open = paFirst.open ?? paFirst.spot;
+      const spot = paLast.spot;
+      const rangePct = (sessionHigh && sessionLow && sessionHigh > sessionLow)
+        ? Math.max(0, Math.min(100, ((spot - sessionLow) / (sessionHigh - sessionLow)) * 100))
+        : 50;
+      const buyCount = summaries.filter(s => s.signal === 'BUY').length;
+      const sellCount = summaries.filter(s => s.signal === 'SELL').length;
+      const noCount = summaries.filter(s => s.signal === 'NO_TRADE' || !s.signal || s.signal === '—').length;
+      const biasCounts = {};
+      summaries.forEach(s => {
+        const b = s.bias || 'NEUTRAL';
+        biasCounts[b] = (biasCounts[b] || 0) + 1;
+      });
+      const dominantBias = Object.entries(biasCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+      const latestActionable = summaries.filter(s => s.signal === 'BUY' || s.signal === 'SELL').pop();
+      const latestTime = latestActionable ? (latestActionable.timestamp || '').replace('T', ' ').slice(11, 16) : '—';
+      const spotVsOpen = open ? (spot > open ? 'above' : spot < open ? 'below' : 'flat') : '—';
+      const spotVsOpenCls = spotVsOpen === 'above' ? 'badge-bull' : spotVsOpen === 'below' ? 'badge-bear' : 'badge-neutral';
+      el.innerHTML = `
+        <div class="day-overview">
+          <div class="day-card">
+            <div class="label">Session Range</div>
+            <div class="val small">${fmt(sessionLow)} – ${fmt(sessionHigh)}</div>
+          </div>
+          <div class="day-card">
+            <div class="label">Open</div>
+            <div class="val">${fmt(open)}</div>
+          </div>
+          <div class="day-card">
+            <div class="label">Last Spot</div>
+            <div class="val">${fmt(spot)}</div>
+          </div>
+          <div class="day-card">
+            <div class="label">Spot vs Open</div>
+            <div class="val"><span class="badge ${spotVsOpenCls}">${spotVsOpen}</span></div>
+          </div>
+          <div class="day-card">
+            <div class="label">Signals</div>
+            <div class="signal-counts">
+              <span class="buy">BUY ${buyCount}</span>
+              <span class="sell">SELL ${sellCount}</span>
+              <span class="no">NO ${noCount}</span>
+            </div>
+          </div>
+          <div class="day-card">
+            <div class="label">Dominant Bias</div>
+            <div class="val"><span class="badge ${badgeClass(dominantBias)}">${fmt(dominantBias)?.replace('_DAY','') || '—'}</span></div>
+          </div>
+          <div class="day-card">
+            <div class="label">Latest Actionable</div>
+            <div class="val small ${latestActionable?.signal === 'BUY' ? 'sig-buy' : latestActionable?.signal === 'SELL' ? 'sig-sell' : ''}">${fmt(latestActionable?.signal)} ${latestTime !== '—' ? '@ ' + latestTime : ''}</div>
+          </div>
+        </div>
+        <p style="margin: 0.5rem 0 0; font-size: 0.75rem; color: #71717a;">Spot in session range (low → high)</p>
+        <div class="day-range-bar" style="height: 18px;" title="Spot at ${rangePct.toFixed(0)}% of range">
+          <div class="fill" style="width: 100%;"></div>
+          <div class="marker" style="left: ${rangePct}%;" title="Spot: ${fmt(spot)}"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #71717a; margin-top: 0.25rem;"><span>${fmt(sessionLow)}</span><span>${fmt(sessionHigh)}</span></div>
+      `;
+    }
+
+    function renderDayTimeline(summaries, onSelect) {
+      const el = document.getElementById('dayTimeline');
+      if (!summaries || summaries.length === 0) {
+        el.innerHTML = '';
+        return;
+      }
+      el.innerHTML = summaries.map((s, i) => {
+        const sig = (s.signal || 'NO_TRADE').toUpperCase();
+        const cls = sig === 'BUY' ? 'buy' : sig === 'SELL' ? 'sell' : 'no';
+        const time = (s.timestamp || '').replace('T', ' ').slice(11, 16);
+        return `<div class="candle-block ${cls}" data-ts="${s.timestamp || ''}" data-i="${i}" title="${time} ${sig}"></div>`;
+      }).join('');
+      el.querySelectorAll('.candle-block').forEach(block => {
+        block.onclick = () => {
+          const ts = block.dataset.ts;
+          if (ts && onSelect) onSelect(ts);
+        };
+      });
+    }
+
+    async function loadAnalysis() {
+      try {
+        const r = await fetch('/api/analysis-summary');
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'Failed to load');
+        const summaries = d.summaries || [];
+        renderDayOverview(summaries);
+        renderDayTimeline(summaries, (ts) => {
+          fetch('/api/analysis-summary?timestamp=' + encodeURIComponent(ts)).then(r => r.json()).then(data => renderAnalysis(data.selected));
+        });
+        const tbody = document.getElementById('analysisOverviewBody');
+        tbody.innerHTML = [...summaries].reverse().map(s => {
+          const pa = s.price_action || {};
+          const fut = s.futures || {};
+          const opt = s.options || {};
+          const pct = rangeBarPct(pa.support, pa.resistance, pa.spot);
+          const biasCls = badgeClass(s.bias);
+          const momCls = badgeClass(pa.momentum);
+          const callChg = opt.call_change_pct != null ? opt.call_change_pct : 0;
+          const putChg = opt.put_change_pct != null ? opt.put_change_pct : 0;
+          const score = s.scores?.final_score != null ? s.scores.final_score : null;
+          return `<tr class="analysis-row" data-ts="${s.timestamp || ''}" style="cursor:pointer">
+            <td>${fmt(s.timestamp)?.replace('T', ' ').slice(11, 16) || '—'}</td>
+            <td class="${sigClass(s.signal)}">${fmt(s.signal)?.replace('_','') || '—'}</td>
+            <td class="num">${fmt(pa.spot)}</td>
+            <td class="num">${fmt(pa.support)}</td>
+            <td class="num">${fmt(pa.resistance)}</td>
+            <td style="min-width:90px"><div class="range-bar" style="height:10px" title="Spot: ${pct.toFixed(0)}% of range"><div class="marker" style="left:${pct}%"></div></div></td>
+            <td class="num ${fut.vs_spot_pct > 0 ? 'pnl-positive' : fut.vs_spot_pct < 0 ? 'pnl-negative' : ''}">${fmt(fut.vs_spot_pct)}%</td>
+            <td class="num ${callChg > 0 ? 'pnl-positive' : callChg < 0 ? 'pnl-negative' : ''}">${fmt(opt.call_change_pct)}%</td>
+            <td class="num ${putChg > 0 ? 'pnl-positive' : putChg < 0 ? 'pnl-negative' : ''}">${fmt(opt.put_change_pct)}%</td>
+            <td class="num">${fmt(opt.put_call_ratio)}</td>
+            <td class="num ${score != null && score > 0 ? 'pnl-positive' : score != null && score < 0 ? 'pnl-negative' : ''}">${score != null ? score.toFixed(2) : '—'}</td>
+            <td><span class="badge ${biasCls}">${fmt(s.bias)?.replace('_DAY','') || '—'}</span></td>
+            <td><span class="badge ${momCls}">${fmt(pa.momentum) || '—'}</span></td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="13">No data. Run Refresh first.</td></tr>';
+        document.querySelectorAll('.analysis-row').forEach(row => {
+          row.onclick = () => {
+            const ts = row.dataset.ts;
+            if (ts) fetch('/api/analysis-summary?timestamp=' + encodeURIComponent(ts)).then(r => r.json()).then(data => renderAnalysis(data.selected));
+          };
+        });
+        renderAnalysis(d.selected);
+      } catch (e) {
+        document.getElementById('analysisContent').innerHTML = '<p class="status err">Error: ' + e.message + '</p>';
+      }
+    }
+
+    function setSelectedTimestamp(ts) {
+      document.querySelectorAll('.day-timeline .candle-block').forEach(b => b.classList.toggle('selected', b.dataset.ts === ts));
+      document.querySelectorAll('.analysis-row').forEach(r => r.classList.toggle('selected', r.dataset.ts === ts));
+    }
+
+    function renderAnalysis(s) {
+      const el = document.getElementById('analysisContent');
+      if (!s) { el.innerHTML = '<p>No analysis data. Run Refresh first.</p>'; setSelectedTimestamp(null); return; }
+      setSelectedTimestamp(s.timestamp || null);
+      const pa = s.price_action || {};
+      const fut = s.futures || {};
+      const opt = s.options || {};
+      const sc = s.scores || {};
+      const tp = s.trade_plan || {};
+      const rangePct = rangeBarPct(pa.support, pa.resistance, pa.spot);
+      const futPct = Math.min(100, Math.max(0, 50 + (fut.vs_spot_pct || 0) * 10));
+      const biasCls = badgeClass(s.bias);
+      const momCls = badgeClass(pa.momentum);
+      el.innerHTML = `
+        <h2 style="margin: 0 0 1rem;">Detail: ${fmt(s.timestamp)} <span class="badge ${sigClass(s.signal)}" style="margin-left:0.5rem">${fmt(s.signal)}</span></h2>
+        <div class="analysis-grid">
+          <div>
+            <h3 style="margin: 0 0 0.5rem;">Price Action</h3>
+            <table class="analysis-table summary-table">
+              <tr><th>Spot</th><td class="num">${fmt(pa.spot)}</td><th>Open</th><td class="num">${fmt(pa.open)}</td></tr>
+              <tr><th>High</th><td class="num">${fmt(pa.high)}</td><th>Low</th><td class="num">${fmt(pa.low)}</td></tr>
+              <tr><th>Support</th><td class="num">${fmt(pa.support)}</td><th>Resistance</th><td class="num">${fmt(pa.resistance)}</td></tr>
+              <tr><th>vs Open</th><td><span class="badge ${badgeClass(pa.spot_vs_open)}">${fmt(pa.spot_vs_open)}</span></td><th>vs VWAP</th><td><span class="badge ${badgeClass(pa.spot_vs_vwap)}">${fmt(pa.spot_vs_vwap)}</span></td></tr>
+              <tr><th>Breakout</th><td class="${pa.breakout ? 'ind-yes' : 'ind-no'}">${pa.breakout ? '✓' : '—'}</td><th>Breakdown</th><td class="${pa.breakdown ? 'ind-yes' : 'ind-no'}">${pa.breakdown ? '✓' : '—'}</td></tr>
+              <tr><th>Follow-through</th><td class="${pa.follow_through ? 'ind-yes' : 'ind-no'}">${pa.follow_through ? '✓' : '—'}</td><th>Spot chg</th><td class="num ${(pa.spot_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(pa.spot_change_pct)}%</td></tr>
+              <tr><th>Candle range</th><td class="num">${fmt(pa.candle_range)}</td><th>Body %</th><td class="num">${fmt(pa.candle_body_pct)}%</td></tr>
+              <tr><th>Session high</th><td class="num">${fmt(pa.session_high)}</td><th>Session low</th><td class="num">${fmt(pa.session_low)}</td></tr>
+              <tr><th>Dist from high</th><td class="num">${fmt(pa.dist_from_session_high_pct)}%</td><th>Dist from low</th><td class="num">${fmt(pa.dist_from_session_low_pct)}%</td></tr>
+              <tr><th>Range size</th><td class="num">${fmt(pa.range_size)}</td><th>Range %</th><td class="num">${fmt(pa.range_pct)}%</td></tr>
+            </table>
+            <p style="margin: 0.5rem 0 0; font-size: 0.75rem; color: #71717a;">Spot in range (S → R)</p>
+            <div class="range-bar" style="height: 12px;"><div class="marker" style="left: ${rangePct}%;" title="Spot"></div></div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #71717a;"><span>${fmt(pa.support)}</span><span>${fmt(pa.resistance)}</span></div>
+          </div>
+          <div>
+            <h3 style="margin: 0 0 0.5rem;">Futures</h3>
+            <table class="analysis-table summary-table">
+              <tr><th>LTP</th><td class="num">${fmt(fut.ltp)}</td><th>Open</th><td class="num">${fmt(fut.open)}</td></tr>
+              <tr><th>vs Spot</th><td class="num ${(fut.vs_spot_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(fut.vs_spot_pct)}%</td><th>vs Open</th><td class="num">${fmt(fut.vs_open_pct)}%</td></tr>
+              <tr><th>vs VWAP</th><td class="num">${fmt(fut.vs_vwap_pct)}%</td><th>Chg %</th><td class="num">${fmt(fut.change_pct)}%</td></tr>
+              <tr><th>Premium/Discount</th><td><span class="badge ${badgeClass(fut.premium)}">${fmt(fut.premium)}</span></td><th>vs Fut VWAP</th><td><span class="badge ${badgeClass(fut.fut_vs_fut_vwap)}">${fmt(fut.fut_vs_fut_vwap)}</span></td></tr>
+            </table>
+            <p style="margin: 0.5rem 0 0; font-size: 0.75rem; color: #71717a;">Strength</p>
+            <div class="gauge" style="margin-top: 0.25rem;"><div class="gauge-fill ${fut.vs_spot_pct >= 0 ? 'bull' : 'bear'}" style="width: ${futPct}%;"></div></div>
+          </div>
+        </div>
+        <h3 style="margin: 1rem 0 0.5rem;">Options</h3>
+        <div class="opt-row" style="margin-top: 0.5rem;">
+          <div class="opt-box call">
+            <div class="label">Call (CE)</div>
+            <div class="val">${fmt(opt.call_ltp)}</div>
+            <div class="num ${(opt.call_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}" style="font-size: 0.9rem;">${fmt(opt.call_change_pct)}%</div>
+            <div class="badge ${opt.call_expanding ? 'badge-bull' : (opt.call_decaying ? 'badge-bear' : 'badge-neutral')}" style="margin-top: 0.25rem;">${opt.call_expanding ? '↑ Expanding' : (opt.call_decaying ? '↓ Decaying' : '—')}</div>
+          </div>
+          <div class="opt-box put">
+            <div class="label">Put (PE)</div>
+            <div class="val">${fmt(opt.put_ltp)}</div>
+            <div class="num ${(opt.put_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}" style="font-size: 0.9rem;">${fmt(opt.put_change_pct)}%</div>
+            <div class="badge ${opt.put_expanding ? 'badge-bear' : (opt.put_decaying ? 'badge-bull' : 'badge-neutral')}" style="margin-top: 0.25rem;">${opt.put_expanding ? '↑ Expanding' : (opt.put_decaying ? '↓ Decaying' : '—')}</div>
+          </div>
+        </div>
+        <p style="margin: 0.5rem 0 0; font-size: 0.8rem;">ATM Strike: <strong>${fmt(opt.atm_strike)}</strong> | P/C Ratio: <strong>${fmt(opt.put_call_ratio)}</strong> | Skew: <span class="badge ${badgeClass(opt.skew)}">${fmt(opt.skew)}</span></p>
+        <h3 style="margin: 1rem 0 0.5rem;">Scores</h3>
+        <table class="analysis-table summary-table" style="max-width: 400px;">
+          <tr><th>Bullish</th><td class="num pnl-positive">${fmt(sc.bullish)}</td><th>Bearish</th><td class="num pnl-negative">${fmt(sc.bearish)}</td></tr>
+          <tr><th>No-trade penalty</th><td class="num">${fmt(sc.no_trade_penalty)}</td><th>Final</th><td class="num ${(sc.final_score || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(sc.final_score)}</td></tr>
+          <tr><th>Confidence</th><td class="num">${fmt(sc.confidence)}</td></tr>
+        </table>
+        <h3 style="margin: 1rem 0 0.5rem;">Trade Plan</h3>
+        <table class="analysis-table summary-table" style="max-width: 400px;">
+          <tr><th>Entry</th><td class="num">${fmt(tp.entry)}</td><th>Target</th><td class="num">${fmt(tp.target)}</td></tr>
+          <tr><th>Stop</th><td class="num">${fmt(tp.stop_loss)}</td><th>R:R</th><td class="num">${fmt(tp.rr)}</td></tr>
+        </table>
+        <h3 style="margin: 1rem 0 0.5rem;">Momentum</h3>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <span class="badge ${momCls}">4-bar: ${fmt(pa.momentum)}</span>
+          <span class="badge ${badgeClass(pa.momentum_3)}">3-bar: ${fmt(pa.momentum_3)}</span>
+          <span class="badge ${badgeClass(pa.momentum_5)}">5-bar: ${fmt(pa.momentum_5)}</span>
+        </div>
+        <h3 style="margin: 1rem 0 0.5rem;">Bias</h3>
+        <span class="badge ${biasCls}">${fmt(s.bias) || '—'}</span>
+        ${s.reasons ? '<h3 style="margin: 1rem 0 0.5rem;">Reasons</h3><p style="font-size: 0.85rem; color: #a1a1aa; line-height: 1.5;">' + fmt(s.reasons) + '</p>' : ''}
+        ${s.notes ? '<h3 style="margin: 1rem 0 0.5rem;">Notes</h3><p style="font-size: 0.85rem; color: #a1a1aa;">' + fmt(s.notes) + '</p>' : ''}
+      `;
+    }
+
+    function bindPositionActions() {
+      document.querySelectorAll('.exit-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const sym = btn.dataset.sym, qty = parseInt(btn.dataset.qty, 10);
+          if (!confirm(`Exit ${sym} qty ${Math.abs(qty)} at market?`)) return;
+          btn.disabled = true;
+          try {
+            const r = await fetch('/api/position/exit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tradingsymbol: sym, quantity: qty }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.detail || 'Exit failed');
+            setStatus('Exit order placed.', true);
+            loadTradeSummary();
+          } catch (e) {
+            setStatus('Error: ' + e.message, false);
+          } finally {
+            btn.disabled = false;
+          }
+        };
+      });
+      document.querySelectorAll('.save-sl').forEach(btn => {
+        btn.onclick = async () => {
+          const row = btn.closest('tr');
+          const sym = row.dataset.sym, qty = parseInt(row.dataset.qty, 10);
+          const input = row.querySelector('.sl-input');
+          const val = input ? parseFloat(input.value) : NaN;
+          if (isNaN(val)) { setStatus('Enter valid SL.', false); return; }
+          btn.disabled = true;
+          try {
+            const r = await fetch('/api/position/sl', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tradingsymbol: sym, quantity: qty, sl_trigger: val }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.detail || 'Update failed');
+            setStatus('SL updated to ' + val, true);
+            loadTradeSummary();
+          } catch (e) {
+            setStatus('Error: ' + e.message, false);
+          } finally {
+            btn.disabled = false;
+          }
+        };
+      });
+      document.querySelectorAll('.trail-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const sym = btn.dataset.sym, qty = parseInt(btn.dataset.qty, 10);
+          const enabled = btn.dataset.on !== 'true';
+          btn.disabled = true;
+          try {
+            const r = await fetch('/api/position/auto-trail', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tradingsymbol: sym, quantity: qty, enabled }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.detail || 'Toggle failed');
+            btn.dataset.on = enabled;
+            btn.textContent = enabled ? 'Trail ON' : 'Auto Trail';
+            btn.className = 'btn ' + (enabled ? 'btn-trail on' : 'btn-trail');
+            setStatus(enabled ? 'Auto-trail enabled.' : 'Auto-trail disabled.', true);
+          } catch (e) {
+            setStatus('Error: ' + e.message, false);
+          } finally {
+            btn.disabled = false;
+          }
+        };
+      });
+    }
+
+    loadSignals();
+  </script>
+</body>
+</html>
