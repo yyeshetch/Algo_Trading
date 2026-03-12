@@ -97,6 +97,16 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         range_pct = _pct_change(range_size, spot_ltp) if spot_ltp else 0
         put_call_ratio = round(put_ltp / call_ltp, 2) if call_ltp else 0
         spot_in_range = ((spot_ltp - support) / (resistance - support) * 100) if (resistance and support and resistance > support) else 50
+        first_row = snapshots_df.iloc[0]
+        fut_oi = float(row.get("future_oi", 0) or 0)
+        call_oi = float(row.get("call_oi", 0) or 0)
+        put_oi = float(row.get("put_oi", 0) or 0)
+        fut_oi_first = float(first_row.get("future_oi", 0) or 0)
+        call_oi_first = float(first_row.get("call_oi", 0) or 0)
+        put_oi_first = float(first_row.get("put_oi", 0) or 0)
+        fut_oi_chg = _pct_change(fut_oi, fut_oi_first) if fut_oi_first else 0
+        call_oi_chg = _pct_change(call_oi, call_oi_first) if call_oi_first else 0
+        put_oi_chg = _pct_change(put_oi, put_oi_first) if put_oi_first else 0
         summaries.append({
             "timestamp": ts,
             "signal": _str_safe(sig.get("signal"), "—"),
@@ -153,6 +163,14 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
                 "call_decaying": call_change < 0,
                 "put_call_ratio": put_call_ratio,
                 "skew": "put_heavy" if put_call_ratio > 1.1 else ("call_heavy" if put_call_ratio < 0.9 else "balanced"),
+            },
+            "oi": {
+                "future_oi": int(fut_oi),
+                "call_oi": int(call_oi),
+                "put_oi": int(put_oi),
+                "fut_oi_change_pct": fut_oi_chg,
+                "call_oi_change_pct": call_oi_chg,
+                "put_oi_change_pct": put_oi_chg,
             },
             "scores": {
                 "bullish": float(sig.get("bullish_score", 0) or 0),

@@ -324,18 +324,16 @@ async def get_underlyings_list():
 
 
 @app.get("/api/signals")
-async def get_signals(underlying: str | None = None):
+async def get_signals(underlying: str | None = None, trade_date: str | None = None):
     store = _get_store(underlying)
     df = store.load_signals()
     if df.empty:
         return {"signals": [], "latest_actionable": None}
-    # Filter to current day only
-    today_str = date.today().isoformat()
+    date_str = trade_date or date.today().isoformat()
     if "timestamp" in df.columns:
-        df = df[df["timestamp"].astype(str).str.startswith(today_str)]
+        df = df[df["timestamp"].astype(str).str.startswith(date_str)]
     if df.empty:
         return {"signals": [], "latest_actionable": None}
-    # Only BUY and SELL signals, newest first
     df = df[df["signal"].isin(["BUY", "SELL"])]
     if df.empty:
         return {"signals": [], "latest_actionable": None}
@@ -344,24 +342,30 @@ async def get_signals(underlying: str | None = None):
     for s in signals:
         for k, v in s.items():
             s[k] = _json_safe(v)
-    latest = store.get_latest_actionable_signal(trade_date=date.today())
+    try:
+        sel_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        sel_date = date.today()
+    latest = store.get_latest_actionable_signal(trade_date=sel_date)
     return {"signals": signals, "latest_actionable": _sanitize_for_json(latest)}
 
 
 @app.get("/api/analysis-summary")
-async def get_analysis_summary(timestamp: str | None = None, underlying: str | None = None):
-    """Return price action, futures, and option summary per timestamp. Optional ?timestamp= for specific candle."""
+async def get_analysis_summary(timestamp: str | None = None, underlying: str | None = None, trade_date: str | None = None):
+    """Return price action, futures, and option summary per timestamp. Optional ?timestamp= for specific candle, ?trade_date= for date."""
     store = _get_store(underlying)
     settings = _get_settings(underlying)
     snap_df = store.load_snapshots()
     sig_df = store.load_signals()
     if snap_df.empty:
         return {"summaries": [], "selected": None}
-    today_str = date.today().isoformat()
+    date_str = trade_date or date.today().isoformat()
     if "timestamp" in snap_df.columns:
-        snap_df = snap_df[snap_df["timestamp"].astype(str).str.startswith(today_str)]
+        snap_df = snap_df[snap_df["timestamp"].astype(str).str.startswith(date_str)]
     if snap_df.empty:
         return {"summaries": [], "selected": None}
+    if not sig_df.empty and "timestamp" in sig_df.columns:
+        sig_df = sig_df[sig_df["timestamp"].astype(str).str.startswith(date_str)]
     summaries = build_analysis_summaries(snap_df, sig_df, lookback=settings.lookback_bars)
     summaries = [s for s in summaries if s]
     for s in summaries:

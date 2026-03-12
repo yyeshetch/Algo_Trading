@@ -17,6 +17,7 @@
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .lots-row { display: flex; align-items: center; gap: 0.5rem; }
     .lots-row input { width: 4rem; padding: 0.5rem; border: 1px solid #3f3f46; border-radius: 6px; background: #18181b; color: #e4e4e7; font-size: 1rem; }
+    .date-picker { padding: 0.5rem; border: 1px solid #3f3f46; border-radius: 6px; background: #18181b; color: #e4e4e7; font-size: 0.9rem; }
     .status { padding: 0.5rem 0; font-size: 0.875rem; color: #a1a1aa; }
     .status.err { color: #f87171; }
     .status.ok { color: #4ade80; }
@@ -109,6 +110,10 @@
     <a href="/stocks" style="color:#60a5fa;text-decoration:none;font-size:0.9rem;font-weight:500;">F&O Stock Scanner →</a>
   </div>
   <div class="controls">
+    <div class="lots-row">
+      <label for="tradeDate">Date:</label>
+      <input type="date" id="tradeDate" class="date-picker" title="Select date to view signals">
+    </div>
     <div class="lots-row">
       <label for="underlying">Underlying:</label>
       <select id="underlying">
@@ -247,20 +252,37 @@
     const btnExecute = document.getElementById('btnExecute');
     const lotsInput = document.getElementById('lots');
     const underlyingSelect = document.getElementById('underlying');
+    const tradeDateInput = document.getElementById('tradeDate');
 
     function getUnderlying() {
       return underlyingSelect ? underlyingSelect.value || 'NIFTY' : 'NIFTY';
     }
 
+    function getTradeDate() {
+      return tradeDateInput ? tradeDateInput.value || new Date().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    }
+
     function apiUrl(path, params = {}) {
       const u = getUnderlying();
-      const q = new URLSearchParams({ ...params, underlying: u });
+      const d = getTradeDate();
+      const q = new URLSearchParams({ ...params, underlying: u, trade_date: d });
       return path + (path.includes('?') ? '&' : '?') + q.toString();
     }
 
     function setStatus(msg, ok) {
       status.textContent = msg;
       status.className = 'status ' + (ok === true ? 'ok' : ok === false ? 'err' : '');
+    }
+
+    function initDatePicker() {
+      if (tradeDateInput && !tradeDateInput.value) {
+        tradeDateInput.value = new Date().toISOString().slice(0, 10);
+        tradeDateInput.max = new Date().toISOString().slice(0, 10);
+      }
+      tradeDateInput.addEventListener('change', () => {
+        loadSignals();
+        loadAnalysis();
+      });
     }
 
     async function loadUnderlyings() {
@@ -315,7 +337,8 @@
             <td>${fmt(s.option_target)}</td>
           </tr>
         `).join('');
-        setStatus('Loaded ' + signals.length + ' signals.', null);
+        const d = getTradeDate();
+        setStatus('Loaded ' + signals.length + ' signals' + (d !== new Date().toISOString().slice(0, 10) ? ' for ' + d : '') + '.', null);
       } catch (e) {
         setStatus('Error: ' + e.message, false);
       }
@@ -666,6 +689,14 @@
           </div>
         </div>
         <p style="margin: 0.5rem 0 0; font-size: 0.8rem;">ATM Strike: <strong>${fmt(opt.atm_strike)}</strong> | P/C Ratio: <strong>${fmt(opt.put_call_ratio)}</strong> | Skew: <span class="badge ${badgeClass(opt.skew)}">${fmt(opt.skew)}</span></p>
+        ${(s.oi && (s.oi.future_oi || s.oi.call_oi || s.oi.put_oi)) ? `
+        <h3 style="margin: 1rem 0 0.5rem;">Open Interest</h3>
+        <table class="analysis-table summary-table" style="max-width: 400px;">
+          <tr><th>Fut OI</th><td class="num">${fmt(s.oi.future_oi)}</td><th>Fut OI chg</th><td class="num ${(s.oi.fut_oi_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(s.oi.fut_oi_change_pct)}%</td></tr>
+          <tr><th>CE OI</th><td class="num">${fmt(s.oi.call_oi)}</td><th>CE OI chg</th><td class="num ${(s.oi.call_oi_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(s.oi.call_oi_change_pct)}%</td></tr>
+          <tr><th>PE OI</th><td class="num">${fmt(s.oi.put_oi)}</td><th>PE OI chg</th><td class="num ${(s.oi.put_oi_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(s.oi.put_oi_change_pct)}%</td></tr>
+        </table>
+        ` : ''}
         <h3 style="margin: 1rem 0 0.5rem;">Scores</h3>
         <table class="analysis-table summary-table" style="max-width: 400px;">
           <tr><th>Bullish</th><td class="num pnl-positive">${fmt(sc.bullish)}</td><th>Bearish</th><td class="num pnl-negative">${fmt(sc.bearish)}</td></tr>
@@ -764,6 +795,7 @@
       });
     }
 
+    initDatePicker();
     loadUnderlyings().then(() => loadSignals());
   </script>
 </body>

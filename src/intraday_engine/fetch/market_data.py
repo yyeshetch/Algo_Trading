@@ -40,13 +40,19 @@ class MarketDataFetcher:
         ce_token = int(deriv_quotes[symbols.ce_symbol]["instrument_token"])
         pe_token = int(deriv_quotes[symbols.pe_symbol]["instrument_token"])
 
-        fut_df = _to_candle_df(self.client.historical_data(fut_token, from_dt, to_dt), "future")
-        ce_df = _to_candle_df(self.client.historical_data(ce_token, from_dt, to_dt), "call")
-        pe_df = _to_candle_df(self.client.historical_data(pe_token, from_dt, to_dt), "put")
+        fut_df = _to_candle_df(self.client.historical_data(fut_token, from_dt, to_dt, oi=True), "future", include_oi=True)
+        ce_df = _to_candle_df(self.client.historical_data(ce_token, from_dt, to_dt, oi=True), "call", include_oi=True)
+        pe_df = _to_candle_df(self.client.historical_data(pe_token, from_dt, to_dt, oi=True), "put", include_oi=True)
 
         merged = spot_df.merge(fut_df, on="timestamp", how="inner")
-        merged = merged.merge(ce_df[["timestamp", "call_close", "call_volume"]], on="timestamp", how="inner")
-        merged = merged.merge(pe_df[["timestamp", "put_close", "put_volume"]], on="timestamp", how="inner")
+        ce_cols = ["timestamp", "call_close", "call_volume"]
+        if "call_oi" in ce_df.columns:
+            ce_cols.append("call_oi")
+        merged = merged.merge(ce_df[ce_cols], on="timestamp", how="inner")
+        pe_cols = ["timestamp", "put_close", "put_volume"]
+        if "put_oi" in pe_df.columns:
+            pe_cols.append("put_oi")
+        merged = merged.merge(pe_df[pe_cols], on="timestamp", how="inner")
         merged = merged.sort_values("timestamp").reset_index(drop=True)
 
         spot_day_open = float(merged.iloc[0]["spot_open_raw"])
@@ -79,33 +85,38 @@ class MarketDataFetcher:
         merged["future_vwap"] = _session_vwap(merged["future_close"], merged["future_volume"])
         merged["timestamp"] = pd.to_datetime(merged["timestamp"]).dt.strftime("%Y-%m-%dT%H:%M:%S")
 
-        return merged[
-            [
-                "timestamp",
-                "spot_symbol",
-                "spot_ltp",
-                "spot_open",
-                "spot_high",
-                "spot_low",
-                "spot_close",
-                "spot_vwap",
-                "future_symbol",
-                "future_ltp",
-                "future_open",
-                "future_high",
-                "future_low",
-                "future_close",
-                "future_vwap",
-                "call_symbol",
-                "call_ltp",
-                "put_symbol",
-                "put_ltp",
-                "atm_strike",
-                "ce_symbol",
-                "pe_symbol",
-                "fut_symbol",
-            ]
+        out_cols = [
+            "timestamp",
+            "spot_symbol",
+            "spot_ltp",
+            "spot_open",
+            "spot_high",
+            "spot_low",
+            "spot_close",
+            "spot_vwap",
+            "future_symbol",
+            "future_ltp",
+            "future_open",
+            "future_high",
+            "future_low",
+            "future_close",
+            "future_vwap",
+            "call_symbol",
+            "call_ltp",
+            "put_symbol",
+            "put_ltp",
+            "atm_strike",
+            "ce_symbol",
+            "pe_symbol",
+            "fut_symbol",
         ]
+        if "future_oi" in merged.columns:
+            out_cols.append("future_oi")
+        if "call_oi" in merged.columns:
+            out_cols.append("call_oi")
+        if "put_oi" in merged.columns:
+            out_cols.append("put_oi")
+        return merged[[c for c in out_cols if c in merged.columns]]
 
 
 def _market_window(trade_date: date | None) -> tuple[datetime, datetime]:
@@ -122,7 +133,7 @@ def _market_window(trade_date: date | None) -> tuple[datetime, datetime]:
     return session_start, previous_completed
 
 
-def _to_candle_df(rows: list[dict[str, object]], prefix: str) -> pd.DataFrame:
+def _to_candle_df(rows: list[dict[str, object]], prefix: str, include_oi: bool = False) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame(columns=["timestamp"])
 
@@ -131,16 +142,17 @@ def _to_candle_df(rows: list[dict[str, object]], prefix: str) -> pd.DataFrame:
     raw["timestamp"] = pd.to_datetime(raw["timestamp"]).dt.tz_localize(None)
     raw = raw.sort_values("timestamp").reset_index(drop=True)
 
-    return pd.DataFrame(
-        {
-            "timestamp": raw["timestamp"],
-            f"{prefix}_open_raw": raw["open"].astype(float),
-            f"{prefix}_high_raw": raw["high"].astype(float),
-            f"{prefix}_low_raw": raw["low"].astype(float),
-            f"{prefix}_close": raw["close"].astype(float),
-            f"{prefix}_volume": raw["volume"].astype(float),
-        }
-    )
+    cols = {
+        "timestamp": raw["timestamp"],
+        f"{prefix}_open_raw": raw["open"].astype(float),
+        f"{prefix}_high_raw": raw["high"].astype(float),
+        f"{prefix}_low_raw": raw["low"].astype(float),
+        f"{prefix}_close": raw["close"].astype(float),
+        f"{prefix}_volume": raw["volume"].astype(float),
+    }
+    if include_oi and "oi" in raw.columns:
+        cols[f"{prefix}_oi"] = raw["oi"].astype(float)
+    return pd.DataFrame(cols)
 
 
 def _session_vwap(price: pd.Series, volume: pd.Series) -> pd.Series:

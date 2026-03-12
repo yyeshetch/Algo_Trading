@@ -6,12 +6,14 @@ from intraday_engine.core.models import ScoreBreakdown
 
 
 WEIGHTS = {
-    "spot_open_vwap_alignment": 0.20,
-    "fut_strength": 0.15,
-    "options_expansion_decay": 0.20,
-    "breakout_follow_through": 0.20,
-    "momentum": 0.15,
-    "structure_quality": 0.10,
+    "spot_open_vwap_alignment": 0.18,
+    "fut_strength": 0.12,
+    "fut_oi": 0.10,
+    "options_expansion_decay": 0.15,
+    "options_oi": 0.10,
+    "breakout_follow_through": 0.18,
+    "momentum": 0.12,
+    "structure_quality": 0.05,
 }
 
 
@@ -47,6 +49,14 @@ def score_signal(
         bearish += WEIGHTS["fut_strength"]
         reasons.append("Futures are weaker than spot.")
 
+    if features.get("fut_oi_available"):
+        if features.get("fut_oi_bullish"):
+            bullish += WEIGHTS["fut_oi"]
+            reasons.append("Fut OI: longs adding or short covering.")
+        elif features.get("fut_oi_bearish"):
+            bearish += WEIGHTS["fut_oi"]
+            reasons.append("Fut OI: shorts adding or long covering.")
+
     if features.get("options_available", True):
         if features["call_change_pct"] > 0 and features["put_change_pct"] < 0:
             bullish += WEIGHTS["options_expansion_decay"]
@@ -57,6 +67,16 @@ def score_signal(
         else:
             no_trade_penalty += 0.08
             reasons.append("Options behavior is conflicting.")
+
+    if features.get("oi_available"):
+        ce_oi = features.get("call_oi_change_pct", 0) or 0
+        pe_oi = features.get("put_oi_change_pct", 0) or 0
+        if ce_oi > 2 and pe_oi < -2:
+            bullish += WEIGHTS["options_oi"]
+            reasons.append("CE OI up, PE OI down (call buying).")
+        elif pe_oi > 2 and ce_oi < -2:
+            bearish += WEIGHTS["options_oi"]
+            reasons.append("PE OI up, CE OI down (put buying).")
 
     if is_breakout and follow_through:
         bullish += WEIGHTS["breakout_follow_through"]
