@@ -26,8 +26,11 @@ from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.market_data import MarketDataFetcher
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.storage import DataStore
+from intraday_engine.storage.data_store import _flatten_for_csv
 from intraday_engine.analysis.summary_builder import build_analysis_summaries
+from intraday_engine.eod.eod_fetcher import run_eod_scan
 from intraday_engine.engine.stock_cycle_runner import run_stocks_15min_cycle
+from intraday_engine.engine.stock_signal_engine import run_stock_analysis_30min
 from intraday_engine.orb.orb_scanner import run_orb_scan, run_pinbar_scan
 from intraday_engine.storage.position_sl_store import get_auto_trail_positions, get_sl as get_sl_record, set_sl as store_sl, update_sl_trigger as store_update_sl, set_auto_trail as store_auto_trail
 from intraday_engine.utils.logging_setup import setup_logging
@@ -321,6 +324,115 @@ async def api_stocks_refresh(limit: int = 50):
 async def get_underlyings_list():
     """Return indices only for the main dashboard dropdown. Stocks use /stocks page."""
     return {"underlyings": list_index_underlyings()}
+
+
+@app.get("/api/stocks/list")
+async def api_stocks_list():
+    """Return F&O stock names for dropdown (excludes indices)."""
+    try:
+        settings = Settings.from_env(underlying="NIFTY")
+        client = ZerodhaClient(settings)
+        names = client.fno_stock_names()
+        return {"stocks": names}
+    except Exception as e:
+        logger.exception("Load F&O stocks failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/eod-indicators")
+async def api_stocks_eod_indicators(trade_date: str | None = None, limit: int = 200):
+    """Return EOD FnO market indicators for all liquid FnO symbols."""
+    try:
+        sel_date = None
+        if trade_date:
+            try:
+                sel_date = datetime.strptime(trade_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        loop = asyncio.get_event_loop()
+        results, failed = await loop.run_in_executor(
+            None,
+            lambda: run_eod_scan(trade_date=sel_date, stock_limit=limit),
+        )
+        return {
+            "indicators": [_sanitize_for_json(r) for r in results],
+            "count": len(results),
+            "failed": [_sanitize_for_json(f) for f in failed],
+            "failed_count": len(failed),
+        }
+    except Exception as e:
+        logger.exception("EOD indicators failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/30min/signals")
+async def api_stocks_30min_signals(stock: str, trade_date: str | None = None):
+    """Fetch 30-min data for stock and return signals (on-the-fly, no persistence)."""
+    if not stock or not stock.strip():
+        raise HTTPException(status_code=400, detail="stock is required")
+    stock = stock.strip().upper()
+    try:
+        sel_date = datetime.strptime(trade_date or date.today().isoformat(), "%Y-%m-%d").date()
+    except ValueError:
+        sel_date = date.today()
+    try:
+        loop = asyncio.get_event_loop()
+        settings = Settings.from_env(underlying="NIFTY")
+        client = ZerodhaClient(settings)
+        merged, signals = await loop.run_in_executor(
+            None,
+            lambda: run_stock_analysis_30min(client, stock, sel_date, include_options=True),
+        )
+        if not signals:
+            return {"signals": [], "latest_actionable": None}
+        actionable = [s for s in signals if s.get("signal") in ("BUY", "SELL")]
+        latest = actionable[-1] if actionable else None
+        return {
+            "signals": [_sanitize_for_json(s) for s in signals[-100:]],
+            "latest_actionable": _sanitize_for_json(latest),
+        }
+    except Exception as e:
+        logger.exception("30min signals for %s failed: %s", stock, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/30min/analysis-summary")
+async def api_stocks_30min_analysis_summary(
+    stock: str,
+    trade_date: str | None = None,
+    timestamp: str | None = None,
+):
+    """Fetch 30-min data for stock and return analysis summary (on-the-fly)."""
+    if not stock or not stock.strip():
+        raise HTTPException(status_code=400, detail="stock is required")
+    stock = stock.strip().upper()
+    try:
+        sel_date = datetime.strptime(trade_date or date.today().isoformat(), "%Y-%m-%d").date()
+    except ValueError:
+        sel_date = date.today()
+    try:
+        loop = asyncio.get_event_loop()
+        settings = Settings.from_env(underlying="NIFTY")
+        client = ZerodhaClient(settings)
+        merged, signals = await loop.run_in_executor(
+            None,
+            lambda: run_stock_analysis_30min(client, stock, sel_date, include_options=True),
+        )
+        if merged is None or merged.empty:
+            return {"summaries": [], "selected": None}
+        sig_df = pd.DataFrame([_flatten_for_csv(s) for s in signals]) if signals else pd.DataFrame()
+        summaries = build_analysis_summaries(merged, sig_df, lookback=min(settings.lookback_bars, 10))
+        summaries = [s for s in summaries if s]
+        for s in summaries:
+            for k, v in s.items():
+                s[k] = _sanitize_for_json(v)
+        if timestamp:
+            selected = next((x for x in summaries if str(x.get("timestamp", "")) == timestamp), None)
+            return {"summaries": summaries, "selected": selected}
+        return {"summaries": summaries, "selected": summaries[-1] if summaries else None}
+    except Exception as e:
+        logger.exception("30min analysis for %s failed: %s", stock, e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/signals")

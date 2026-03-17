@@ -16,7 +16,7 @@ from intraday_engine.analysis.support_resistance import calculate_support_resist
 from intraday_engine.analysis.trade_plan import build_trade_plan
 from intraday_engine.core.config import Settings
 from intraday_engine.features.feature_engineering import compute_features
-from intraday_engine.fetch.stock_market_data import fetch_stock_15min_frame
+from intraday_engine.fetch.stock_market_data import fetch_stock_15min_frame, fetch_stock_30min_frame
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.storage import DataStore
 
@@ -145,6 +145,30 @@ def _analyze_frame(frame: pd.DataFrame, stock_name: str, settings: Settings) -> 
     else:
         payload["option_symbol"] = None
     return payload
+
+
+def run_stock_analysis_30min(
+    client: ZerodhaClient,
+    stock_name: str,
+    trade_date: date | None = None,
+    include_options: bool = True,
+) -> tuple[pd.DataFrame | None, list[Dict[str, Any]]]:
+    """
+    Fetch 30-min data for stock, run analysis in-memory (no persistence).
+    Returns (merged_df, signals_list). Both can be None/empty on failure.
+    """
+    merged = fetch_stock_30min_frame(client, stock_name, trade_date, include_options=include_options)
+    if merged is None or merged.empty or len(merged) < 2:
+        return (None, [])
+
+    settings = Settings.from_env(underlying=stock_name)
+    signals: list[Dict[str, Any]] = []
+    for idx in range(len(merged)):
+        frame = merged.iloc[: idx + 1].reset_index(drop=True)
+        payload = _analyze_frame(frame, stock_name, settings)
+        if payload:
+            signals.append(payload)
+    return (merged, signals)
 
 
 def _no_trade(

@@ -107,6 +107,8 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         fut_oi_chg = _pct_change(fut_oi, fut_oi_first) if fut_oi_first else 0
         call_oi_chg = _pct_change(call_oi, call_oi_first) if call_oi_first else 0
         put_oi_chg = _pct_change(put_oi, put_oi_first) if put_oi_first else 0
+        prev_fut_oi = float(prev.get("future_oi", 0) or 0)
+        fut_oi_chg_candle = _pct_change(fut_oi, prev_fut_oi) if prev_fut_oi and idx > 0 else 0
         summaries.append({
             "timestamp": ts,
             "signal": _str_safe(sig.get("signal"), "—"),
@@ -171,6 +173,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
                 "fut_oi_change_pct": fut_oi_chg,
                 "call_oi_change_pct": call_oi_chg,
                 "put_oi_change_pct": put_oi_chg,
+                "fut_oi_change_candle_pct": fut_oi_chg_candle,
             },
             "scores": {
                 "bullish": float(sig.get("bullish_score", 0) or 0),

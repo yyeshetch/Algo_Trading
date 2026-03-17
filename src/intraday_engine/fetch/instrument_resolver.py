@@ -52,6 +52,19 @@ class InstrumentResolver:
         return int(round(spot_price / step) * step)
 
     @staticmethod
+    def _matches_underlying(r: Dict[str, object], underlying: str) -> bool:
+        """Match by name or tradingsymbol prefix (NFO format: UNDERLYING+EXPIRY+FUT/CE/PE)."""
+        if r.get("name") == underlying:
+            return True
+        ts = str(r.get("tradingsymbol") or "")
+        if not ts.startswith(underlying):
+            return False
+        # Ensure we don't match "LT" to "LTI" - next char should be digit (expiry start)
+        if len(ts) <= len(underlying):
+            return False
+        return ts[len(underlying) : len(underlying) + 1].isdigit()
+
+    @staticmethod
     def _nearest_future(
         records: List[Dict[str, object]],
         underlying: str,
@@ -60,7 +73,7 @@ class InstrumentResolver:
         futs = [
             r
             for r in records
-            if r.get("name") == underlying
+            if InstrumentResolver._matches_underlying(r, underlying)
             and r.get("instrument_type") == "FUT"
             and r.get("expiry")
             and r["expiry"] >= today
@@ -79,7 +92,7 @@ class InstrumentResolver:
         opts = [
             r
             for r in records
-            if r.get("name") == underlying
+            if InstrumentResolver._matches_underlying(r, underlying)
             and r.get("instrument_type") == option_type
             and int(float(r.get("strike", 0))) == strike
             and r.get("expiry")

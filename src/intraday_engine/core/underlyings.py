@@ -33,6 +33,27 @@ INDEX_UNDERLYINGS: dict[str, UnderlyingConfig] = {
         lot_size=15,
         is_index=True,
     ),
+    "FINNIFTY": UnderlyingConfig(
+        name="FINNIFTY",
+        spot_symbol="NSE:NIFTY FIN SERVICE",
+        option_strike_step=50,
+        lot_size=25,
+        is_index=True,
+    ),
+    "MIDCPNIFTY": UnderlyingConfig(
+        name="MIDCPNIFTY",
+        spot_symbol="NSE:NIFTY MID SELECT",
+        option_strike_step=25,
+        lot_size=75,
+        is_index=True,
+    ),
+    "NIFTYNXT50": UnderlyingConfig(
+        name="NIFTYNXT50",
+        spot_symbol="NSE:NIFTY NEXT 50",
+        option_strike_step=5,
+        lot_size=30,
+        is_index=True,
+    ),
 }
 
 

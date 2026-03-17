@@ -178,6 +178,31 @@
     .tab-panel.active { display: block; }
     .chk { display: flex; align-items: center; gap: 0.5rem; }
     .chk input { accent-color: var(--accent); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; }
+    .day-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .day-card { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.75rem; text-align: center; }
+    .day-card .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem; }
+    .day-card .val { font-size: 1rem; font-weight: 600; }
+    .day-card .val.small { font-size: 0.9rem; }
+    .signal-counts { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+    .signal-counts span { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+    .signal-counts .buy { background: #14532d; color: #86efac; }
+    .signal-counts .sell { background: #7f1d1d; color: #fecaca; }
+    .signal-counts .no { background: var(--border); color: var(--text-muted); }
+    .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+    .badge-bull { background: #14532d; color: #86efac; }
+    .badge-bear { background: #7f1d1d; color: #fecaca; }
+    .badge-neutral { background: var(--border); color: var(--text-muted); }
+    .range-bar { height: 8px; background: var(--border); border-radius: 4px; position: relative; margin: 0.5rem 0; }
+    .range-bar .marker { position: absolute; width: 4px; height: 14px; top: -3px; background: var(--accent); border-radius: 2px; transform: translateX(-50%); }
+    .summary-table { font-size: 0.8rem; }
+    .summary-table td { padding: 0.4rem 0.6rem; }
+    .analysis-row { cursor: pointer; }
+    .analysis-row:hover { background: var(--surface-hover) !important; }
+    .analysis-row.selected { background: rgba(99, 102, 241, 0.2) !important; }
+    .analysis-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pnl-positive { color: var(--buy); }
+    .pnl-negative { color: var(--sell); }
   </style>
 </head>
 <body>
@@ -195,6 +220,8 @@
       <button class="tab active" data-tab="signals">15-min Signals</button>
       <button class="tab" data-tab="orb">15-min ORB</button>
       <button class="tab" data-tab="pinbar">Pinbars</button>
+      <button class="tab" data-tab="30min">30-min Analysis</button>
+      <button class="tab" data-tab="eod">EOD FnO Analysis</button>
     </div>
     <div id="panel-signals" class="tab-panel active">
       <div class="toolbar">
@@ -262,6 +289,124 @@
                 <tbody></tbody>
               </table>
               <div class="empty" id="orbSellEmpty" style="display:none;">No ORB SELL signals.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="panel-30min" class="tab-panel">
+      <div class="toolbar">
+        <div class="limit-row">
+          <label for="stock30">Stock:</label>
+          <select id="stock30" style="min-width: 140px; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+            <option value="">Select stock…</option>
+          </select>
+        </div>
+        <div class="limit-row">
+          <label for="date30">Date:</label>
+          <input type="date" id="date30" style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+        </div>
+        <button class="btn btn-primary" id="btn30min">Fetch & Analyze</button>
+        <span class="status" id="status30"></span>
+      </div>
+      <div id="content30">
+        <div class="loading" id="loading30">Select a stock and click Fetch & Analyze to load 30-min data.</div>
+        <div id="results30" style="display:none;">
+          <div class="card" style="margin-bottom: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem;">
+            <h2 style="margin: 0 0 0.75rem; font-size: 1rem; font-weight: 600;">Day at a Glance</h2>
+            <div id="dayOverview30"></div>
+          </div>
+          <div class="card" style="margin-bottom: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem;">
+            <h2 style="margin: 0 0 0.75rem; font-size: 1rem; font-weight: 600;">Signals (30-min)</h2>
+            <div style="overflow-x: auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Signal</th>
+                    <th>Entry</th>
+                    <th>Target</th>
+                    <th>Stop</th>
+                    <th>RR</th>
+                    <th>Conf</th>
+                    <th>Bias</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody30"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem;">
+            <h3 style="margin: 0 0 0.5rem; font-size: 0.95rem;">Candle-by-candle (click row for detail)</h3>
+            <div style="overflow-x: auto;">
+              <table class="summary-table" style="font-size: 0.8rem;">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Signal</th>
+                    <th>Spot</th>
+                    <th>S</th>
+                    <th>R</th>
+                    <th>Range</th>
+                    <th>Fut%</th>
+                    <th>Fut OI chg%</th>
+                    <th>Spot chg%</th>
+                    <th>Score</th>
+                    <th>Bias</th>
+                  </tr>
+                </thead>
+                <tbody id="analysisOverviewBody30"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="analysisContent30" class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem;"></div>
+        </div>
+      </div>
+    </div>
+    <div id="panel-eod" class="tab-panel">
+      <div class="toolbar">
+        <div class="limit-row">
+          <label for="eodDate">Date:</label>
+          <input type="date" id="eodDate" style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+        </div>
+        <div class="limit-row">
+          <label for="eodLimit">Limit:</label>
+          <input type="number" id="eodLimit" value="200" min="50" max="500" style="width: 5rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+        </div>
+        <button class="btn btn-primary" id="btnEod">Fetch EOD Indicators</button>
+        <span class="status" id="eodStatus"></span>
+      </div>
+      <div id="eodContent">
+        <div class="loading" id="eodLoading">Click Fetch EOD Indicators to load daily FnO market data for all liquid symbols.</div>
+        <div id="eodResults" style="display:none;">
+          <div class="panel" style="margin-top: 1rem;">
+            <div class="panel-head">FnO Market Indicators (NIFTY, BANKNIFTY + selected liquid symbols)</div>
+            <div class="panel-body">
+              <div style="overflow-x: auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>OI Buildup</th>
+                      <th>FnO Ind</th>
+                      <th>Spot</th>
+                      <th>Spot chg%</th>
+                      <th>Vol</th>
+                      <th>Fut OI</th>
+                      <th>Fut OI chg%</th>
+                      <th>Fut vs Spot%</th>
+                      <th>CE OI</th>
+                      <th>CE OI chg%</th>
+                      <th>PE OI</th>
+                      <th>PE OI chg%</th>
+                      <th>PCR</th>
+                      <th>CE prem chg%</th>
+                      <th>PE prem chg%</th>
+                    </tr>
+                  </thead>
+                  <tbody id="eodTbody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -391,6 +536,11 @@
 
     loadSignals();
 
+    // Open 30min tab from hash (#30min)
+    if (window.location.hash === '#30min') {
+      document.querySelector('.tab[data-tab="30min"]')?.click();
+    }
+
     // Tabs
     document.querySelectorAll('.tab').forEach(t => {
       t.addEventListener('click', () => {
@@ -398,6 +548,7 @@
         document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
         t.classList.add('active');
         document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+        if (t.dataset.tab === '30min') loadStocksFor30min();
       });
     });
 
@@ -523,6 +674,293 @@
         btnOrb.disabled = false;
       }
     });
+
+    // EOD FnO Analysis tab
+    const btnEod = document.getElementById('btnEod');
+    const eodDate = document.getElementById('eodDate');
+    const eodLimit = document.getElementById('eodLimit');
+    const eodStatus = document.getElementById('eodStatus');
+    const eodLoading = document.getElementById('eodLoading');
+    const eodResults = document.getElementById('eodResults');
+    const eodTbody = document.getElementById('eodTbody');
+    if (eodDate && !eodDate.value) {
+      eodDate.value = new Date().toISOString().slice(0, 10);
+      eodDate.max = new Date().toISOString().slice(0, 10);
+    }
+    btnEod.addEventListener('click', async () => {
+      btnEod.disabled = true;
+      eodLoading.style.display = 'block';
+      eodLoading.textContent = 'Fetching EOD data for all liquid FnO symbols…';
+      eodResults.style.display = 'none';
+      eodStatus.textContent = '';
+      try {
+        const tradeDate = eodDate?.value || new Date().toISOString().slice(0, 10);
+        const limit = parseInt(eodLimit?.value, 10) || 200;
+        const r = await fetch('/api/stocks/eod-indicators?trade_date=' + encodeURIComponent(tradeDate) + '&limit=' + limit);
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'EOD fetch failed');
+        const indicators = d.indicators || [];
+        eodTbody.innerHTML = indicators.map(i => {
+          const spotChg = (i.spot_change_pct || 0);
+          const futOiChg = (i.fut_oi_change_pct || 0);
+          const ceOiChg = (i.ce_oi_change_pct || 0);
+          const peOiChg = (i.pe_oi_change_pct || 0);
+          const futVsSpot = (i.fut_vs_spot_pct || 0);
+          const cePremChg = (i.ce_premium_change_pct || 0);
+          const pePremChg = (i.pe_premium_change_pct || 0);
+          const ind = i.fno_indicator || '—';
+          const indCls = ind === 'BULLISH' ? 'badge-bull' : ind === 'BEARISH' ? 'badge-bear' : 'badge-neutral';
+          const oiBuildup = i.oi_buildup || '—';
+          const oiBuildupCls = (oiBuildup === 'LONG_BUILDUP' || oiBuildup === 'SHORT_COVERING') ? 'badge-bull' : (oiBuildup === 'SHORT_BUILDUP' || oiBuildup === 'LONG_UNWINDING') ? 'badge-bear' : 'badge-neutral';
+          return `<tr>
+            <td class="stock">${fmt(i.stock)}</td>
+            <td><span class="badge ${oiBuildupCls}">${oiBuildup !== '—' ? oiBuildup.replace(/_/g, ' ') : '—'}</span></td>
+            <td><span class="badge ${indCls}">${ind}</span></td>
+            <td class="num">${fmt(i.spot_close)}</td>
+            <td class="num ${spotChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${spotChg >= 0 ? '+' : ''}${fmt(spotChg)}%</td>
+            <td class="num">${(i.spot_volume || 0).toLocaleString()}</td>
+            <td class="num">${(i.fut_oi || 0).toLocaleString()}</td>
+            <td class="num ${futOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${futOiChg >= 0 ? '+' : ''}${fmt(futOiChg)}%</td>
+            <td class="num ${futVsSpot >= 0 ? 'pnl-positive' : 'pnl-negative'}">${futVsSpot >= 0 ? '+' : ''}${fmt(futVsSpot)}%</td>
+            <td class="num">${(i.ce_oi || 0).toLocaleString()}</td>
+            <td class="num ${ceOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${ceOiChg >= 0 ? '+' : ''}${fmt(ceOiChg)}%</td>
+            <td class="num">${(i.pe_oi || 0).toLocaleString()}</td>
+            <td class="num ${peOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${peOiChg >= 0 ? '+' : ''}${fmt(peOiChg)}%</td>
+            <td class="num">${fmt(i.pcr)}</td>
+            <td class="num ${cePremChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${cePremChg >= 0 ? '+' : ''}${fmt(cePremChg)}%</td>
+            <td class="num ${pePremChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${pePremChg >= 0 ? '+' : ''}${fmt(pePremChg)}%</td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="16">No data.</td></tr>';
+        eodLoading.style.display = 'none';
+        eodResults.style.display = 'block';
+        const failedCount = d.failed_count || 0;
+        eodStatus.textContent = `Loaded ${indicators.length} symbols.` + (failedCount ? ` (${failedCount} failed: ${(d.failed || []).map(f => f.symbol).join(', ')})` : '');
+        eodStatus.className = 'status ok';
+      } catch (e) {
+        eodLoading.textContent = 'Click Fetch EOD Indicators to load.';
+        eodLoading.style.display = 'block';
+        eodStatus.textContent = 'Error: ' + e.message;
+        eodStatus.className = 'status err';
+      } finally {
+        btnEod.disabled = false;
+      }
+    });
+
+    // 30-min Analysis tab
+    const stock30Select = document.getElementById('stock30');
+    const date30Input = document.getElementById('date30');
+    const btn30min = document.getElementById('btn30min');
+    const status30 = document.getElementById('status30');
+    const loading30 = document.getElementById('loading30');
+    const results30 = document.getElementById('results30');
+    const tbody30 = document.getElementById('tbody30');
+    const dayOverview30 = document.getElementById('dayOverview30');
+    const analysisOverviewBody30 = document.getElementById('analysisOverviewBody30');
+    const analysisContent30 = document.getElementById('analysisContent30');
+
+    if (date30Input && !date30Input.value) {
+      date30Input.value = new Date().toISOString().slice(0, 10);
+      date30Input.max = new Date().toISOString().slice(0, 10);
+    }
+
+    function sigClass30(s) {
+      if (s === 'BUY') return 'sig-buy';
+      if (s === 'SELL') return 'sig-sell';
+      return 'sig-no';
+    }
+    function badgeClass30(v) {
+      if (v === 'BULLISH_DAY' || v === 'UP' || v === 'above' || v === 'premium' || v === 'call_heavy') return 'badge-bull';
+      if (v === 'BEARISH_DAY' || v === 'DOWN' || v === 'below' || v === 'discount' || v === 'put_heavy') return 'badge-bear';
+      return 'badge-neutral';
+    }
+    function rangeBarPct30(support, resistance, spot) {
+      if (!support || !resistance || support >= resistance) return 50;
+      return Math.max(0, Math.min(100, ((spot - support) / (resistance - support)) * 100));
+    }
+
+    async function loadStocksFor30min() {
+      if (!stock30Select || stock30Select.options.length > 1) return;
+      try {
+        const r = await fetch('/api/stocks/list');
+        const d = await r.json().catch(() => ({}));
+        const stocks = d.stocks || [];
+        stock30Select.innerHTML = '<option value="">Select stock…</option>' + stocks.map(s => `<option value="${s}">${s}</option>`).join('');
+      } catch (e) {
+        console.warn('Could not load stocks:', e);
+      }
+    }
+
+    // Preload all F&O stocks for 30min dropdown on page load
+    loadStocksFor30min();
+
+    btn30min.addEventListener('click', async () => {
+      const stock = stock30Select?.value?.trim();
+      if (!stock) {
+        status30.textContent = 'Select a stock first.';
+        status30.className = 'status err';
+        return;
+      }
+      btn30min.disabled = true;
+      loading30.style.display = 'block';
+      loading30.textContent = 'Fetching 30-min data…';
+      results30.style.display = 'none';
+      status30.textContent = '';
+      try {
+        const tradeDate = date30Input?.value || new Date().toISOString().slice(0, 10);
+        const [sigRes, anaRes] = await Promise.all([
+          fetch(`/api/stocks/30min/signals?stock=${encodeURIComponent(stock)}&trade_date=${tradeDate}`),
+          fetch(`/api/stocks/30min/analysis-summary?stock=${encodeURIComponent(stock)}&trade_date=${tradeDate}`)
+        ]);
+        const sigData = await sigRes.json().catch(() => ({}));
+        const anaData = await anaRes.json().catch(() => ({}));
+        if (!sigRes.ok) throw new Error(sigData.detail || 'Signals fetch failed');
+        if (!anaRes.ok) throw new Error(anaData.detail || 'Analysis fetch failed');
+        const signals = sigData.signals || [];
+        const summaries = anaData.summaries || [];
+        const selected = anaData.selected;
+        tbody30.innerHTML = signals.map(s => `
+          <tr>
+            <td>${fmt(s.timestamp)?.replace('T', ' ').slice(11, 16) || '—'}</td>
+            <td class="${sigClass30(s.signal)}">${fmt(s.signal)}</td>
+            <td class="num">${fmt(s.entry)}</td>
+            <td class="num">${fmt(s.target)}</td>
+            <td class="num">${fmt(s.stop_loss)}</td>
+            <td class="num">${fmt(s.rr)}</td>
+            <td class="num">${s.confidence != null ? (s.confidence * 100).toFixed(0) + '%' : '—'}</td>
+            <td><span class="badge ${badgeClass30(s.bias)}">${fmt(s.bias)?.replace('_DAY','') || '—'}</span></td>
+          </tr>
+        `).join('') || '<tr><td colspan="8">No signals.</td></tr>';
+        if (summaries.length === 0) {
+          dayOverview30.innerHTML = '<p style="color: var(--text-muted);">No data for this date. Market may be closed or no 30-min candles yet.</p>';
+          analysisOverviewBody30.innerHTML = '<tr><td colspan="11">No analysis data.</td></tr>';
+          analysisContent30.innerHTML = '<p>No analysis data.</p>';
+        } else {
+          const first = summaries[0], last = summaries[summaries.length - 1];
+          const paLast = last.price_action || {};
+          const sessionHigh = paLast.session_high ?? paLast.high ?? paLast.spot;
+          const sessionLow = paLast.session_low ?? paLast.low ?? paLast.spot;
+          const open = first.price_action?.open ?? first.price_action?.spot;
+          const spot = paLast.spot;
+          const buyCount = summaries.filter(s => s.signal === 'BUY').length;
+          const sellCount = summaries.filter(s => s.signal === 'SELL').length;
+          const noCount = summaries.filter(s => s.signal === 'NO_TRADE' || !s.signal || s.signal === '—').length;
+          const biasCounts = {};
+          summaries.forEach(s => { const b = s.bias || 'NEUTRAL'; biasCounts[b] = (biasCounts[b] || 0) + 1; });
+          const dominantBias = Object.entries(biasCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+          const latestActionable = summaries.filter(s => s.signal === 'BUY' || s.signal === 'SELL').pop();
+          const latestTime = latestActionable ? (latestActionable.timestamp || '').replace('T', ' ').slice(11, 16) : '—';
+          const spotVsOpen = open ? (spot > open ? 'above' : spot < open ? 'below' : 'flat') : '—';
+          dayOverview30.innerHTML = `
+            <div class="day-overview">
+              <div class="day-card"><div class="label">Session Range</div><div class="val small">${fmt(sessionLow)} – ${fmt(sessionHigh)}</div></div>
+              <div class="day-card"><div class="label">Open</div><div class="val">${fmt(open)}</div></div>
+              <div class="day-card"><div class="label">Last Spot</div><div class="val">${fmt(spot)}</div></div>
+              <div class="day-card"><div class="label">Spot vs Open</div><div class="val"><span class="badge ${badgeClass30(spotVsOpen)}">${spotVsOpen}</span></div></div>
+              <div class="day-card"><div class="label">Signals</div><div class="signal-counts"><span class="buy">BUY ${buyCount}</span><span class="sell">SELL ${sellCount}</span><span class="no">NO ${noCount}</span></div></div>
+              <div class="day-card"><div class="label">Dominant Bias</div><div class="val"><span class="badge ${badgeClass30(dominantBias)}">${fmt(dominantBias)?.replace('_DAY','') || '—'}</span></div></div>
+              <div class="day-card"><div class="label">Latest Actionable</div><div class="val small ${latestActionable?.signal === 'BUY' ? 'sig-buy' : latestActionable?.signal === 'SELL' ? 'sig-sell' : ''}">${fmt(latestActionable?.signal)} ${latestTime !== '—' ? '@ ' + latestTime : ''}</div></div>
+            </div>
+          `;
+          analysisOverviewBody30.innerHTML = [...summaries].reverse().map(s => {
+            const pa = s.price_action || {};
+            const fut = s.futures || {};
+            const oi = s.oi || {};
+            const pct = rangeBarPct30(pa.support, pa.resistance, pa.spot);
+            const score = s.scores?.final_score != null ? s.scores.final_score : null;
+            const futOiChg = oi.fut_oi_change_candle_pct != null ? oi.fut_oi_change_candle_pct : null;
+            const spotChg = pa.spot_change_pct != null ? pa.spot_change_pct : null;
+            return `<tr class="analysis-row" data-ts="${s.timestamp || ''}">
+              <td>${fmt(s.timestamp)?.replace('T', ' ').slice(11, 16) || '—'}</td>
+              <td class="${sigClass30(s.signal)}">${fmt(s.signal)?.replace('_','') || '—'}</td>
+              <td class="num">${fmt(pa.spot)}</td>
+              <td class="num">${fmt(pa.support)}</td>
+              <td class="num">${fmt(pa.resistance)}</td>
+              <td style="min-width:80px"><div class="range-bar" style="height:10px"><div class="marker" style="left:${pct}%"></div></div></td>
+              <td class="num ${(fut.vs_spot_pct || 0) > 0 ? 'pnl-positive' : (fut.vs_spot_pct || 0) < 0 ? 'pnl-negative' : ''}">${fmt(fut.vs_spot_pct)}%</td>
+              <td class="num ${(futOiChg || 0) > 0 ? 'pnl-positive' : (futOiChg || 0) < 0 ? 'pnl-negative' : ''}">${futOiChg != null ? futOiChg.toFixed(2) + '%' : '—'}</td>
+              <td class="num ${(spotChg || 0) > 0 ? 'pnl-positive' : (spotChg || 0) < 0 ? 'pnl-negative' : ''}">${spotChg != null ? spotChg.toFixed(2) + '%' : '—'}</td>
+              <td class="num ${score != null && score > 0 ? 'pnl-positive' : score != null && score < 0 ? 'pnl-negative' : ''}">${score != null ? score.toFixed(2) : '—'}</td>
+              <td><span class="badge ${badgeClass30(s.bias)}">${fmt(s.bias)?.replace('_DAY','') || '—'}</span></td>
+            </tr>`;
+          }).join('') || '<tr><td colspan="11">No data.</td></tr>';
+          document.querySelectorAll('#analysisOverviewBody30 .analysis-row').forEach(row => {
+            row.onclick = () => {
+              const ts = row.dataset.ts;
+              if (!ts) return;
+              document.querySelectorAll('#analysisOverviewBody30 .analysis-row').forEach(r => r.classList.remove('selected'));
+              row.classList.add('selected');
+              const sel = summaries.find(x => String(x.timestamp || '') === ts);
+              if (sel) renderAnalysisDetail30(sel);
+            };
+          });
+          renderAnalysisDetail30(selected || summaries[summaries.length - 1]);
+        }
+        loading30.style.display = 'none';
+        results30.style.display = 'block';
+        status30.textContent = `Loaded ${signals.length} signals, ${summaries.length} candles for ${stock}.`;
+        status30.className = 'status ok';
+      } catch (e) {
+        loading30.textContent = 'Select a stock and click Fetch & Analyze.';
+        loading30.style.display = 'block';
+        status30.textContent = 'Error: ' + e.message;
+        status30.className = 'status err';
+      } finally {
+        btn30min.disabled = false;
+      }
+    });
+
+    function renderAnalysisDetail30(s) {
+      const el = analysisContent30;
+      if (!s) { el.innerHTML = '<p>No detail.</p>'; return; }
+      const pa = s.price_action || {};
+      const fut = s.futures || {};
+      const opt = s.options || {};
+      const oi = s.oi || {};
+      const sc = s.scores || {};
+      const tp = s.trade_plan || {};
+      const rangePct = rangeBarPct30(pa.support, pa.resistance, pa.spot);
+      el.innerHTML = `
+        <h2 style="margin: 0 0 1rem;">Detail: ${fmt(s.timestamp)} <span class="badge ${sigClass30(s.signal)}" style="margin-left:0.5rem">${fmt(s.signal)}</span></h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div>
+            <h3 style="margin: 0 0 0.5rem;">Price Action</h3>
+            <table class="summary-table" style="font-size: 0.8rem;">
+              <tr><th>Spot</th><td class="num">${fmt(pa.spot)}</td><th>Open</th><td class="num">${fmt(pa.open)}</td></tr>
+              <tr><th>High</th><td class="num">${fmt(pa.high)}</td><th>Low</th><td class="num">${fmt(pa.low)}</td></tr>
+              <tr><th>Support</th><td class="num">${fmt(pa.support)}</td><th>Resistance</th><td class="num">${fmt(pa.resistance)}</td></tr>
+              <tr><th>Breakout</th><td>${pa.breakout ? '✓' : '—'}</td><th>Breakdown</th><td>${pa.breakdown ? '✓' : '—'}</td></tr>
+            </table>
+            <div class="range-bar" style="height: 12px; margin-top: 0.5rem;"><div class="marker" style="left: ${rangePct}%;"></div></div>
+          </div>
+          <div>
+            <h3 style="margin: 0 0 0.5rem;">Futures</h3>
+            <table class="summary-table" style="font-size: 0.8rem;">
+              <tr><th>LTP</th><td class="num">${fmt(fut.ltp)}</td><th>vs Spot</th><td class="num ${(fut.vs_spot_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(fut.vs_spot_pct)}%</td></tr>
+              <tr><th>Premium</th><td><span class="badge ${badgeClass30(fut.premium)}">${fmt(fut.premium)}</span></td><th>vs VWAP</th><td><span class="badge ${badgeClass30(fut.fut_vs_fut_vwap)}">${fmt(fut.fut_vs_fut_vwap)}</span></td></tr>
+            </table>
+            <h3 style="margin: 0.75rem 0 0.5rem;">FUT vs Spot Analysis</h3>
+            <table class="summary-table" style="font-size: 0.8rem;">
+              <tr><th>Fut OI</th><td class="num">${fmt(oi.future_oi)}</td><th>Fut OI chg (candle)</th><td class="num ${(oi.fut_oi_change_candle_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(oi.fut_oi_change_candle_pct)}%</td></tr>
+              <tr><th>Fut OI chg (session)</th><td class="num ${(oi.fut_oi_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(oi.fut_oi_change_pct)}%</td><th>Spot chg</th><td class="num ${(pa.spot_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(pa.spot_change_pct)}%</td></tr>
+              <tr><th>Fut vs Spot</th><td class="num ${(fut.vs_spot_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(fut.vs_spot_pct)}%</td><th>Fut chg</th><td class="num ${(fut.change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(fut.change_pct)}%</td></tr>
+              <tr><th>CE OI</th><td class="num">${fmt(oi.call_oi)}</td><th>PE OI</th><td class="num">${fmt(oi.put_oi)}</td></tr>
+            </table>
+            <h3 style="margin: 0.75rem 0 0.5rem;">Options</h3>
+            <p style="font-size: 0.85rem;">Call: ${fmt(opt.call_ltp)} (${fmt(opt.call_change_pct)}%) | Put: ${fmt(opt.put_ltp)} (${fmt(opt.put_change_pct)}%) | P/C: ${fmt(opt.put_call_ratio)}</p>
+          </div>
+        </div>
+        <h3 style="margin: 1rem 0 0.5rem;">Scores</h3>
+        <table class="summary-table" style="font-size: 0.8rem; max-width: 400px;">
+          <tr><th>Bullish</th><td class="num pnl-positive">${fmt(sc.bullish)}</td><th>Bearish</th><td class="num pnl-negative">${fmt(sc.bearish)}</td></tr>
+          <tr><th>Final</th><td class="num ${(sc.final_score || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(sc.final_score)}</td><th>Confidence</th><td class="num">${fmt(sc.confidence)}</td></tr>
+        </table>
+        <h3 style="margin: 1rem 0 0.5rem;">Trade Plan</h3>
+        <table class="summary-table" style="font-size: 0.8rem; max-width: 400px;">
+          <tr><th>Entry</th><td class="num">${fmt(tp.entry)}</td><th>Target</th><td class="num">${fmt(tp.target)}</td><th>Stop</th><td class="num">${fmt(tp.stop_loss)}</td><th>R:R</th><td class="num">${fmt(tp.rr)}</td></tr>
+        </table>
+        ${s.reasons ? '<h3 style="margin: 1rem 0 0.5rem;">Reasons</h3><p style="font-size: 0.85rem; color: var(--text-muted);">' + fmt(s.reasons) + '</p>' : ''}
+      `;
+    }
   </script>
 </body>
 </html>
