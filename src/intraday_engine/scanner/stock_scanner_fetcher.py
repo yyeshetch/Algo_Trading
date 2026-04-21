@@ -14,16 +14,16 @@ from intraday_engine.fetch.zerodha_client import ZerodhaClient
 
 
 def _market_window_15min(trade_date: date | None) -> tuple[datetime, datetime]:
-    """Session window for 15-min candles."""
-    if trade_date is not None:
-        session_start = datetime.combine(trade_date, datetime.min.time()).replace(hour=9, minute=15)
-        session_end = datetime.combine(trade_date, datetime.min.time()).replace(hour=15, minute=30)
-        return session_start, session_end
+    """Session window for completed 15-min candles only."""
     now = datetime.now()
-    session_start = now.replace(hour=9, minute=15, second=0, microsecond=0)
-    current_boundary = now.replace(minute=(now.minute // 15) * 15, second=0, microsecond=0)
-    previous_completed = current_boundary - timedelta(minutes=15)
-    return session_start, previous_completed
+    target_date = trade_date or now.date()
+    session_start = datetime.combine(target_date, datetime.min.time()).replace(hour=9, minute=15)
+    session_end = datetime.combine(target_date, datetime.min.time()).replace(hour=15, minute=30)
+    if target_date < now.date():
+        return session_start, session_end
+    if target_date > now.date():
+        return session_start, session_start - timedelta(minutes=15)
+    return session_start, min(session_end, now.replace(second=0, microsecond=0))
 
 
 def _to_candle_df(rows: list[dict[str, Any]], prefix: str, include_oi: bool = False) -> pd.DataFrame:
@@ -44,6 +44,25 @@ def _to_candle_df(rows: list[dict[str, Any]], prefix: str, include_oi: bool = Fa
     if include_oi and "oi" in raw.columns:
         cols[f"{prefix}_oi"] = raw["oi"].astype(float)
     return pd.DataFrame(cols)
+
+
+def _drop_incomplete_candles(
+    df: pd.DataFrame,
+    trade_date: date | None,
+    interval_minutes: int,
+) -> pd.DataFrame:
+    if df.empty:
+        return df
+    now = datetime.now()
+    target_date = trade_date or now.date()
+    if target_date != now.date():
+        return df
+    cutoff = min(
+        datetime.combine(target_date, datetime.min.time()).replace(hour=15, minute=30),
+        now.replace(second=0, microsecond=0),
+    )
+    completed_mask = df["timestamp"] + pd.to_timedelta(interval_minutes, unit="m") <= cutoff
+    return df.loc[completed_mask].reset_index(drop=True)
 
 
 def fetch_stock_15min_data(
@@ -73,7 +92,7 @@ def fetch_stock_15min_data(
         return None
 
     spot_rows = client.historical_data(spot_token, from_dt, to_dt, interval="15minute")
-    spot_df = _to_candle_df(spot_rows, "spot")
+    spot_df = _drop_incomplete_candles(_to_candle_df(spot_rows, "spot"), trade_date, 15)
     if spot_df.empty:
         return None
 
@@ -88,16 +107,28 @@ def fetch_stock_15min_data(
     ce_token = int(deriv_quotes[symbols.ce_symbol]["instrument_token"])
     pe_token = int(deriv_quotes[symbols.pe_symbol]["instrument_token"])
 
-    fut_df = _to_candle_df(client.historical_data(fut_token, from_dt, to_dt, interval="15minute"), "future")
-    ce_df = _to_candle_df(
-        client.historical_data(ce_token, from_dt, to_dt, interval="15minute", oi=True),
-        "call",
-        include_oi=True,
+    fut_df = _drop_incomplete_candles(
+        _to_candle_df(client.historical_data(fut_token, from_dt, to_dt, interval="15minute"), "future"),
+        trade_date,
+        15,
     )
-    pe_df = _to_candle_df(
-        client.historical_data(pe_token, from_dt, to_dt, interval="15minute", oi=True),
-        "put",
-        include_oi=True,
+    ce_df = _drop_incomplete_candles(
+        _to_candle_df(
+            client.historical_data(ce_token, from_dt, to_dt, interval="15minute", oi=True),
+            "call",
+            include_oi=True,
+        ),
+        trade_date,
+        15,
+    )
+    pe_df = _drop_incomplete_candles(
+        _to_candle_df(
+            client.historical_data(pe_token, from_dt, to_dt, interval="15minute", oi=True),
+            "put",
+            include_oi=True,
+        ),
+        trade_date,
+        15,
     )
 
     merged = spot_df.merge(fut_df, on="timestamp", how="inner")

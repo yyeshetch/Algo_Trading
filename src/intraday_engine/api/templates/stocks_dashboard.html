@@ -34,7 +34,7 @@
       line-height: 1.5;
     }
     .layout {
-      max-width: 1400px;
+      max-width: 1800px;
       margin: 0 auto;
       padding: 1.5rem;
     }
@@ -96,10 +96,14 @@
     }
     .status.ok { color: var(--buy); }
     .status.err { color: var(--sell); }
+    .status.warn { color: #d4a017; }
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1.5rem;
+    }
+    #results {
+      grid-template-columns: 1fr;
     }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
     .panel {
@@ -120,10 +124,19 @@
     .panel-body {
       overflow-x: auto;
     }
+    #results .panel-body {
+      max-height: 420px;
+      overflow: auto;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
       font-size: 0.85rem;
+    }
+    #results table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
     th, td {
       padding: 0.75rem 1rem;
@@ -161,15 +174,6 @@
       color: var(--text-muted);
     }
     .limit-row { display: flex; align-items: center; gap: 0.5rem; }
-    .limit-row input {
-      width: 4rem;
-      padding: 0.5rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
-    }
     .tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
     .tab { padding: 0.6rem 1.2rem; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; }
     .tab:hover { color: var(--text); }
@@ -216,21 +220,24 @@
       <h1>F&O Stock Signals</h1>
       <p class="sub">15-min timeframe • Spot + Futures (options when available) • 15-min ORB (0.2% variation)</p>
     </header>
+    <div class="toolbar">
+      <button class="btn btn-primary" id="btnRefreshAll">Refresh All Tabs (15m/1H/1D)</button>
+      <span class="status" id="refreshAllStatus"></span>
+      <span class="status" id="refreshAllMeta">Last shared refresh: —</span>
+      <span class="status" style="color: var(--text-muted);">
+        Single refresh updates 15-min signals, Intraday Signals, and Watchlist for Tomorrow.
+      </span>
+    </div>
     <div class="tabs">
       <button class="tab active" data-tab="signals">15-min Signals</button>
-      <button class="tab" data-tab="orb">15-min ORB</button>
-      <button class="tab" data-tab="pinbar">Pinbars</button>
+      <button class="tab" data-tab="intraday">Intraday Signals</button>
       <button class="tab" data-tab="30min">30-min Analysis</button>
       <button class="tab" data-tab="eod">EOD FnO Analysis</button>
+      <button class="tab" data-tab="tomorrow">Watchlist for Tomorrow</button>
     </div>
     <div id="panel-signals" class="tab-panel active">
       <div class="toolbar">
-        <button class="btn btn-primary" id="btnRefresh">Refresh (Fetch & Generate)</button>
-        <div class="limit-row">
-          <label for="limit">Limit:</label>
-          <input type="number" id="limit" value="50" min="10" max="200">
-        </div>
-        <span class="status" id="status"></span>
+        <span class="status" id="status">Uses data from shared refresh.</span>
       </div>
       <div id="content">
       <div class="loading" id="loading">Loading stored signals…</div>
@@ -239,7 +246,7 @@
           <div class="panel-head">▲ BUY Signals</div>
           <div class="panel-body">
             <table id="buyTable">
-              <thead><tr><th>Stock</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Reasons</th></tr></thead>
+              <thead><tr><th>Stock</th><th>Strategy</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Status</th><th>RSI 60m</th><th>RSI 15m</th><th>Fut OI %</th><th>RS vs NIFTY</th><th>ORB</th><th>Pinbar</th><th>Bias Vol x</th><th>Bias Vol</th><th>20 SMA Vol</th><th>Mom UP</th><th>Fut &gt; VWAP</th><th>Calls Exp</th><th>Puts Dec</th><th>Trig Near High</th><th>Break Res</th><th>Reasons</th></tr></thead>
               <tbody></tbody>
             </table>
             <div class="empty" id="buyEmpty" style="display:none;">No BUY signals. Click Refresh to fetch 15-min data.</div>
@@ -249,7 +256,7 @@
           <div class="panel-head">▼ SELL Signals</div>
           <div class="panel-body">
             <table id="sellTable">
-              <thead><tr><th>Stock</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Reasons</th></tr></thead>
+              <thead><tr><th>Stock</th><th>Strategy</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Status</th><th>RSI 60m</th><th>RSI 15m</th><th>Fut OI %</th><th>RS vs NIFTY</th><th>ORB</th><th>Pinbar</th><th>Bias Vol x</th><th>Bias Vol</th><th>20 SMA Vol</th><th>Mom DOWN</th><th>Fut &lt; VWAP</th><th>Calls Dec</th><th>Puts Exp</th><th>Trig Near Low</th><th>Break Sup</th><th>Reasons</th></tr></thead>
               <tbody></tbody>
             </table>
             <div class="empty" id="sellEmpty" style="display:none;">No SELL signals. Click Refresh to fetch 15-min data.</div>
@@ -258,38 +265,76 @@
       </div>
     </div>
     </div>
-    <div id="panel-orb" class="tab-panel">
+    <div id="panel-intraday" class="tab-panel">
       <div class="toolbar">
-        <button class="btn btn-primary" id="btnOrb">Scan ORB</button>
-        <div class="limit-row">
-          <label for="orbLimit">Limit:</label>
-          <input type="number" id="orbLimit" value="200" min="50" max="500">
-        </div>
-        <label class="chk"><input type="checkbox" id="orbCached" checked> Use cached OR (9:15–9:30)</label>
-        <span class="status" id="orbStatus"></span>
+        <span class="status" id="intradayStatus">Uses data from shared refresh.</span>
       </div>
-      <div id="orbContent">
-        <div class="loading" id="orbLoading">Click Scan ORB to run (uses latest 15-min candle close vs OR)</div>
-        <div id="orbResults" class="grid" style="display:none;">
+      <div id="intradayMeta" class="card" style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);"></div>
+      <div id="intradayLoading" class="loading">Loading stored intraday signals…</div>
+      <div id="intradayContent" style="display: none;">
+        <div class="card" style="margin-bottom: 1rem;">
+          <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">Watchlist Rules</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            BUY watchlist: 60m RSI &gt; 55 and 15m RSI &gt; 55. SELL watchlist: 60m RSI &lt; 45 and 15m RSI &lt; 45.
+            Watchlists update only on hourly slots from 9:15 AM to 3:15 PM. Intraday BUY/SELL signals are generated only for symbols already in the matching watchlist.
+          </p>
+        </div>
+        <div class="grid" style="margin-bottom: 1rem;">
           <div class="panel buy">
-            <div class="panel-head">▲ ORB BUY (latest candle close ≥ OR high − 0.2%)</div>
+            <div class="panel-head">BUY Watchlist</div>
             <div class="panel-body">
-              <table id="orbBuyTable">
-                <thead><tr><th>Stock</th><th>Close</th><th>OR High</th><th>Upper Break</th><th>OI</th><th>Time</th></tr></thead>
+              <table id="watchBuyTable">
+                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>Time</th></tr></thead>
                 <tbody></tbody>
               </table>
-              <div class="empty" id="orbBuyEmpty" style="display:none;">No ORB BUY signals.</div>
+              <div class="empty" id="watchBuyEmpty" style="display:none;">No BUY watchlist symbols.</div>
             </div>
           </div>
           <div class="panel sell">
-            <div class="panel-head">▼ ORB SELL (latest candle close ≤ OR low + 0.2%)</div>
+            <div class="panel-head">SELL Watchlist</div>
             <div class="panel-body">
-              <table id="orbSellTable">
-                <thead><tr><th>Stock</th><th>Close</th><th>OR Low</th><th>Lower Break</th><th>OI</th><th>Time</th></tr></thead>
+              <table id="watchSellTable">
+                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>Time</th></tr></thead>
                 <tbody></tbody>
               </table>
-              <div class="empty" id="orbSellEmpty" style="display:none;">No ORB SELL signals.</div>
+              <div class="empty" id="watchSellEmpty" style="display:none;">No SELL watchlist symbols.</div>
             </div>
+          </div>
+        </div>
+        <div class="grid" style="margin-bottom: 1rem;">
+          <div class="panel buy">
+            <div class="panel-head">BUY Signals</div>
+            <div class="panel-body">
+              <table id="intradayBuyTable">
+                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>RSI 5m</th><th>ORB</th><th>PDH</th><th>VWAP</th><th>Vol 2×</th><th>OI↓</th><th>Swing</th><th>Vol Bias</th><th>Liquidity Grab</th><th>Grab Status</th><th>Time</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="empty" id="intradayBuyEmpty" style="display:none;">No BUY signals for this run.</div>
+            </div>
+          </div>
+          <div class="panel sell">
+            <div class="panel-head">SELL Signals</div>
+            <div class="panel-body">
+              <table id="intradaySellTable">
+                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>RSI 5m</th><th>OR ↓</th><th>PDL</th><th>&lt;VWAP</th><th>Vol 2×</th><th>OI↑</th><th>Swing</th><th>Vol Bias</th><th>Liquidity Grab</th><th>Grab Status</th><th>Time</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="empty" id="intradaySellEmpty" style="display:none;">No SELL signals for this run.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">All Scanned Symbols</h2>
+          <div style="overflow-x: auto; max-height: 420px; overflow-y: auto;">
+            <table id="intradayAllTable">
+              <thead>
+                <tr>
+                  <th>Stock</th><th>Watchlist</th><th>Signal</th><th>RSI 60/15/5</th>
+                  <th>BUY gates</th><th>SELL gates</th><th>Vol Bias</th><th>Liquidity Grab</th><th>Grab Status</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -353,6 +398,9 @@
                     <th>Spot chg%</th>
                     <th>Score</th>
                     <th>Bias</th>
+                    <th>Vol Bias</th>
+                    <th>Liquidity Grab</th>
+                    <th>Grab Status</th>
                   </tr>
                 </thead>
                 <tbody id="analysisOverviewBody30"></tbody>
@@ -368,10 +416,6 @@
         <div class="limit-row">
           <label for="eodDate">Date:</label>
           <input type="date" id="eodDate" style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
-        </div>
-        <div class="limit-row">
-          <label for="eodLimit">Limit:</label>
-          <input type="number" id="eodLimit" value="200" min="50" max="500" style="width: 5rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
         </div>
         <button class="btn btn-primary" id="btnEod">Fetch EOD Indicators</button>
         <span class="status" id="eodStatus"></span>
@@ -412,45 +456,52 @@
         </div>
       </div>
     </div>
-    <div id="panel-pinbar" class="tab-panel">
+    <div id="panel-tomorrow" class="tab-panel">
       <div class="toolbar">
-        <button class="btn btn-primary" id="btnPinbar">Scan Pinbars</button>
-        <div class="limit-row">
-          <label for="pinbarLimit">Limit:</label>
-          <input type="number" id="pinbarLimit" value="200" min="50" max="500">
-        </div>
-        <span class="status" id="pinbarStatus"></span>
+        <span class="status" id="twStatus">Uses data from shared refresh.</span>
       </div>
-      <div id="pinbarContent">
-        <div class="loading" id="pinbarLoading">Click Scan Pinbars to find bullish/bearish pinbars on 15-min</div>
-        <div id="pinbarResults" class="grid" style="display:none;">
-          <div class="panel buy">
-            <div class="panel-head">▲ Bullish Pinbar (long lower wick, rejection at low)</div>
-            <div class="panel-body">
-              <table id="pinbarBullTable">
-                <thead><tr><th>Stock</th><th>O</th><th>H</th><th>L</th><th>C</th><th>OI</th><th>Time</th></tr></thead>
-                <tbody></tbody>
-              </table>
-              <div class="empty" id="pinbarBullEmpty" style="display:none;">No bullish pinbars.</div>
-            </div>
-          </div>
-          <div class="panel sell">
-            <div class="panel-head">▼ Bearish Pinbar (long upper wick, rejection at high)</div>
-            <div class="panel-body">
-              <table id="pinbarBearTable">
-                <thead><tr><th>Stock</th><th>O</th><th>H</th><th>L</th><th>C</th><th>OI</th><th>Time</th></tr></thead>
-                <tbody></tbody>
-              </table>
-              <div class="empty" id="pinbarBearEmpty" style="display:none;">No bearish pinbars.</div>
-            </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 900px;">
+        End-of-day style scan: <strong>15m equity history only</strong> (chunked backward when needed), aggregated locally to <strong>1D</strong> and <strong>1H</strong>; raw 15m drives VWAP and compression. FnO names may add one short future daily call for OI. Rate-limited; typically faster than separate day+hour+15m pulls.
+        Results are saved as <code style="font-size:0.8rem;">nifty500_tomorrow_watchlist_&lt;date&gt;.json</code> under your data directory.
+      </p>
+      <div id="twLoading" class="loading" style="display:none;">Loading…</div>
+      <div id="twEmpty" class="empty" style="display:none;">No saved watchlist for this date. Click <strong>Run scan</strong> (requires Kite credentials).</div>
+      <div id="twContent" style="display:none;">
+        <div id="twMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head">Ranked picks (confidence × volume × structure)</div>
+          <div class="panel-body" style="max-height: 640px; overflow: auto;">
+            <table id="twTable" style="font-size: 0.8rem;">
+              <thead>
+                <tr>
+                  <th>Stock</th>
+                  <th>Setup</th>
+                  <th class="num">Price</th>
+                  <th>Level</th>
+                  <th class="num">Dist%</th>
+                  <th>Vol</th>
+                  <th class="num">×10d</th>
+                  <th>OI</th>
+                  <th>Bias</th>
+                  <th class="num">Entry</th>
+                  <th class="num">SL</th>
+                  <th class="num">Target</th>
+                  <th class="num">R:R</th>
+                  <th class="num">Conf</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="twTbody"></tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
   </div>
   <script>
-    const btnRefresh = document.getElementById('btnRefresh');
-    const limitInput = document.getElementById('limit');
+    const btnRefreshAll = document.getElementById('btnRefreshAll');
+    const refreshAllStatus = document.getElementById('refreshAllStatus');
+    const refreshAllMeta = document.getElementById('refreshAllMeta');
     const status = document.getElementById('status');
     const loading = document.getElementById('loading');
     const results = document.getElementById('results');
@@ -463,28 +514,162 @@
       if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
       return String(v);
     }
+    function shiftIsoTs(ts, minutes = 0) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return String(ts);
+      d.setMinutes(d.getMinutes() + minutes);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
     function confClass(c) {
       const v = parseFloat(c);
       if (v >= 0.7) return 'conf-high';
       return 'conf-mid';
     }
-    function shortTs(ts) {
-      if (!ts) return '—';
-      const m = ts.match(/T(\d{2}:\d{2})/);
-      return m ? m[1] : ts.slice(-8, -3);
+    function shortTs(ts, closeMinutes = 0) {
+      const shifted = shiftIsoTs(ts, closeMinutes);
+      if (!shifted) return '—';
+      const m = String(shifted).match(/T(\d{2}:\d{2})/);
+      return m ? m[1] : String(shifted).slice(-8, -3);
+    }
+    function fullTs(ts, closeMinutes = 0) {
+      const shifted = shiftIsoTs(ts, closeMinutes);
+      return shifted ? shifted.replace('T', ' ') : '—';
+    }
+    function biasText(v) {
+      return fmt(v)?.replace(/_/g, ' ') || '—';
+    }
+    function tickCrossCell(active, label) {
+      const safe = fmt(label) || '';
+      return active
+        ? `<span class="sig-buy" title="${safe}">✓</span>`
+        : `<span class="sig-sell" title="${safe || 'No signal'}">✗</span>`;
+    }
+
+    function asBool(v) {
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'number') return v !== 0;
+      const s = String(v || '').trim().toLowerCase();
+      return s === 'true' || s === '1' || s === 'yes';
+    }
+
+    function volCell(v) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return '—';
+      const cls = n >= 1.5 ? 'sig-buy' : 'sig-sell';
+      return `<span class="${cls}" title="Bias candle volume multiple">${n.toFixed(2)}x</span>`;
+    }
+
+    function numValue(v, digits = 2) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return '—';
+      return n.toFixed(digits);
+    }
+
+    function volumeValue(v) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return '—';
+      return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+
+    function biasSmaVolumeValue(s) {
+      const direct = parseFloat(s.bias_volume_sma20);
+      if (Number.isFinite(direct) && direct > 0) return volumeValue(direct);
+      const vol = parseFloat(s.bias_volume);
+      const multiple = parseFloat(s.bias_volume_multiple ?? s.volume_multiple);
+      if (Number.isFinite(vol) && Number.isFinite(multiple) && multiple > 0) {
+        return volumeValue(vol / multiple);
+      }
+      return '—';
+    }
+
+    function signedPctCell(v) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return '—';
+      const cls = n > 0 ? 'sig-buy' : n < 0 ? 'sig-sell' : 'sig-no';
+      const prefix = n > 0 ? '+' : '';
+      return `<span class="${cls}">${prefix}${n.toFixed(2)}%</span>`;
+    }
+
+    function strategyLabel(v) {
+      const s = fmt(v);
+      if (s === 'FAILED_BIAS') return 'Failed Bias';
+      if (s === 'DIRECTIONAL') return 'Directional';
+      return s;
+    }
+
+    function reasonHas(s, needle) {
+      const reasons = String(s?.reasons || '').toLowerCase();
+      return reasons.includes(String(needle || '').toLowerCase());
+    }
+
+    function flagOrReason(s, field, needle) {
+      return asBool(s?.[field]) || reasonHas(s, needle);
+    }
+
+    function signalStatusCell(s) {
+      if (asBool(s?.active_now)) return '<span class="badge badge-bull">LIVE</span>';
+      if (s?.fresh_until) return `<span class="badge badge-neutral" title="Expired after ${shortTs(fmt(s.fresh_until))}">EXPIRED</span>`;
+      return '<span class="badge badge-neutral">HIST</span>';
     }
 
     function renderRow(s, isBuy) {
       const conf = (s.confidence != null ? parseFloat(s.confidence) : 0);
+      const timeText = s.trigger_timestamp
+        ? shortTs(fmt(s.trigger_timestamp))
+        : shortTs(fmt(s.timestamp), 15);
+      const details = isBuy
+        ? `
+        <td class="num">${volCell(s.bias_volume_multiple ?? s.volume_multiple)}</td>
+        <td class="num">${volumeValue(s.bias_volume)}</td>
+        <td class="num">${biasSmaVolumeValue(s)}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'momentum_up', '15-min momentum is UP'), '15-min momentum is UP')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'futures_above_vwap', 'Futures are rising above VWAP'), 'Futures are rising above VWAP')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'calls_expanding', 'Calls are expanding'), 'Calls are expanding')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'puts_decaying', 'puts are decaying'), 'Puts are decaying')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'trigger_near_high', 'Trigger candle closed near its high'), 'Trigger candle closed near its high')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'break_resistance', 'Price is breaking session resistance'), 'Price is breaking session resistance')}</td>`
+        : `
+        <td class="num">${volCell(s.bias_volume_multiple ?? s.volume_multiple)}</td>
+        <td class="num">${volumeValue(s.bias_volume)}</td>
+        <td class="num">${biasSmaVolumeValue(s)}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'momentum_down', '15-min momentum is DOWN'), '15-min momentum is DOWN')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'futures_below_vwap', 'Futures are weakening below VWAP'), 'Futures are weakening below VWAP')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'calls_decaying', 'calls are decaying'), 'Calls are decaying')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'puts_expanding', 'Puts are expanding'), 'Puts are expanding')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'trigger_near_low', 'Trigger candle closed near its low'), 'Trigger candle closed near its low')}</td>
+        <td class="num">${tickCrossCell(flagOrReason(s, 'break_support', 'Price is breaking session support'), 'Price is breaking session support')}</td>`;
       return `<tr>
         <td class="stock">${fmt(s.stock)}</td>
+        <td>${strategyLabel(s.strategy_label || s.pattern || s.strategy)}</td>
         <td class="num">${fmt(s.entry)}</td>
         <td class="num">${fmt(s.target)}</td>
         <td class="num">${fmt(s.stop_loss)}</td>
         <td class="num ${confClass(conf)}">${conf ? (conf * 100).toFixed(0) + '%' : '—'}</td>
-        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
+        <td class="ts">${timeText}</td>
+        <td>${signalStatusCell(s)}</td>
+        <td class="num">${numValue(s.rsi_60m)}</td>
+        <td class="num">${numValue(s.rsi_15m)}</td>
+        <td class="num">${signedPctCell(s.future_oi_change_pct)}</td>
+        <td class="num">${signedPctCell(s.relative_strength_nifty)}</td>
+        <td class="ts">${tickCrossCell(asBool(s.orb_active), fmt(s.orb_signal))}</td>
+        <td class="ts">${tickCrossCell(asBool(s.pinbar_active), fmt(s.pinbar_pattern || s.pinbar_signal))}</td>
+        ${details}
         <td class="reasons">${fmt(s.reasons) || '—'}</td>
       </tr>`;
+    }
+
+    function signalSortTime(s) {
+      if (s.trigger_timestamp) {
+        const ts = Date.parse(fmt(s.trigger_timestamp));
+        return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
+      }
+      if (s.timestamp) {
+        const ts = Date.parse(shiftIsoTs(fmt(s.timestamp), 15));
+        return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
+      }
+      return Number.MAX_SAFE_INTEGER;
     }
 
     async function loadSignals() {
@@ -496,8 +681,8 @@
         const r = await fetch('/api/stocks/signals');
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.detail || 'Failed');
-        const buy = d.buy || [];
-        const sell = d.sell || [];
+        const buy = [...(d.buy || [])].sort((a, b) => signalSortTime(b) - signalSortTime(a));
+        const sell = [...(d.sell || [])].sort((a, b) => signalSortTime(b) - signalSortTime(a));
         buyTbody.innerHTML = buy.map(s => renderRow(s, true)).join('');
         sellTbody.innerHTML = sell.map(s => renderRow(s, false)).join('');
         buyEmpty.style.display = buy.length ? 'none' : 'block';
@@ -512,22 +697,74 @@
       }
     }
 
-    btnRefresh.addEventListener('click', async () => {
-      btnRefresh.disabled = true;
-      setStatus('Fetching 15-min data for all F&O stocks…', null);
+    function setRefreshAllStatus(msg, ok) {
+      if (!refreshAllStatus) return;
+      refreshAllStatus.textContent = msg;
+      refreshAllStatus.className = 'status ' + (ok === true ? 'ok' : ok === false ? 'err' : '');
+    }
+
+    function setRefreshAllMeta(tsIso, tradeDate) {
+      if (!refreshAllMeta) return;
+      if (!tsIso) {
+        refreshAllMeta.textContent = 'Last shared refresh: —';
+        return;
+      }
+      const d = new Date(tsIso);
+      const shown = Number.isNaN(d.getTime())
+        ? String(tsIso).replace('T', ' ')
+        : d.toLocaleString('en-IN', { hour12: false });
+      const td = tradeDate ? ` (${tradeDate})` : '';
+      refreshAllMeta.textContent = `Last shared refresh: ${shown}${td}`;
+    }
+
+    async function refreshAllTabs() {
+      if (btnRefreshAll) btnRefreshAll.disabled = true;
+      setRefreshAllStatus('Refreshing shared 15m/1H/1D data…', null);
+      setStatus('Refreshing from shared data pipeline…', null);
+      if (intradayStatus) {
+        intradayStatus.textContent = 'Refreshing from shared data pipeline…';
+        intradayStatus.className = 'status';
+      }
+      if (twStatus) {
+        twStatus.textContent = 'Refreshing from shared data pipeline…';
+        twStatus.className = 'status';
+      }
       try {
-        const limit = parseInt(limitInput.value, 10) || 50;
-        const r = await fetch('/api/stocks/refresh?limit=' + limit, { method: 'POST' });
+        const r = await fetch('/api/stocks/refresh-all', { method: 'POST' });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.detail || 'Refresh failed');
-        setStatus(`Processed ${d.count || 0} stocks.`, true);
-        await loadSignals();
+        await Promise.all([
+          loadSignals(),
+          loadIntradaySignals(),
+          loadTomorrowWatchlist(),
+        ]);
+        const stocksN = d?.stocks?.processed ?? 0;
+        const intradayBuy = d?.intraday?.buy_signals ?? 0;
+        const intradaySell = d?.intraday?.sell_signals ?? 0;
+        const twPicks = d?.tomorrow_watchlist?.picks ?? 0;
+        setRefreshAllStatus(
+          `Updated: ${stocksN} stocks, intraday ${intradayBuy}/${intradaySell} BUY/SELL, tomorrow picks ${twPicks}.`,
+          true
+        );
+        setRefreshAllMeta(new Date().toISOString(), d?.trade_date);
+        setStatus(`Loaded from shared refresh (${stocksN} stocks).`, true);
       } catch (e) {
+        setRefreshAllStatus('Error: ' + e.message, false);
         setStatus('Error: ' + e.message, false);
+        if (intradayStatus) {
+          intradayStatus.textContent = 'Error: ' + e.message;
+          intradayStatus.className = 'status err';
+        }
+        if (twStatus) {
+          twStatus.textContent = 'Error: ' + e.message;
+          twStatus.className = 'status err';
+        }
       } finally {
-        btnRefresh.disabled = false;
+        if (btnRefreshAll) btnRefreshAll.disabled = false;
       }
-    });
+    }
+
+    btnRefreshAll?.addEventListener('click', refreshAllTabs);
 
     function setStatus(msg, ok) {
       status.textContent = msg;
@@ -536,9 +773,157 @@
 
     loadSignals();
 
+    // Intraday Signals tab
+    const intradayStatus = document.getElementById('intradayStatus');
+    const intradayLoading = document.getElementById('intradayLoading');
+    const intradayContent = document.getElementById('intradayContent');
+    const intradayMeta = document.getElementById('intradayMeta');
+    const watchBuyTbody = document.querySelector('#watchBuyTable tbody');
+    const watchSellTbody = document.querySelector('#watchSellTable tbody');
+    const intradayBuyTbody = document.querySelector('#intradayBuyTable tbody');
+    const intradaySellTbody = document.querySelector('#intradaySellTable tbody');
+    const intradayAllTbody = document.querySelector('#intradayAllTable tbody');
+    const watchBuyEmpty = document.getElementById('watchBuyEmpty');
+    const watchSellEmpty = document.getElementById('watchSellEmpty');
+    const intradayBuyEmpty = document.getElementById('intradayBuyEmpty');
+    const intradaySellEmpty = document.getElementById('intradaySellEmpty');
+
+    function yn(x, cls = 'sig-buy') {
+      return x ? `<span class="${cls}">✓</span>` : '<span style="color:var(--neutral)">—</span>';
+    }
+
+    function gateScore(c) {
+      const vals = Object.values(c || {});
+      if (!vals.length) return '0/0';
+      return `${vals.filter(Boolean).length}/${vals.length}`;
+    }
+
+    function renderWatchRow(s) {
+      return `<tr>
+        <td class="stock">${fmt(s.stock)}</td>
+        <td class="num">${fmt(s.price)}</td>
+        <td class="num">${fmt(s.rsi_60m)}</td>
+        <td class="num">${fmt(s.rsi_15m)}</td>
+        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
+      </tr>`;
+    }
+
+    function renderIntradayBuyRow(s) {
+      const c = s.buy_confirmations || {};
+      return `<tr>
+        <td class="stock">${fmt(s.stock)}</td>
+        <td class="num">${fmt(s.price)}</td>
+        <td class="num">${fmt(s.rsi_60m)}</td>
+        <td class="num">${fmt(s.rsi_15m)}</td>
+        <td class="num">${fmt(s.rsi_5m)}</td>
+        <td class="num">${yn(c.orb_5m)}</td>
+        <td class="num">${yn(c.pdh_breakout)}</td>
+        <td class="num">${yn(c.above_vwap_5m)}</td>
+        <td class="num">${yn(c.volume_2x_sma20)}</td>
+        <td class="num">${yn(c.futures_oi_drop)}</td>
+        <td class="num">${yn(c.swing_high_breakout)}</td>
+        <td><span class="badge ${badgeClass30(s.volume_bias)}">${biasText(s.volume_bias)}</span></td>
+        <td class="num">${fmt(s.liquidity_grab)}</td>
+        <td>${fmt(s.liquidity_grab_status)}${s.liquidity_grab_hit_at ? ' @ ' + shortTs(s.liquidity_grab_hit_at) : ''}</td>
+        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
+      </tr>`;
+    }
+
+    function renderIntradaySellRow(s) {
+      const c = s.sell_confirmations || {};
+      return `<tr>
+        <td class="stock">${fmt(s.stock)}</td>
+        <td class="num">${fmt(s.price)}</td>
+        <td class="num">${fmt(s.rsi_60m)}</td>
+        <td class="num">${fmt(s.rsi_15m)}</td>
+        <td class="num">${fmt(s.rsi_5m)}</td>
+        <td class="num">${yn(c.orb_5m_breakdown, 'sig-sell')}</td>
+        <td class="num">${yn(c.pdl_breakdown, 'sig-sell')}</td>
+        <td class="num">${yn(c.below_vwap_5m, 'sig-sell')}</td>
+        <td class="num">${yn(c.volume_2x_sma20, 'sig-sell')}</td>
+        <td class="num">${yn(c.futures_oi_rise, 'sig-sell')}</td>
+        <td class="num">${yn(c.swing_low_breakdown, 'sig-sell')}</td>
+        <td><span class="badge ${badgeClass30(s.volume_bias)}">${biasText(s.volume_bias)}</span></td>
+        <td class="num">${fmt(s.liquidity_grab)}</td>
+        <td>${fmt(s.liquidity_grab_status)}${s.liquidity_grab_hit_at ? ' @ ' + shortTs(s.liquidity_grab_hit_at) : ''}</td>
+        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
+      </tr>`;
+    }
+
+    function renderIntradayAllRow(s) {
+      const watchCls = s.watchlist_side === 'BUY' ? 'sig-buy' : s.watchlist_side === 'SELL' ? 'sig-sell' : 'sig-no';
+      const sigCls = s.signal === 'BUY' ? 'sig-buy' : s.signal === 'SELL' ? 'sig-sell' : 'sig-no';
+      return `<tr>
+        <td class="stock">${fmt(s.stock)}</td>
+        <td class="${watchCls}">${fmt(s.watchlist_side)}</td>
+        <td class="${sigCls}">${fmt(s.signal)}</td>
+        <td class="num">${fmt(s.rsi_60m)} / ${fmt(s.rsi_15m)} / ${fmt(s.rsi_5m)}</td>
+        <td class="num">${gateScore(s.buy_confirmations)}</td>
+        <td class="num">${gateScore(s.sell_confirmations)}</td>
+        <td><span class="badge ${badgeClass30(s.volume_bias)}">${biasText(s.volume_bias)}</span></td>
+        <td class="num">${fmt(s.liquidity_grab)}</td>
+        <td>${fmt(s.liquidity_grab_status)}${s.liquidity_grab_hit_at ? ' @ ' + shortTs(s.liquidity_grab_hit_at) : ''}</td>
+      </tr>`;
+    }
+
+    async function loadIntradaySignals() {
+      if (!intradayLoading || !intradayContent) return;
+      intradayLoading.style.display = 'block';
+      intradayContent.style.display = 'none';
+      intradayStatus.textContent = '';
+      try {
+        const r = await fetch('/api/stocks/intraday-signals');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'Load failed');
+        const buyWatch = d.buy_watchlist || [];
+        const sellWatch = d.sell_watchlist || [];
+        const buySignals = d.buy_signals || [];
+        const sellSignals = d.sell_signals || [];
+        const signals = d.signals || [];
+
+        watchBuyTbody.innerHTML = buyWatch.map(renderWatchRow).join('');
+        watchSellTbody.innerHTML = sellWatch.map(renderWatchRow).join('');
+        intradayBuyTbody.innerHTML = buySignals.map(renderIntradayBuyRow).join('');
+        intradaySellTbody.innerHTML = sellSignals.map(renderIntradaySellRow).join('');
+        intradayAllTbody.innerHTML = signals.map(renderIntradayAllRow).join('');
+
+        watchBuyEmpty.style.display = buyWatch.length ? 'none' : 'block';
+        watchSellEmpty.style.display = sellWatch.length ? 'none' : 'block';
+        intradayBuyEmpty.style.display = buySignals.length ? 'none' : 'block';
+        intradaySellEmpty.style.display = sellSignals.length ? 'none' : 'block';
+
+        const lr = d.last_run_at ? fmt(d.last_run_at).replace('T', ' ') : '—';
+        const nr = d.next_refresh_at ? fmt(d.next_refresh_at).replace('T', ' ') : '—';
+        const wu = d.watchlist_updated_at ? fmt(d.watchlist_updated_at).replace('T', ' ') : '—';
+        const ws = d.watchlist_slot_at ? shortTs(fmt(d.watchlist_slot_at)) : '—';
+        const we = d.watchlist_slot_end_at ? shortTs(fmt(d.watchlist_slot_end_at)) : '—';
+        const nw = d.next_watchlist_update_at ? fmt(d.next_watchlist_update_at).replace('T', ' ') : '—';
+        const failed = (d.failed_symbols || []).length;
+        intradayMeta.innerHTML = `<strong>Last run:</strong> ${lr} &nbsp;|&nbsp; <strong>Watchlist rebuilt at:</strong> ${wu} &nbsp;|&nbsp; <strong>Active slot:</strong> ${ws} - ${we} &nbsp;|&nbsp; <strong>Next slot:</strong> ${nw} &nbsp;|&nbsp; <strong>Next refresh (suggested):</strong> ${nr} &nbsp;|&nbsp; <strong>Universe:</strong> ${(d.symbols_scanned || []).length} symbols` + (failed ? ` &nbsp;|&nbsp; <strong>Failed:</strong> ${failed}` : '');
+        intradayLoading.style.display = 'none';
+        intradayContent.style.display = 'block';
+        intradayStatus.textContent = `${buyWatch.length} BUY watchlist • ${sellWatch.length} SELL watchlist • ${buySignals.length} BUY signals • ${sellSignals.length} SELL signals`;
+        intradayStatus.className = 'status ok';
+      } catch (e) {
+        intradayLoading.textContent = 'Could not load. Click Refresh after the server has stored a run.';
+        intradayStatus.textContent = 'Error: ' + e.message;
+        intradayStatus.className = 'status err';
+      }
+    }
+
     // Open 30min tab from hash (#30min)
     if (window.location.hash === '#30min') {
       document.querySelector('.tab[data-tab="30min"]')?.click();
+    }
+    if (
+      window.location.hash === '#intraday' ||
+      window.location.hash === '#intraday-buy' ||
+      window.location.hash === '#intraday-sell'
+    ) {
+      document.querySelector('.tab[data-tab="intraday"]')?.click();
+    }
+    if (window.location.hash === '#tomorrow' || window.location.hash === '#watchlist-tomorrow') {
+      document.querySelector('.tab[data-tab="tomorrow"]')?.click();
     }
 
     // Tabs
@@ -549,136 +934,14 @@
         t.classList.add('active');
         document.getElementById('panel-' + t.dataset.tab).classList.add('active');
         if (t.dataset.tab === '30min') loadStocksFor30min();
+        if (t.dataset.tab === 'intraday') loadIntradaySignals();
+        if (t.dataset.tab === 'tomorrow') loadTomorrowWatchlist();
       });
-    });
-
-    // ORB
-    const btnOrb = document.getElementById('btnOrb');
-    const orbLimit = document.getElementById('orbLimit');
-    const orbCached = document.getElementById('orbCached');
-    const orbStatus = document.getElementById('orbStatus');
-    const orbLoading = document.getElementById('orbLoading');
-    const orbResults = document.getElementById('orbResults');
-    const orbBuyTbody = document.querySelector('#orbBuyTable tbody');
-    const orbSellTbody = document.querySelector('#orbSellTable tbody');
-    const orbBuyEmpty = document.getElementById('orbBuyEmpty');
-    const orbSellEmpty = document.getElementById('orbSellEmpty');
-
-    function renderOrbRow(s, isBuy) {
-      const ts = fmt(s.timestamp);
-      const shortTs = ts.match(/T(\d{2}:\d{2})/) ? ts.match(/T(\d{2}:\d{2})/)[1] : (ts.slice(-8, -3) || '—');
-      if (isBuy) {
-        return `<tr>
-          <td class="stock">${fmt(s.stock)}</td>
-          <td class="num">${fmt(s.price)}</td>
-          <td class="num">${fmt(s.or_high)}</td>
-          <td class="num">${fmt(s.upper_break)}</td>
-          <td class="num">${fmt(s.oi)}</td>
-          <td class="ts">${shortTs}</td>
-        </tr>`;
-      }
-      return `<tr>
-        <td class="stock">${fmt(s.stock)}</td>
-        <td class="num">${fmt(s.price)}</td>
-        <td class="num">${fmt(s.or_low)}</td>
-        <td class="num">${fmt(s.lower_break)}</td>
-        <td class="num">${fmt(s.oi)}</td>
-        <td class="ts">${shortTs}</td>
-      </tr>`;
-    }
-
-    // Pinbar
-    const btnPinbar = document.getElementById('btnPinbar');
-    const pinbarLimit = document.getElementById('pinbarLimit');
-    const pinbarStatus = document.getElementById('pinbarStatus');
-    const pinbarLoading = document.getElementById('pinbarLoading');
-    const pinbarResults = document.getElementById('pinbarResults');
-    const pinbarBullTbody = document.querySelector('#pinbarBullTable tbody');
-    const pinbarBearTbody = document.querySelector('#pinbarBearTable tbody');
-    const pinbarBullEmpty = document.getElementById('pinbarBullEmpty');
-    const pinbarBearEmpty = document.getElementById('pinbarBearEmpty');
-
-    function renderPinbarRow(s, isBull) {
-      const ts = fmt(s.timestamp);
-      const shortTs = ts.match(/T(\d{2}:\d{2})/) ? ts.match(/T(\d{2}:\d{2})/)[1] : (ts.slice(-8, -3) || '—');
-      return `<tr>
-        <td class="stock">${fmt(s.stock)}</td>
-        <td class="num">${fmt(s.open)}</td>
-        <td class="num">${fmt(s.high)}</td>
-        <td class="num">${fmt(s.low)}</td>
-        <td class="num">${fmt(s.close)}</td>
-        <td class="num">${fmt(s.oi)}</td>
-        <td class="ts">${shortTs}</td>
-      </tr>`;
-    }
-
-    btnPinbar.addEventListener('click', async () => {
-      btnPinbar.disabled = true;
-      pinbarLoading.style.display = 'block';
-      pinbarLoading.textContent = 'Scanning pinbars (parallel fetch)…';
-      pinbarResults.style.display = 'none';
-      pinbarStatus.textContent = '';
-      try {
-        const limit = parseInt(pinbarLimit.value, 10) || 200;
-        const r = await fetch('/api/stocks/pinbar?limit=' + limit);
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'Pinbar scan failed');
-        const bull = d.bullish || [];
-        const bear = d.bearish || [];
-        pinbarBullTbody.innerHTML = bull.map(s => renderPinbarRow(s, true)).join('');
-        pinbarBearTbody.innerHTML = bear.map(s => renderPinbarRow(s, false)).join('');
-        pinbarBullEmpty.style.display = bull.length ? 'none' : 'block';
-        pinbarBearEmpty.style.display = bear.length ? 'none' : 'block';
-        pinbarLoading.style.display = 'none';
-        pinbarResults.style.display = 'grid';
-        pinbarStatus.textContent = `${bull.length} bullish, ${bear.length} bearish pinbars`;
-        pinbarStatus.className = 'status ok';
-      } catch (e) {
-        pinbarLoading.textContent = 'Click Scan Pinbars to run';
-        pinbarLoading.style.display = 'block';
-        pinbarStatus.textContent = 'Error: ' + e.message;
-        pinbarStatus.className = 'status err';
-      } finally {
-        btnPinbar.disabled = false;
-      }
-    });
-
-    btnOrb.addEventListener('click', async () => {
-      btnOrb.disabled = true;
-      orbLoading.style.display = 'block';
-      orbLoading.textContent = 'Scanning ORB (bulk quote + OR ranges)…';
-      orbResults.style.display = 'none';
-      orbStatus.textContent = '';
-      try {
-        const limit = parseInt(orbLimit.value, 10) || 200;
-        const useCached = orbCached.checked;
-        const r = await fetch('/api/stocks/orb?limit=' + limit + '&use_cached=' + useCached);
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'ORB scan failed');
-        const buy = d.buy || [];
-        const sell = d.sell || [];
-        orbBuyTbody.innerHTML = buy.map(s => renderOrbRow(s, true)).join('');
-        orbSellTbody.innerHTML = sell.map(s => renderOrbRow(s, false)).join('');
-        orbBuyEmpty.style.display = buy.length ? 'none' : 'block';
-        orbSellEmpty.style.display = sell.length ? 'none' : 'block';
-        orbLoading.style.display = 'none';
-        orbResults.style.display = 'grid';
-        orbStatus.textContent = `${buy.length} BUY, ${sell.length} SELL (latest candle close vs OR)`;
-        orbStatus.className = 'status ok';
-      } catch (e) {
-        orbLoading.textContent = 'Click Scan ORB to run';
-        orbLoading.style.display = 'block';
-        orbStatus.textContent = 'Error: ' + e.message;
-        orbStatus.className = 'status err';
-      } finally {
-        btnOrb.disabled = false;
-      }
     });
 
     // EOD FnO Analysis tab
     const btnEod = document.getElementById('btnEod');
     const eodDate = document.getElementById('eodDate');
-    const eodLimit = document.getElementById('eodLimit');
     const eodStatus = document.getElementById('eodStatus');
     const eodLoading = document.getElementById('eodLoading');
     const eodResults = document.getElementById('eodResults');
@@ -687,6 +950,84 @@
       eodDate.value = new Date().toISOString().slice(0, 10);
       eodDate.max = new Date().toISOString().slice(0, 10);
     }
+    // Watchlist for Tomorrow
+    const twStatus = document.getElementById('twStatus');
+    const twLoading = document.getElementById('twLoading');
+    const twEmpty = document.getElementById('twEmpty');
+    const twContent = document.getElementById('twContent');
+    const twMeta = document.getElementById('twMeta');
+    const twTbody = document.getElementById('twTbody');
+
+    function twFmtOi(s) {
+      const t = fmt(s);
+      if (t.length <= 56) return t;
+      return `<span title="${t.replace(/"/g, '&quot;')}">${t.slice(0, 54)}…</span>`;
+    }
+
+    async function loadTomorrowWatchlist() {
+      if (!twLoading || !twContent) return;
+      twLoading.style.display = 'block';
+      twLoading.textContent = 'Loading watchlist…';
+      twContent.style.display = 'none';
+      twEmpty.style.display = 'none';
+      twStatus.textContent = '';
+      twStatus.className = 'status';
+      try {
+        const r = await fetch('/api/stocks/tomorrow-watchlist', { method: 'GET' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'Request failed');
+        const picks = d.picks || [];
+        twTbody.innerHTML = picks.map(p => {
+          const tp = p.trade_plan || {};
+          const biasCls = p.next_day_bias === 'Bullish' ? 'sig-buy' : 'sig-sell';
+          const lvl = p.key_level != null ? `${fmt(p.key_level_type)} ${fmt(p.key_level)}` : '—';
+          return `<tr>
+            <td class="stock">${fmt(p.stock)}</td>
+            <td>${fmt(p.setup_type)}</td>
+            <td class="num">${fmt(p.current_price)}</td>
+            <td>${lvl}</td>
+            <td class="num">${p.distance_to_breakout_pct != null ? Number(p.distance_to_breakout_pct).toFixed(2) : '—'}</td>
+            <td>${fmt(p.volume_profile)}</td>
+            <td class="num">${fmt(p.volume_vs_10d)}</td>
+            <td style="max-width:140px;font-size:0.75rem;">${twFmtOi(p.oi_interpretation)}</td>
+            <td class="${biasCls}">${fmt(p.next_day_bias)}</td>
+            <td class="num">${fmt(tp.entry)}</td>
+            <td class="num">${fmt(tp.stop_loss)}</td>
+            <td class="num">${fmt(tp.target)}</td>
+            <td class="num">${fmt(tp.rr)}</td>
+            <td class="num conf-high">${p.confidence_score != null ? Number(p.confidence_score).toFixed(0) : '—'}</td>
+            <td class="reasons" style="max-width:320px;">${fmt(p.reason)}</td>
+          </tr>`;
+        }).join('');
+        twLoading.style.display = 'none';
+        if (picks.length === 0) {
+          twEmpty.style.display = 'block';
+          twEmpty.innerHTML = d.message
+            ? String(d.message)
+            : 'No picks passed filters for this run.';
+          twStatus.textContent = d.scanned != null ? `Scanned ${d.scanned} symbols, 0 picks.` : '';
+          twStatus.className = 'status';
+          return;
+        }
+        twContent.style.display = 'block';
+        const failed = d.failed_count != null ? d.failed_count : 0;
+        twMeta.innerHTML = `<strong>As of:</strong> ${fmt(d.run_at).replace('T', ' ')} &nbsp;|&nbsp; <strong>Trade date:</strong> ${fmt(d.trade_date)} &nbsp;|&nbsp; <strong>Universe:</strong> ${fmt(d.universe)} &nbsp;|&nbsp; <strong>Scanned:</strong> ${d.scanned} &nbsp;|&nbsp; <strong>Picks:</strong> ${picks.length}` + (failed ? ` &nbsp;|&nbsp; <strong>Fetch errors:</strong> ${failed}` : '');
+        if (d.stale && d.message) {
+          twStatus.textContent = d.message + ' ' + `${picks.length} stocks — sorted by confidence and volume/structure.`;
+          twStatus.className = 'status warn';
+        } else {
+          twStatus.textContent = `${picks.length} stocks — sorted by confidence and volume/structure.`;
+          twStatus.className = 'status ok';
+        }
+      } catch (e) {
+        twLoading.style.display = 'none';
+        twEmpty.style.display = 'block';
+        twEmpty.textContent = 'Error: ' + e.message;
+        twStatus.textContent = e.message;
+        twStatus.className = 'status err';
+      }
+    }
+
     btnEod.addEventListener('click', async () => {
       btnEod.disabled = true;
       eodLoading.style.display = 'block';
@@ -695,8 +1036,7 @@
       eodStatus.textContent = '';
       try {
         const tradeDate = eodDate?.value || new Date().toISOString().slice(0, 10);
-        const limit = parseInt(eodLimit?.value, 10) || 200;
-        const r = await fetch('/api/stocks/eod-indicators?trade_date=' + encodeURIComponent(tradeDate) + '&limit=' + limit);
+        const r = await fetch('/api/stocks/eod-indicators?trade_date=' + encodeURIComponent(tradeDate));
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.detail || 'EOD fetch failed');
         const indicators = d.indicators || [];
@@ -769,8 +1109,8 @@
       return 'sig-no';
     }
     function badgeClass30(v) {
-      if (v === 'BULLISH_DAY' || v === 'UP' || v === 'above' || v === 'premium' || v === 'call_heavy') return 'badge-bull';
-      if (v === 'BEARISH_DAY' || v === 'DOWN' || v === 'below' || v === 'discount' || v === 'put_heavy') return 'badge-bear';
+      if (v === 'BULLISH_DAY' || v === 'UP' || v === 'above' || v === 'premium' || v === 'call_heavy' || v === 'BULLISH_BIAS') return 'badge-bull';
+      if (v === 'BEARISH_DAY' || v === 'DOWN' || v === 'below' || v === 'discount' || v === 'put_heavy' || v === 'BEARISH_BIAS') return 'badge-bear';
       return 'badge-neutral';
     }
     function rangeBarPct30(support, resistance, spot) {
@@ -820,7 +1160,7 @@
         const selected = anaData.selected;
         tbody30.innerHTML = signals.map(s => `
           <tr>
-            <td>${fmt(s.timestamp)?.replace('T', ' ').slice(11, 16) || '—'}</td>
+            <td>${shortTs(fmt(s.timestamp), 30)}</td>
             <td class="${sigClass30(s.signal)}">${fmt(s.signal)}</td>
             <td class="num">${fmt(s.entry)}</td>
             <td class="num">${fmt(s.target)}</td>
@@ -832,11 +1172,12 @@
         `).join('') || '<tr><td colspan="8">No signals.</td></tr>';
         if (summaries.length === 0) {
           dayOverview30.innerHTML = '<p style="color: var(--text-muted);">No data for this date. Market may be closed or no 30-min candles yet.</p>';
-          analysisOverviewBody30.innerHTML = '<tr><td colspan="11">No analysis data.</td></tr>';
+          analysisOverviewBody30.innerHTML = '<tr><td colspan="14">No analysis data.</td></tr>';
           analysisContent30.innerHTML = '<p>No analysis data.</p>';
         } else {
           const first = summaries[0], last = summaries[summaries.length - 1];
           const paLast = last.price_action || {};
+          const vbLast = last.volume_bias || {};
           const sessionHigh = paLast.session_high ?? paLast.high ?? paLast.spot;
           const sessionLow = paLast.session_low ?? paLast.low ?? paLast.spot;
           const open = first.price_action?.open ?? first.price_action?.spot;
@@ -848,7 +1189,7 @@
           summaries.forEach(s => { const b = s.bias || 'NEUTRAL'; biasCounts[b] = (biasCounts[b] || 0) + 1; });
           const dominantBias = Object.entries(biasCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
           const latestActionable = summaries.filter(s => s.signal === 'BUY' || s.signal === 'SELL').pop();
-          const latestTime = latestActionable ? (latestActionable.timestamp || '').replace('T', ' ').slice(11, 16) : '—';
+          const latestTime = latestActionable ? shortTs(latestActionable.timestamp || '', 30) : '—';
           const spotVsOpen = open ? (spot > open ? 'above' : spot < open ? 'below' : 'flat') : '—';
           dayOverview30.innerHTML = `
             <div class="day-overview">
@@ -859,18 +1200,20 @@
               <div class="day-card"><div class="label">Signals</div><div class="signal-counts"><span class="buy">BUY ${buyCount}</span><span class="sell">SELL ${sellCount}</span><span class="no">NO ${noCount}</span></div></div>
               <div class="day-card"><div class="label">Dominant Bias</div><div class="val"><span class="badge ${badgeClass30(dominantBias)}">${fmt(dominantBias)?.replace('_DAY','') || '—'}</span></div></div>
               <div class="day-card"><div class="label">Latest Actionable</div><div class="val small ${latestActionable?.signal === 'BUY' ? 'sig-buy' : latestActionable?.signal === 'SELL' ? 'sig-sell' : ''}">${fmt(latestActionable?.signal)} ${latestTime !== '—' ? '@ ' + latestTime : ''}</div></div>
+              <div class="day-card"><div class="label">Latest Vol Bias</div><div class="val small"><span class="badge ${badgeClass30(vbLast.bias)}">${biasText(vbLast.bias)}</span><div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${fmt(vbLast.liquidity_grab_status)}${vbLast.liquidity_grab_hit_at ? ' @ ' + shortTs(vbLast.liquidity_grab_hit_at, 30) : ''}</div></div></div>
             </div>
           `;
           analysisOverviewBody30.innerHTML = [...summaries].reverse().map(s => {
             const pa = s.price_action || {};
             const fut = s.futures || {};
             const oi = s.oi || {};
+            const vb = s.volume_bias || {};
             const pct = rangeBarPct30(pa.support, pa.resistance, pa.spot);
             const score = s.scores?.final_score != null ? s.scores.final_score : null;
             const futOiChg = oi.fut_oi_change_candle_pct != null ? oi.fut_oi_change_candle_pct : null;
             const spotChg = pa.spot_change_pct != null ? pa.spot_change_pct : null;
             return `<tr class="analysis-row" data-ts="${s.timestamp || ''}">
-              <td>${fmt(s.timestamp)?.replace('T', ' ').slice(11, 16) || '—'}</td>
+              <td>${shortTs(fmt(s.timestamp), 30)}</td>
               <td class="${sigClass30(s.signal)}">${fmt(s.signal)?.replace('_','') || '—'}</td>
               <td class="num">${fmt(pa.spot)}</td>
               <td class="num">${fmt(pa.support)}</td>
@@ -881,8 +1224,11 @@
               <td class="num ${(spotChg || 0) > 0 ? 'pnl-positive' : (spotChg || 0) < 0 ? 'pnl-negative' : ''}">${spotChg != null ? spotChg.toFixed(2) + '%' : '—'}</td>
               <td class="num ${score != null && score > 0 ? 'pnl-positive' : score != null && score < 0 ? 'pnl-negative' : ''}">${score != null ? score.toFixed(2) : '—'}</td>
               <td><span class="badge ${badgeClass30(s.bias)}">${fmt(s.bias)?.replace('_DAY','') || '—'}</span></td>
+              <td><span class="badge ${badgeClass30(vb.bias)}">${biasText(vb.bias)}</span></td>
+              <td class="num">${fmt(vb.liquidity_grab)}</td>
+              <td>${fmt(vb.liquidity_grab_status)}${vb.liquidity_grab_hit_at ? ' @ ' + shortTs(vb.liquidity_grab_hit_at, 30) : ''}</td>
             </tr>`;
-          }).join('') || '<tr><td colspan="11">No data.</td></tr>';
+          }).join('') || '<tr><td colspan="14">No data.</td></tr>';
           document.querySelectorAll('#analysisOverviewBody30 .analysis-row').forEach(row => {
             row.onclick = () => {
               const ts = row.dataset.ts;
@@ -916,11 +1262,12 @@
       const fut = s.futures || {};
       const opt = s.options || {};
       const oi = s.oi || {};
+      const vb = s.volume_bias || {};
       const sc = s.scores || {};
       const tp = s.trade_plan || {};
       const rangePct = rangeBarPct30(pa.support, pa.resistance, pa.spot);
       el.innerHTML = `
-        <h2 style="margin: 0 0 1rem;">Detail: ${fmt(s.timestamp)} <span class="badge ${sigClass30(s.signal)}" style="margin-left:0.5rem">${fmt(s.signal)}</span></h2>
+        <h2 style="margin: 0 0 1rem;">Detail: ${fullTs(s.timestamp, 30)} <span class="badge ${sigClass30(s.signal)}" style="margin-left:0.5rem">${fmt(s.signal)}</span></h2>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div>
             <h3 style="margin: 0 0 0.5rem;">Price Action</h3>
@@ -937,6 +1284,13 @@
             <table class="summary-table" style="font-size: 0.8rem;">
               <tr><th>LTP</th><td class="num">${fmt(fut.ltp)}</td><th>vs Spot</th><td class="num ${(fut.vs_spot_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(fut.vs_spot_pct)}%</td></tr>
               <tr><th>Premium</th><td><span class="badge ${badgeClass30(fut.premium)}">${fmt(fut.premium)}</span></td><th>vs VWAP</th><td><span class="badge ${badgeClass30(fut.fut_vs_fut_vwap)}">${fmt(fut.fut_vs_fut_vwap)}</span></td></tr>
+            </table>
+            <h3 style="margin: 0.75rem 0 0.5rem;">Volume Bias</h3>
+            <table class="summary-table" style="font-size: 0.8rem;">
+              <tr><th>Bias</th><td><span class="badge ${badgeClass30(vb.bias)}">${biasText(vb.bias)}</span></td><th>Liquidity Grab</th><td class="num">${fmt(vb.liquidity_grab)}</td></tr>
+              <tr><th>Volume</th><td class="num">${fmt(vb.volume)}</td><th>20 SMA</th><td class="num">${fmt(vb.volume_sma20)}</td></tr>
+              <tr><th>Multiple</th><td class="num">${fmt(vb.volume_multiple)}</td><th>Rule</th><td>${vb.bias === 'NEUTRAL' ? 'No 1.5x volume expansion' : '1.5x volume expansion + candle color'}</td></tr>
+              <tr><th>Confirmed At</th><td>${vb.confirmation_timestamp ? fullTs(vb.confirmation_timestamp, 30) : '—'}</td><th>Grab Status</th><td>${fmt(vb.liquidity_grab_status)}${vb.liquidity_grab_hit_at ? ' @ ' + fullTs(vb.liquidity_grab_hit_at, 30) : ''}</td></tr>
             </table>
             <h3 style="margin: 0.75rem 0 0.5rem;">FUT vs Spot Analysis</h3>
             <table class="summary-table" style="font-size: 0.8rem;">

@@ -28,11 +28,9 @@ class InstrumentResolver:
     def resolve_for_date(self, spot_price: float, trade_date: date) -> DerivativeSymbols:
         instruments = self.client.nfo_instruments()
         underlying = self.settings.underlying
-        atm_strike = self._to_atm_strike(spot_price, self.settings.option_strike_step)
 
         fut = self._nearest_future(instruments, underlying, trade_date)
-        ce = self._nearest_option(instruments, underlying, trade_date, atm_strike, "CE")
-        pe = self._nearest_option(instruments, underlying, trade_date, atm_strike, "PE")
+        ce, pe, atm_strike = self._nearest_option_pair(instruments, underlying, trade_date, spot_price)
 
         if not fut or not ce or not pe:
             raise RuntimeError("Unable to resolve required derivatives symbols from NFO instruments.")
@@ -100,4 +98,50 @@ class InstrumentResolver:
         ]
         opts.sort(key=lambda x: x["expiry"])
         return opts[0] if opts else None
+
+    @staticmethod
+    def _nearest_option_pair(
+        records: List[Dict[str, object]],
+        underlying: str,
+        today: date,
+        spot_price: float,
+    ) -> tuple[Dict[str, object] | None, Dict[str, object] | None, int]:
+        """
+        Choose the nearest available CE/PE strike from the live option chain.
+
+        For stock options, listed strikes are often sparse (e.g. 20/40-point steps),
+        so rounding by a configured step can point to a strike that does not exist.
+        """
+        eligible = [
+            r
+            for r in records
+            if InstrumentResolver._matches_underlying(r, underlying)
+            and r.get("instrument_type") in ("CE", "PE")
+            and r.get("expiry")
+            and r["expiry"] >= today
+        ]
+        if not eligible:
+            return None, None, 0
+
+        expiries = sorted({r["expiry"] for r in eligible})
+        for expiry in expiries:
+            by_strike: Dict[int, Dict[str, Dict[str, object]]] = {}
+            for row in eligible:
+                if row["expiry"] != expiry:
+                    continue
+                strike = int(float(row.get("strike", 0) or 0))
+                if strike <= 0:
+                    continue
+                strike_bucket = by_strike.setdefault(strike, {})
+                strike_bucket[str(row.get("instrument_type"))] = row
+
+            common_strikes = [strike for strike, legs in by_strike.items() if "CE" in legs and "PE" in legs]
+            if not common_strikes:
+                continue
+
+            nearest_strike = min(common_strikes, key=lambda strike: (abs(strike - spot_price), strike))
+            legs = by_strike[nearest_strike]
+            return legs["CE"], legs["PE"], nearest_strike
+
+        return None, None, 0
 

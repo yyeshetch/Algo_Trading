@@ -7,80 +7,24 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from intraday_engine.core.config import Settings
+from intraday_engine.core.underlyings import LIQUID_FNO_STOCKS, get_underlying_config
+from intraday_engine.fetch.instrument_resolver import InstrumentResolver
+from intraday_engine.fetch.zerodha_client import ZerodhaClient
 
-# Liquid FnO symbols to scrape (indices + selected stocks)
-EOD_SYMBOLS: tuple[str, ...] = (
+# Liquid FnO symbols to scrape (indices + Chartink-selected stocks)
+EOD_INDEX_SYMBOLS: tuple[str, ...] = (
     "NIFTY",
     "BANKNIFTY",
-    "ADANIPORTS",
-    "AMBER",
-    "ASHOKLEY",
-    "AXISBANK",
-    "BAJAJ-AUTO",
-    "BAJFINANCE",
-    "BANDHANBNK",
-    "BEL",
-    "BHARTIARTL",
-    "BPCL",
-    "BSE",
-    "CHOLAFIN",
-    "COALINDIA",
-    "COFORGE",
-    "CUMMINSIND",
-    "DIXON",
-    "EICHERMOT",
-    "ETERNAL",
-    "FEDERALBNK",
     "FINNIFTY",
-    "HAL",
-    "HCLTECH",
-    "HDFCAMC",
-    "HDFCBANK",
-    "HINDALCO",
-    "HINDPETRO",
-    "HINDUNILVR",
-    "ICICIBANK",
-    "IDEA",
-    "INDIGO",
-    "INFY",
-    "IOC",
-    "ITC",
-    "KAYNES",
-    "KOTAKBANK",
-    "LT",
-    "M&M",
-    "MARUTI",
-    "MAZDOCK",
-    "MCX",
     "MIDCPNIFTY",
-    "MUTHOOTFIN",
-    "NATIONALUM",
     "NIFTYNXT50",
-    "NTPC",
-    "ONGC",
-    "PFC",
-    "POWERGRID",
-    "RELIANCE",
-    "SAIL",
-    "SBIN",
-    "SHRIRAMFIN",
-    "SUNPHARMA",
-    "TATAPOWER",
-    "TATASTEEL",
-    "TCS",
-    "TITAN",
-    "TRENT",
-    "TVSMOTOR",
-    "ULTRACEMCO",
-    "VEDL",
-    "WAAREEENER",
-    "WIPRO",
+)
+EOD_SYMBOLS: tuple[str, ...] = (
+    *EOD_INDEX_SYMBOLS,
+    *LIQUID_FNO_STOCKS,
 )
 # Override NSE spot symbols for symbols that differ from NFO name (add as needed)
 EOD_SPOT_OVERRIDES: dict[str, str] = {}
-from intraday_engine.core.underlyings import get_underlying_config
-from intraday_engine.fetch.instrument_resolver import InstrumentResolver
-from intraday_engine.fetch.zerodha_client import ZerodhaClient
 
 logger = logging.getLogger(__name__)
 
@@ -316,12 +260,12 @@ def run_eod_scan(
     stock_limit: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     """
-    Fetch EOD indicators for liquid FnO symbols (EOD_SYMBOLS only).
+    Fetch EOD indicators for index underlyings plus the allowed liquid FnO stocks.
     Returns list of indicator dicts, sorted by spot_volume descending (most liquid first).
     """
     settings = Settings.from_env(underlying="NIFTY")
     client = ZerodhaClient(settings)
-    stock_names = list(EOD_SYMBOLS)
+    stock_names = [*EOD_INDEX_SYMBOLS, *client.fno_stock_names()]
     if stock_limit:
         stock_names = stock_names[:stock_limit]
 

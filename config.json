@@ -1,0 +1,548 @@
+{
+  "_meta": {
+    "about": "Tunables for Algo_Trading. Standard JSON has no comments; each field includes a help string.",
+    "env_override": "For settings.* entries, if the listed env var is set in .env it overrides the value here."
+  },
+  "version": 1,
+  "settings": {
+    "poll_interval_minutes": {
+      "value": 5,
+      "type": "int",
+      "help": "How often the index scheduler polls (minutes).",
+      "env": "POLL_INTERVAL_MINUTES"
+    },
+    "lookback_bars": {
+      "value": 20,
+      "type": "int",
+      "help": "Bars used for support/resistance and structure (5m index path).",
+      "env": "LOOKBACK_BARS"
+    },
+    "min_rr": {
+      "value": 1.8,
+      "type": "float",
+      "help": "Minimum reward:risk for trade plan.",
+      "env": "MIN_RR"
+    },
+    "min_confidence": {
+      "value": 0.7,
+      "type": "float",
+      "help": "Minimum model confidence for directional trade (non-neutral day).",
+      "env": "MIN_CONFIDENCE"
+    },
+    "min_confidence_neutral_day": {
+      "value": 0.85,
+      "type": "float",
+      "help": "Stricter confidence when day bias is neutral.",
+      "env": "MIN_CONFIDENCE_NEUTRAL_DAY"
+    },
+    "max_stop_pct": {
+      "value": 0.45,
+      "type": "float",
+      "help": "Max stop distance (% of spot) for longs.",
+      "env": "MAX_STOP_PCT"
+    },
+    "max_stop_pct_short": {
+      "value": 0.65,
+      "type": "float",
+      "help": "Max stop distance (% of spot) for shorts.",
+      "env": "MAX_STOP_PCT_SHORT"
+    },
+    "option_stop_ratio": {
+      "value": 0.35,
+      "type": "float",
+      "help": "Option premium stop as fraction of entry.",
+      "env": "OPTION_STOP_RATIO"
+    },
+    "min_day_range_pct": {
+      "value": 0.4,
+      "type": "float",
+      "help": "Min session range (% of spot) to avoid sideways chop filter.",
+      "env": "MIN_DAY_RANGE_PCT"
+    },
+    "daily_sl_rupees": {
+      "value": 4000,
+      "type": "float",
+      "help": "Daily loss cap (rupees) for dashboard / risk.",
+      "env": "DAILY_SL_RUPEES"
+    },
+    "default_sl_points": {
+      "value": 10,
+      "type": "float",
+      "help": "Default SL distance in points when not specified.",
+      "env": "DEFAULT_SL_POINTS"
+    },
+    "log_level": {
+      "value": "INFO",
+      "type": "str",
+      "help": "Logging level (DEBUG, INFO, \u2026). Overridden by env LOG_LEVEL if set.",
+      "env": "LOG_LEVEL"
+    }
+  },
+  "stock_signal_engine": {
+    "FAILED_BIAS_VOLUME_MULTIPLIER": {
+      "value": 1.5,
+      "type": "float",
+      "help": "Failed-bias candle volume vs SMA must exceed this multiple."
+    },
+    "FAILED_BIAS_MIN_BARS": {
+      "value": 1,
+      "type": "int",
+      "help": "Minimum bars required for failed-bias volume logic."
+    },
+    "FAILED_BIAS_SMA_WINDOW": {
+      "value": 20,
+      "type": "int",
+      "help": "Volume SMA length for bias / vol setups."
+    },
+    "FAILED_BIAS_MIN_CONFIDENCE": {
+      "value": 0.9,
+      "type": "float",
+      "help": "Minimum failed-bias score confidence to allow trade."
+    },
+    "FAILED_BIAS_MAX_AGE_BARS": {
+      "value": 4,
+      "type": "int",
+      "help": "Max bars after trigger before failed-bias expires."
+    },
+    "FAILED_BIAS_MIN_RUNWAY_BARS": {
+      "value": 6,
+      "type": "int",
+      "help": "Min bars of session left (as bar count) for failed-bias."
+    },
+    "FAILED_BIAS_TARGET_RR": {
+      "value": 1.25,
+      "type": "float",
+      "help": "Fast target RR used in failed-bias structure."
+    },
+    "FAILED_BIAS_MAX_STOP_PCT": {
+      "value": 0.5,
+      "type": "float",
+      "help": "Max stop %% for failed-bias quality filter."
+    },
+    "FAILED_BIAS_MINUTES_FROM_OPEN": {
+      "value": 105,
+      "type": "int",
+      "help": "Minutes from open before failed-bias allowed (intraday)."
+    },
+    "FAILED_BIAS_RSI_BUY_FLOOR": {
+      "value": 45.0,
+      "type": "float",
+      "help": "RSI floor for BUY-side failed-bias and generic BUY filter."
+    },
+    "FAILED_BIAS_RSI_BUY_REGIME": {
+      "value": 55.0,
+      "type": "float",
+      "help": "RSI regime: BUY needs readings above this (failed-bias 10-bar check)."
+    },
+    "FAILED_BIAS_RSI_SELL_CEILING": {
+      "value": 55.0,
+      "type": "float",
+      "help": "RSI ceiling for SELL-side filters."
+    },
+    "FAILED_BIAS_RSI_SELL_REGIME": {
+      "value": 45.0,
+      "type": "float",
+      "help": "RSI regime: SELL needs readings below this."
+    },
+    "FAILED_BIAS_RSI_LOOKBACK_CANDLES": {
+      "value": 10,
+      "type": "int",
+      "help": "Prior RSI bars checked for failed-bias regime."
+    },
+    "ORB_VARIATION_PCT": {
+      "value": 0.2,
+      "type": "float",
+      "help": "ORB breakout band: %% variation from opening range high/low."
+    },
+    "OVERBOUGHT_RSI_THRESHOLD": {
+      "value": 75.0,
+      "type": "float",
+      "help": "15m RSI above this \u2192 OVERBROUGHT_LOOK_FOR_REVERSAL alert."
+    },
+    "VOL_EMA_VOLUME_MULTIPLIER": {
+      "value": 1.5,
+      "type": "float",
+      "help": "Vol+EMA BUY: volume vs prior SMA multiple."
+    },
+    "VOL_EMA_NEAR_PCT": {
+      "value": 0.35,
+      "type": "float",
+      "help": "Vol+EMA BUY: max %% distance from close to nearest EMA."
+    },
+    "VOL_EMA_MIN_EXTENDED_CLOSES": {
+      "value": 30,
+      "type": "int",
+      "help": "Min extended 15m closes (history+session) for EMA context."
+    },
+    "VOL_EMA_MIN_SESSION_BARS": {
+      "value": 3,
+      "type": "int",
+      "help": "Min session bars for vol+EMA path."
+    },
+    "VOL_EMA_SYNTHETIC_CONFIDENCE": {
+      "value": 0.72,
+      "type": "float",
+      "help": "Floor for synthetic score confidence in vol+EMA BUY."
+    },
+    "DIRECTIONAL_FOLLOW_THROUGH_MIN_PCT": {
+      "value": 0.06,
+      "type": "float",
+      "help": "Min |spot_change_pct| to count as follow-through."
+    },
+    "DIRECTIONAL_MID_RANGE_FRAC": {
+      "value": 0.18,
+      "type": "float",
+      "help": "Distance from mid of S/R must be below this \u00d7 range to be mid-range."
+    },
+    "FAILED_BIAS_OPTION_SL_RATIO": {
+      "value": 0.7,
+      "type": "float",
+      "help": "Failed-bias option SL as fraction of option entry."
+    },
+    "FAILED_BIAS_OPTION_TARGET_RATIO": {
+      "value": 1.5,
+      "type": "float",
+      "help": "Failed-bias option target multiple on premium."
+    }
+  },
+  "candle_patterns": {
+    "PINBAR_WICK_BODY_RATIO": {
+      "value": 2.0,
+      "type": "float",
+      "help": "Pinbar: wick must be \u2265 this \u00d7 body."
+    },
+    "PINBAR_BODY_MAX_RANGE_FRAC": {
+      "value": 0.35,
+      "type": "float",
+      "help": "Pinbar: body at most this fraction of range."
+    },
+    "PINBAR_OPP_WICK_MAX_RATIO": {
+      "value": 0.5,
+      "type": "float",
+      "help": "Pinbar: opposite wick \u2264 this \u00d7 primary wick."
+    }
+  },
+  "fno_intraday_buy_scanner": {
+    "MAX_WORKERS": {
+      "value": 5,
+      "type": "int",
+      "help": "Parallel workers for intraday FNO scan."
+    },
+    "RATE_LIMIT_SEC": {
+      "value": 0.25,
+      "type": "float",
+      "help": "Delay between API calls per worker (seconds)."
+    },
+    "RSI_PERIOD": {
+      "value": 14,
+      "type": "int",
+      "help": "RSI period for scanner."
+    },
+    "BUY_WATCHLIST_RSI": {
+      "value": 55.0,
+      "type": "float",
+      "help": "RSI threshold for buy watchlist."
+    },
+    "SELL_WATCHLIST_RSI": {
+      "value": 45.0,
+      "type": "float",
+      "help": "RSI threshold for sell watchlist."
+    },
+    "VOL_SMA_BARS": {
+      "value": 20,
+      "type": "int",
+      "help": "Volume SMA length."
+    },
+    "VOL_MULTIPLIER": {
+      "value": 2.0,
+      "type": "float",
+      "help": "Volume spike multiple vs SMA."
+    },
+    "SWING_LOOKBACK": {
+      "value": 10,
+      "type": "int",
+      "help": "Swing lookback bars."
+    },
+    "VOLUME_BIAS_MULTIPLIER": {
+      "value": 1.5,
+      "type": "float",
+      "help": "Volume bias candle multiple vs SMA."
+    }
+  },
+  "orb_scanner": {
+    "ORB_VARIATION_PCT": {
+      "value": 0.2,
+      "type": "float",
+      "help": "ORB band %% from opening range (stock ORB scan)."
+    },
+    "QUOTE_BATCH_SIZE": {
+      "value": 500,
+      "type": "int",
+      "help": "Max symbols per quote batch."
+    },
+    "MAX_WORKERS": {
+      "value": 5,
+      "type": "int",
+      "help": "Parallel workers."
+    },
+    "RATE_LIMIT": {
+      "value": 0.25,
+      "type": "float",
+      "help": "Seconds between requests."
+    }
+  },
+  "position_monitor": {
+    "TRAIL_POINTS": {
+      "value": 5,
+      "type": "int",
+      "help": "Trail step in points."
+    },
+    "TRAIL_INTERVAL_MINUTES": {
+      "value": 5,
+      "type": "int",
+      "help": "Trail evaluation interval."
+    },
+    "BTST_STEP_POINTS": {
+      "value": 50,
+      "type": "int",
+      "help": "BTST limit price step per retry."
+    },
+    "BTST_WAIT_SECONDS": {
+      "value": 2,
+      "type": "int",
+      "help": "Wait before checking fill."
+    }
+  },
+  "expiry_calendar": {
+    "NIFTY_WEEKLY_EXPIRY_WEEKDAY": {
+      "value": 1,
+      "type": "int",
+      "help": "Python weekday: Nifty weekly expiry (0=Mon \u2026 1=Tue)."
+    },
+    "BANKNIFTY_WEEKLY_EXPIRY_WEEKDAY": {
+      "value": 4,
+      "type": "int",
+      "help": "Bank Nifty weekly expiry weekday (4=Fri)."
+    }
+  },
+  "option_chain": {
+    "OPTION_CHAIN_STRIKE_STEP": {
+      "value": 100,
+      "type": "int",
+      "help": "Strike step when stepping chain (index strikes)."
+    }
+  },
+  "feature_engineering": {
+    "FUT_OI_CHANGE_THRESHOLD_PCT": {
+      "value": 1.0,
+      "type": "float",
+      "help": "Futures OI change %% to flag up/down."
+    }
+  },
+  "scoring": {
+    "weights": {
+      "spot_open_vwap_alignment": {
+        "value": 0.18,
+        "type": "float",
+        "help": "Weight: spot vs open/VWAP alignment."
+      },
+      "fut_strength": {
+        "value": 0.12,
+        "type": "float",
+        "help": "Weight: futures vs spot strength."
+      },
+      "fut_oi": {
+        "value": 0.1,
+        "type": "float",
+        "help": "Weight: futures OI direction."
+      },
+      "options_expansion_decay": {
+        "value": 0.15,
+        "type": "float",
+        "help": "Weight: ATM call/put premium expansion."
+      },
+      "options_oi": {
+        "value": 0.1,
+        "type": "float",
+        "help": "Weight: CE/PE OI change."
+      },
+      "breakout_follow_through": {
+        "value": 0.18,
+        "type": "float",
+        "help": "Weight: breakout with follow-through."
+      },
+      "momentum": {
+        "value": 0.12,
+        "type": "float",
+        "help": "Weight: momentum direction."
+      },
+      "structure_quality": {
+        "value": 0.05,
+        "type": "float",
+        "help": "Weight: structure / mid-range penalty bucket."
+      }
+    },
+    "penalties": {
+      "chop_open_vwap": {
+        "value": 0.1,
+        "type": "float",
+        "help": "No-trade penalty: chop around open/VWAP."
+      },
+      "options_conflict": {
+        "value": 0.08,
+        "type": "float",
+        "help": "Penalty: conflicting option premiums."
+      },
+      "no_follow_through": {
+        "value": 0.08,
+        "type": "float",
+        "help": "Penalty: no follow-through on break."
+      },
+      "momentum_neutral": {
+        "value": 0.05,
+        "type": "float",
+        "help": "Penalty: neutral momentum."
+      },
+      "stop_too_wide": {
+        "value": 0.15,
+        "type": "float",
+        "help": "Penalty: stop too wide."
+      }
+    },
+    "thresholds": {
+      "fut_strength_pct": {
+        "value": 0.03,
+        "type": "float",
+        "help": "Futures strength vs spot threshold (%%)."
+      },
+      "options_oi_change_abs": {
+        "value": 2.0,
+        "type": "float",
+        "help": "CE/PE OI change threshold (%%) for directional OI signal."
+      },
+      "confidence_offset": {
+        "value": 0.5,
+        "type": "float",
+        "help": "Added inside confidence = strength - penalty + offset."
+      }
+    }
+  },
+  "gamma_blast": {
+    "PCR_BULLISH_MAX": {
+      "value": 0.7,
+      "type": "float",
+      "help": "PCR below this \u2192 bullish (CE-heavy)."
+    },
+    "PCR_BEARISH_MIN": {
+      "value": 1.3,
+      "type": "float",
+      "help": "PCR above this \u2192 bearish (PE-heavy)."
+    },
+    "CONFIDENCE_AFTER_1345": {
+      "value": 0.7,
+      "type": "float",
+      "help": "Time factor after 13:45 on expiry day."
+    },
+    "CONFIDENCE_BEFORE_1345": {
+      "value": 0.4,
+      "type": "float",
+      "help": "Time factor before 13:45."
+    },
+    "PCR_DEV_WEIGHT": {
+      "value": 0.6,
+      "type": "float",
+      "help": "Weight of PCR deviation in confidence."
+    },
+    "TIME_FACTOR_WEIGHT": {
+      "value": 0.4,
+      "type": "float",
+      "help": "Weight of time factor in confidence."
+    }
+  },
+  "huge_move_predictor": {
+    "HUGE_MOVE_POINTS": {
+      "value": 100.0,
+      "type": "float",
+      "help": "Reference move size (points) for labeling."
+    },
+    "PCR_OI_EXTREME_BULL": {
+      "value": 0.6,
+      "type": "float",
+      "help": "PCR OI below \u2192 extra bullish probability mass."
+    },
+    "PCR_OI_BULL": {
+      "value": 0.7,
+      "type": "float",
+      "help": "PCR OI below \u2192 moderate bullish mass."
+    },
+    "PCR_OI_EXTREME_BEAR": {
+      "value": 1.5,
+      "type": "float",
+      "help": "PCR OI above \u2192 extra bearish mass."
+    },
+    "PCR_OI_BEAR": {
+      "value": 1.3,
+      "type": "float",
+      "help": "PCR OI above \u2192 moderate bearish mass."
+    },
+    "PCR_VOL_BULL": {
+      "value": 0.5,
+      "type": "float",
+      "help": "PCR volume below \u2192 call buying."
+    },
+    "PCR_VOL_BEAR": {
+      "value": 2.0,
+      "type": "float",
+      "help": "PCR volume above \u2192 put buying."
+    },
+    "PREMIUM_CHG_THRESHOLD": {
+      "value": 15.0,
+      "type": "float",
+      "help": "ATM premium %% move threshold."
+    },
+    "MAX_PAIN_DEV_POINTS": {
+      "value": 50.0,
+      "type": "float",
+      "help": "Spot vs max pain deviation (points) to add bias."
+    },
+    "NORM_TOTAL_OFFSET": {
+      "value": 0.3,
+      "type": "float",
+      "help": "Normalization denominator offset."
+    },
+    "PROB_CAP": {
+      "value": 0.7,
+      "type": "float",
+      "help": "Cap on normalized up/down probability."
+    },
+    "PROB_NO_FLOOR": {
+      "value": 0.1,
+      "type": "float",
+      "help": "Floor on probability of no huge move."
+    },
+    "DIRECTION_CONF_THRESHOLD": {
+      "value": 0.4,
+      "type": "float",
+      "help": "Min edge to call direction BULLISH/BEARISH."
+    },
+    "DEFAULT_NUM_STRIKES": {
+      "value": 5,
+      "type": "int",
+      "help": "Strikes each side of spot for chain fetch."
+    }
+  },
+  "zerodha_client": {
+    "NFO_INSTRUMENTS_CACHE_HOURS": {
+      "value": 6,
+      "type": "int",
+      "help": "Refresh NFO instruments cache after this many hours."
+    }
+  },
+  "rsi": {
+    "DEFAULT_PERIOD": {
+      "value": 14,
+      "type": "int",
+      "help": "Default RSI period (Wilder)."
+    }
+  }
+}

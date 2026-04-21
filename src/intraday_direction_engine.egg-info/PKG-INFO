@@ -1,3 +1,14 @@
+Metadata-Version: 2.4
+Name: intraday-direction-engine
+Version: 0.1.0
+Summary: Rule-based production intraday direction engine for Zerodha Kite.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: kiteconnect>=5.0.1
+Requires-Dist: pandas>=2.2.2
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: tenacity>=8.3.0
+
 # Intraday Direction Engine (Zerodha Kite)
 
 Production-oriented, explainable, rule-based intraday signal engine that runs every 5 minutes and emits:
@@ -167,7 +178,3 @@ PYTHONPATH=src python3 -m intraday_engine.main \
 python3 -m intraday_engine.main --tomorrow-watchlist
 # optional:
 python3 -m intraday_engine.main --tomorrow-watchlist --tw-top 20 --tw-workers 4 --tw-limit 30
-
-
-
-PYTHONPATH=src python -m intraday_engine.backtest.uhv --data-dir data/NIFTY500 --output-dir data/backtesting/uhv_backtest

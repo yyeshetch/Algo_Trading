@@ -31,6 +31,99 @@ def _momentum(df: pd.DataFrame, col: str, bars: int) -> str:
     return "UP" if move > 0.20 else ("DOWN" if move < -0.20 else "NEUTRAL")
 
 
+def _volume_bias(frame: pd.DataFrame, candle_open: float, candle_close: float, candle_low: float, candle_high: float) -> dict[str, Any]:
+    if frame.empty or "spot_volume" not in frame.columns or len(frame) < 2:
+        return {
+            "bias": "NEUTRAL",
+            "volume": None,
+            "volume_sma20": None,
+            "volume_multiple": None,
+            "liquidity_grab": None,
+        }
+
+    volume_series = frame["spot_volume"].astype(float)
+    current_volume = float(volume_series.iloc[-1])
+    window_size = min(20, len(volume_series))
+    volume_sma20 = float(volume_series.iloc[-window_size:].mean())
+    volume_multiple = (current_volume / volume_sma20) if volume_sma20 > 0 else 0.0
+
+    bias = "NEUTRAL"
+    liquidity_grab: float | None = None
+    if volume_sma20 > 0 and current_volume > 1.5 * volume_sma20:
+        if candle_close > candle_open:
+            bias = "BULLISH_BIAS"
+            liquidity_grab = candle_low
+        elif candle_close < candle_open:
+            bias = "BEARISH_BIAS"
+            liquidity_grab = candle_high
+
+    return {
+        "bias": bias,
+        "volume": round(current_volume, 2),
+        "volume_sma20": round(volume_sma20, 2),
+        "volume_multiple": round(volume_multiple, 2),
+        "liquidity_grab": round(liquidity_grab, 2) if liquidity_grab is not None else None,
+        "confirmation_timestamp": str(frame.iloc[-1].get("timestamp", "")) if bias != "NEUTRAL" else None,
+        "liquidity_grab_status": "PENDING" if bias != "NEUTRAL" else "NONE",
+        "liquidity_grab_hit_at": None,
+    }
+
+
+def _latest_volume_bias(frame: pd.DataFrame) -> dict[str, Any]:
+    latest = {
+        "bias": "NEUTRAL",
+        "volume": None,
+        "volume_sma20": None,
+        "volume_multiple": None,
+        "liquidity_grab": None,
+        "confirmation_timestamp": None,
+        "liquidity_grab_status": "NONE",
+        "liquidity_grab_hit_at": None,
+    }
+    if frame.empty or "spot_volume" not in frame.columns or len(frame) < 2:
+        return latest
+
+    for idx in range(len(frame)):
+        partial = frame.iloc[: idx + 1].reset_index(drop=True)
+        row = partial.iloc[-1]
+        candle_open = float(row.get("spot_open_raw", partial.iloc[-2]["spot_ltp"] if len(partial) > 1 else row.get("spot_ltp", 0)) or 0)
+        bias_snapshot = _volume_bias(
+            partial,
+            candle_open=candle_open,
+            candle_close=float(row.get("spot_ltp", 0) or 0),
+            candle_low=float(row.get("spot_low", 0) or 0),
+            candle_high=float(row.get("spot_high", 0) or 0),
+        )
+        if bias_snapshot["bias"] != "NEUTRAL":
+            latest = bias_snapshot
+
+    if latest["bias"] == "NEUTRAL" or latest["confirmation_timestamp"] is None:
+        return latest
+
+    confirmation_ts = str(latest["confirmation_timestamp"])
+    confirmation_rows = frame.index[frame["timestamp"].astype(str) == confirmation_ts].tolist()
+    if not confirmation_rows:
+        return latest
+    start_idx = confirmation_rows[-1] + 1
+    if start_idx >= len(frame):
+        return latest
+
+    level = latest["liquidity_grab"]
+    if level is None:
+        return latest
+
+    future = frame.iloc[start_idx:].reset_index(drop=True)
+    if latest["bias"] == "BULLISH_BIAS":
+        hit = future[future["spot_low"].astype(float) <= float(level)]
+    else:
+        hit = future[future["spot_high"].astype(float) >= float(level)]
+
+    if not hit.empty:
+        latest["liquidity_grab_status"] = "GRABBED"
+        latest["liquidity_grab_hit_at"] = str(hit.iloc[0].get("timestamp", ""))
+    return latest
+
+
 def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFrame, lookback: int = 20) -> list[dict[str, Any]]:
     """Build analysis summary for each timestamp in snapshots."""
     if snapshots_df.empty:
@@ -85,7 +178,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         fut_vs_vwap = _pct_change(fut_ltp, fut_vwap) if fut_vwap else 0
         spot_high = float(row.get("spot_high", 0) or 0)
         spot_low = float(row.get("spot_low", 0) or 0)
-        candle_open = prev_spot
+        candle_open = float(row.get("spot_open_raw", prev_spot) or prev_spot)
         candle_range = spot_high - spot_low if spot_high and spot_low else 0
         body = spot_ltp - candle_open
         body_pct = _pct_change(spot_ltp, candle_open) if candle_open else 0
@@ -109,6 +202,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         put_oi_chg = _pct_change(put_oi, put_oi_first) if put_oi_first else 0
         prev_fut_oi = float(prev.get("future_oi", 0) or 0)
         fut_oi_chg_candle = _pct_change(fut_oi, prev_fut_oi) if prev_fut_oi and idx > 0 else 0
+        volume_bias = _latest_volume_bias(frame)
         summaries.append({
             "timestamp": ts,
             "signal": _str_safe(sig.get("signal"), "—"),
@@ -175,6 +269,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
                 "put_oi_change_pct": put_oi_chg,
                 "fut_oi_change_candle_pct": fut_oi_chg_candle,
             },
+            "volume_bias": volume_bias,
             "scores": {
                 "bullish": float(sig.get("bullish_score", 0) or 0),
                 "bearish": float(sig.get("bearish_score", 0) or 0),

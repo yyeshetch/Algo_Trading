@@ -13,26 +13,44 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from kiteconnect import exceptions as kite_exceptions
 
 from intraday_engine.core.config import Settings
+from intraday_engine.core.tunables import (
+    apply_value_updates,
+    default_config,
+    ensure_config_file,
+    load_config,
+    save_config,
+    validate_no_unknown_keys,
+)
 from intraday_engine.core.underlyings import list_index_underlyings
 from intraday_engine.engine import DirectionEngine
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.market_data import MarketDataFetcher
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
-from intraday_engine.storage import DataStore
+from intraday_engine.storage import DataStore, load_signal_rows
 from intraday_engine.storage.data_store import _flatten_for_csv
 from intraday_engine.analysis.summary_builder import build_analysis_summaries
 from intraday_engine.eod.eod_fetcher import run_eod_scan
 from intraday_engine.engine.stock_cycle_runner import run_stocks_15min_cycle
 from intraday_engine.engine.stock_signal_engine import run_stock_analysis_30min
 from intraday_engine.orb.orb_scanner import run_orb_scan, run_pinbar_scan
+from intraday_engine.scanner.fno_intraday_buy_scanner import (
+    load_stored_intraday_scan,
+    run_fno_intraday_scan,
+)
+from intraday_engine.research.tomorrow_watchlist_scanner import (
+    load_stored_tomorrow_watchlist_fresh_or_previous,
+    run_tomorrow_watchlist_scan,
+)
+from intraday_engine.gamma.huge_move_predictor import HugeMovePredictor
 from intraday_engine.storage.position_sl_store import get_auto_trail_positions, get_sl as get_sl_record, set_sl as store_sl, update_sl_trigger as store_update_sl, set_auto_trail as store_auto_trail
+from intraday_engine.storage.signal_invalidation_store import invalidate as store_invalidate_signal, load_invalidated_keys, reinstate as store_reinstate_signal
 from intraday_engine.utils.logging_setup import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -115,6 +133,10 @@ async def _auto_trail_loop():
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     global _auto_trail_task
+    try:
+        ensure_config_file()
+    except Exception as e:
+        logger.warning("Could not ensure config.json: %s", e)
     _auto_trail_task = asyncio.create_task(_auto_trail_loop())
     yield
     if _auto_trail_task:
@@ -188,6 +210,36 @@ async def stocks_dashboard():
     return HTMLResponse(path.read_text(encoding="utf-8"))
 
 
+@app.get("/tunables", response_class=HTMLResponse)
+async def tunables_page():
+    """Edit project config.json (tunables) in the browser."""
+    path = _templates_dir() / "tunables.html"
+    if not path.exists():
+        raise HTTPException(status_code=500, detail="Tunables template not found.")
+    return HTMLResponse(path.read_text(encoding="utf-8"))
+
+
+@app.get("/api/tunables")
+async def api_tunables_get():
+    try:
+        ensure_config_file()
+    except Exception as e:
+        logger.warning("ensure_config_file: %s", e)
+    return _sanitize_for_json(load_config(force_reload=True))
+
+
+@app.put("/api/tunables")
+async def api_tunables_put(payload: dict = Body(...)):
+    template = default_config()
+    errs = validate_no_unknown_keys(template, payload)
+    if errs:
+        raise HTTPException(status_code=400, detail="; ".join(errs[:12]))
+    merged = load_config(force_reload=True)
+    apply_value_updates(merged, payload)
+    save_config(merged)
+    return {"status": "ok", "message": "config.json saved. Restart long-running processes to pick up all changes."}
+
+
 def _json_safe(val):
     """Convert value to JSON-serializable form (NaN -> None)."""
     if val is None:
@@ -216,32 +268,94 @@ def _sanitize_for_json(obj):
 
 
 def _load_stored_stock_signals() -> list[dict]:
-    """Load latest 15-min signals from data/{stock}/signals.csv for today."""
+    """Load unique 15-min signals for today, preserving full-day history."""
     settings = Settings.from_env(underlying="NIFTY")
-    data_dir = settings.data_dir
     today_str = date.today().isoformat()
     all_signals: list[dict] = []
-    index_lower = {u.lower() for u in list_index_underlyings()}
-    for d in data_dir.iterdir():
-        if not d.is_dir() or d.name.startswith(".") or d.name.lower() in index_lower:
-            continue
-        sig_csv = d / "signals.csv"
-        if not sig_csv.exists():
-            continue
-        try:
-            df = pd.read_csv(sig_csv)
-            if df.empty or "timestamp" not in df.columns:
-                continue
-            df = df[df["timestamp"].astype(str).str.startswith(today_str)]
-            if df.empty:
-                continue
-            df = df.sort_values(by="timestamp", ascending=False)
-            row = df.iloc[0].to_dict()
-            row["stock"] = d.name.upper()
-            all_signals.append(row)
-        except Exception:
-            continue
+    try:
+        df = load_signal_rows(settings.data_dir, trade_date=date.today(), asset_class="stock")
+        if df.empty or "timestamp" not in df.columns:
+            return []
+        df = df[df["timestamp"].astype(str).str.startswith(today_str)]
+        if df.empty:
+            return []
+        grouped = df.groupby("underlying", sort=True)
+        for underlying, rows in grouped:
+            rows = rows.copy()
+            if "strategy" not in rows.columns:
+                rows["strategy"] = rows.apply(_infer_strategy, axis=1)
+            else:
+                rows["strategy"] = rows["strategy"].fillna("DIRECTIONAL").astype(str)
+                rows["strategy"] = rows.apply(
+                    lambda row: _infer_strategy(row) if str(row.get("strategy") or "").strip() in {"", "None", "nan"} else str(row.get("strategy")),
+                    axis=1,
+                )
+            if "strategy_label" not in rows.columns:
+                rows["strategy_label"] = rows.apply(_infer_strategy_label, axis=1)
+            else:
+                rows["strategy_label"] = rows.apply(
+                    lambda row: _infer_strategy_label(row)
+                    if str(row.get("strategy_label") or "").strip() in {"", "None", "nan"}
+                    else str(row.get("strategy_label")),
+                    axis=1,
+                )
+            rows = rows.sort_values(by="timestamp", ascending=True)
+            first_by_key: dict[str, pd.Series] = {}
+            latest_by_key: dict[str, pd.Series] = {}
+            for _, row in rows.iterrows():
+                key = _signal_identity_key(row)
+                latest_by_key[key] = row
+                if str(row.get("signal") or "") in {"BUY", "SELL"} and key not in first_by_key:
+                    first_by_key[key] = row
+            for key, first_row in first_by_key.items():
+                row = first_row.to_dict()
+                latest_row = latest_by_key.get(key)
+                fresh_until = str(row.get("fresh_until") or "").strip()
+                if fresh_until and fresh_until not in {"", "None", "nan"}:
+                    try:
+                        row["active_now"] = datetime.now() <= pd.to_datetime(fresh_until).to_pydatetime()
+                    except Exception:
+                        row["active_now"] = False
+                else:
+                    row["active_now"] = str(latest_row.get("signal") or "") in {"BUY", "SELL"} if latest_row is not None else False
+                row["stock"] = str(underlying).upper()
+                all_signals.append(row)
+    except Exception:
+        return []
     return all_signals
+
+
+def _signal_identity_key(row: pd.Series) -> str:
+    strategy = str(row.get("strategy") or _infer_strategy(row))
+    strategy_label = str(row.get("strategy_label") or _infer_strategy_label(row))
+    trigger_ts = str(row.get("trigger_timestamp") or "").strip()
+    if strategy == "FAILED_BIAS" and trigger_ts and trigger_ts not in {"", "None", "nan"}:
+        return f"{strategy}|{strategy_label}|{trigger_ts}"
+    ts = str(row.get("timestamp") or "").strip()
+    signal = str(row.get("signal") or "").strip()
+    return f"{strategy}|{strategy_label}|{signal}|{ts}"
+
+
+def _infer_strategy(row: pd.Series) -> str:
+    pattern = str(row.get("pattern") or "").strip()
+    bias = str(row.get("bias") or "").strip()
+    if pattern.startswith("FAILED_") or bias.startswith("FAILED_") or bias == "FAILED_BIAS":
+        return "FAILED_BIAS"
+    return "DIRECTIONAL"
+
+
+def _infer_strategy_label(row: pd.Series) -> str:
+    pattern = str(row.get("pattern") or "").strip()
+    if pattern:
+        return pattern
+    strategy = _infer_strategy(row)
+    signal = str(row.get("signal") or "").strip()
+    bias = str(row.get("bias") or "").strip().replace(" ", "_")
+    if strategy == "FAILED_BIAS":
+        return bias or "FAILED_BIAS"
+    if signal in {"BUY", "SELL"} and bias:
+        return f"DIRECTIONAL_{signal}_{bias}"
+    return strategy
 
 
 @app.get("/api/stocks/signals")
@@ -305,8 +419,115 @@ async def api_stocks_pinbar(limit: int = 200):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/stocks/intraday-signals")
+async def api_stocks_intraday_signals(trade_date: str | None = None):
+    """Stored combined intraday scan: watchlists from 60m/15m RSI, signals from 5m confirmations."""
+    try:
+        sel_date = date.today()
+        if trade_date:
+            try:
+                sel_date = datetime.strptime(trade_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        settings = Settings.from_env(underlying="NIFTY")
+        data = load_stored_intraday_scan(settings.data_dir, sel_date)
+        if not data:
+            return {
+                "trade_date": sel_date.isoformat(),
+                "signals": [],
+                "buy_watchlist": [],
+                "sell_watchlist": [],
+                "buy_signals": [],
+                "sell_signals": [],
+                "message": "No stored run yet. Open Intraday Signals and click Refresh.",
+            }
+        return _sanitize_for_json(data)
+    except Exception as e:
+        logger.exception("Intraday signals load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/tomorrow-watchlist")
+async def api_stocks_tomorrow_watchlist(trade_date: str | None = None):
+    """Load last saved NIFTY 500 multi-timeframe watchlist JSON (per trade_date)."""
+    try:
+        td = date.today()
+        if trade_date:
+            try:
+                td = datetime.strptime(trade_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        settings = Settings.from_env(underlying="NIFTY")
+        data, stale = load_stored_tomorrow_watchlist_fresh_or_previous(settings.data_dir, td)
+        if not data:
+            return {
+                "trade_date": td.isoformat(),
+                "picks": [],
+                "message": "No saved scan for this date. Click Run scan on the Watchlist for Tomorrow tab.",
+            }
+        if stale:
+            data = dict(data)
+            data["stale"] = True
+            data["requested_trade_date"] = td.isoformat()
+            shown = data.get("trade_date", "?")
+            data["message"] = (
+                f"Showing last saved watchlist ({shown}) until you run a scan for {td.isoformat()}."
+            )
+        return _sanitize_for_json(data)
+    except Exception as e:
+        logger.exception("Tomorrow watchlist load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/tomorrow-watchlist/refresh")
+async def api_stocks_tomorrow_watchlist_refresh(
+    trade_date: str | None = None,
+    top_n: int = 20,
+    stock_limit: int | None = None,
+    max_workers: int = 4,
+):
+    """Run full NIFTY 500 scan (slow; many Kite historical calls)."""
+    try:
+        td = date.today()
+        if trade_date:
+            try:
+                td = datetime.strptime(trade_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        lim = stock_limit if stock_limit is not None and stock_limit > 0 else None
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_tomorrow_watchlist_scan(
+                trade_date=td,
+                top_n=top_n,
+                max_workers=max_workers,
+                stock_limit=lim,
+            ),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("Tomorrow watchlist refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/intraday-signals/refresh")
+async def api_stocks_intraday_signals_refresh(limit: int | None = None):
+    """Run a single intraday scan for watchlists and BUY/SELL signals."""
+    try:
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_fno_intraday_scan(trade_date=date.today(), stock_limit=limit),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("Intraday signals refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/stocks/refresh")
-async def api_stocks_refresh(limit: int = 50):
+async def api_stocks_refresh(limit: int | None = None):
     """Run 15-min data fetch and signal generation for all F&O stocks."""
     try:
         loop = asyncio.get_event_loop()
@@ -317,6 +538,68 @@ async def api_stocks_refresh(limit: int = 50):
         return {"status": "ok", "message": f"Processed {n} stocks.", "count": n}
     except Exception as e:
         logger.exception("Stocks refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/refresh-all")
+async def api_stocks_refresh_all(
+    limit: int | None = None,
+    top_n: int = 20,
+    max_workers: int = 4,
+):
+    """
+    Single refresh entrypoint for stock dashboard tabs:
+    - 15-min stock signals
+    - Intraday signals
+    - Tomorrow watchlist (15m aggregated to 1h/1d inside scanner)
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        td = date.today()
+
+        stock_count = await loop.run_in_executor(
+            None,
+            lambda: run_stocks_15min_cycle(trade_date=td, stock_limit=limit),
+        )
+        intraday_payload = await loop.run_in_executor(
+            None,
+            lambda: run_fno_intraday_scan(trade_date=td, stock_limit=limit),
+        )
+        lim = limit if limit is not None and limit > 0 else None
+        watchlist_payload = await loop.run_in_executor(
+            None,
+            lambda: run_tomorrow_watchlist_scan(
+                trade_date=td,
+                top_n=top_n,
+                max_workers=max_workers,
+                stock_limit=lim,
+            ),
+        )
+
+        return {
+            "status": "ok",
+            "message": "Shared refresh complete for stock tabs.",
+            "trade_date": td.isoformat(),
+            "stocks": {
+                "processed": int(stock_count or 0),
+            },
+            "intraday": {
+                "universe": len(intraday_payload.get("symbols_scanned", []) or []),
+                "buy_watchlist": len(intraday_payload.get("buy_watchlist", []) or []),
+                "sell_watchlist": len(intraday_payload.get("sell_watchlist", []) or []),
+                "buy_signals": len(intraday_payload.get("buy_signals", []) or []),
+                "sell_signals": len(intraday_payload.get("sell_signals", []) or []),
+                "failed": len(intraday_payload.get("failed_symbols", []) or []),
+            },
+            "tomorrow_watchlist": {
+                "scanned": int(watchlist_payload.get("scanned", 0) or 0),
+                "picks": len(watchlist_payload.get("picks", []) or []),
+                "failed": int(watchlist_payload.get("failed_count", 0) or 0),
+                "data_source": watchlist_payload.get("data_source"),
+            },
+        }
+    except Exception as e:
+        logger.exception("Shared stocks refresh failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -340,7 +623,7 @@ async def api_stocks_list():
 
 
 @app.get("/api/stocks/eod-indicators")
-async def api_stocks_eod_indicators(trade_date: str | None = None, limit: int = 200):
+async def api_stocks_eod_indicators(trade_date: str | None = None, limit: int | None = None):
     """Return EOD FnO market indicators for all liquid FnO symbols."""
     try:
         sel_date = None
@@ -435,31 +718,90 @@ async def api_stocks_30min_analysis_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class IndexSignalMonitorRequest(BaseModel):
+    trade_date: str
+    timestamp: str
+    signal: str
+    underlying: str | None = None
+    note: str | None = None
+
+
 @app.get("/api/signals")
 async def get_signals(underlying: str | None = None, trade_date: str | None = None):
     store = _get_store(underlying)
-    df = store.load_signals()
-    if df.empty:
-        return {"signals": [], "latest_actionable": None}
     date_str = trade_date or date.today().isoformat()
-    if "timestamp" in df.columns:
-        df = df[df["timestamp"].astype(str).str.startswith(date_str)]
-    if df.empty:
-        return {"signals": [], "latest_actionable": None}
-    df = df[df["signal"].isin(["BUY", "SELL"])]
-    if df.empty:
-        return {"signals": [], "latest_actionable": None}
-    df = df.sort_values(by="timestamp", ascending=False).head(100)
-    signals = df.to_dict(orient="records")
-    for s in signals:
-        for k, v in s.items():
-            s[k] = _json_safe(v)
     try:
         sel_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         sel_date = date.today()
+        date_str = sel_date.isoformat()
+    df = store.load_signals(trade_date=sel_date)
+    if df.empty or "signal" not in df.columns:
+        return {
+            "signals": [],
+            "latest_actionable": None,
+            "invalidation_supported": store.asset_class == "index",
+        }
+    df = df[df["signal"].isin(["BUY", "SELL"])]
+    if df.empty:
+        return {
+            "signals": [],
+            "latest_actionable": None,
+            "invalidation_supported": store.asset_class == "index",
+        }
+    if "timestamp" in df.columns:
+        df = df.sort_values(by="timestamp", ascending=False).head(100)
+    signals = df.to_dict(orient="records")
+    for s in signals:
+        for k, v in s.items():
+            s[k] = _json_safe(v)
+    if store.asset_class == "index":
+        inv = load_invalidated_keys(store.root_data_dir, store.underlying, date_str)
+        for s in signals:
+            key = f"{str(s.get('timestamp', '')).strip()}|{str(s.get('signal', '')).strip().upper()}"
+            s["invalidated"] = key in inv
+    else:
+        for s in signals:
+            s["invalidated"] = False
     latest = store.get_latest_actionable_signal(trade_date=sel_date)
-    return {"signals": signals, "latest_actionable": _sanitize_for_json(latest)}
+    return {
+        "signals": signals,
+        "latest_actionable": _sanitize_for_json(latest),
+        "invalidation_supported": store.asset_class == "index",
+    }
+
+
+@app.post("/api/signals/invalidate")
+async def api_invalidate_index_signal(body: IndexSignalMonitorRequest):
+    store = _get_store(body.underlying)
+    if store.asset_class != "index":
+        raise HTTPException(status_code=400, detail="Strike-out is only available for index underlyings.")
+    store_invalidate_signal(
+        store.root_data_dir,
+        store.underlying,
+        body.trade_date,
+        body.timestamp,
+        body.signal,
+        body.note,
+    )
+    return {"status": "ok"}
+
+
+@app.post("/api/signals/reinstate")
+async def api_reinstate_index_signal(body: IndexSignalMonitorRequest):
+    store = _get_store(body.underlying)
+    if store.asset_class != "index":
+        raise HTTPException(status_code=400, detail="Reinstate is only available for index underlyings.")
+    ok = store_reinstate_signal(
+        store.root_data_dir,
+        store.underlying,
+        body.trade_date,
+        body.timestamp,
+        body.signal,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="No strike-out found for that signal.")
+    return {"status": "ok"}
 
 
 @app.get("/api/analysis-summary")
@@ -564,11 +906,70 @@ async def refresh(request: Request):
         if proc.returncode != 0:
             err = (stderr or stdout or b"").decode("utf-8", errors="replace")
             raise HTTPException(status_code=500, detail=f"Refresh failed: {err}")
-        return {"status": "ok", "message": "Data fetched and signals generated."}
+
+        # Run huge move prediction for index underlyings
+        huge_move = None
+        u_key = _underlying_key(underlying)
+        if u_key in list_index_underlyings():
+            try:
+                loop = asyncio.get_event_loop()
+                huge_move = await loop.run_in_executor(
+                    None,
+                    lambda: _run_huge_move_prediction(u_key),
+                )
+            except Exception as e:
+                logger.warning("Huge move prediction failed: %s", e)
+
+        return {
+            "status": "ok",
+            "message": "Data fetched and signals generated.",
+            "huge_move": _sanitize_for_json(huge_move) if huge_move else None,
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _run_huge_move_prediction(underlying: str) -> dict | None:
+    """Run option chain capture + huge move prediction. Returns dict for API or None."""
+    settings = Settings.from_env(underlying=underlying)
+    client = ZerodhaClient(settings)
+    predictor = HugeMovePredictor(client, settings)
+    pred = predictor.predict(num_strikes=5, use_stored=False)
+    if pred is None:
+        return None
+    return {
+        "direction": pred.direction,
+        "confidence": pred.confidence,
+        "prob_huge_up": pred.prob_huge_up,
+        "prob_huge_down": pred.prob_huge_down,
+        "prob_no_move": pred.prob_no_move,
+        "pcr_oi": pred.pcr_oi,
+        "pcr_volume": pred.pcr_volume,
+        "max_pain": pred.max_pain,
+        "spot_vs_max_pain": pred.spot_vs_max_pain,
+        "suggested_strike": pred.suggested_strike,
+        "reasons": pred.reasons,
+    }
+
+
+@app.get("/api/huge-move")
+async def get_huge_move(underlying: str | None = None):
+    """Fetch option chain and run huge move prediction. Returns probability of 100+ point move."""
+    u_key = _underlying_key(underlying)
+    if u_key not in list_index_underlyings():
+        return {"huge_move": None, "message": "Huge move analysis only for indices (NIFTY, BANKNIFTY)."}
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: _run_huge_move_prediction(u_key),
+        )
+        return {"huge_move": _sanitize_for_json(result), "status": "ok"}
+    except Exception as e:
+        logger.exception("Huge move failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

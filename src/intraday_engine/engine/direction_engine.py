@@ -28,7 +28,7 @@ class DirectionEngine:
     def run_cycle(self, trade_date: date | None = None) -> Dict[str, object]:
         merged = self.fetcher.fetch_intraday_frame_for_date(trade_date)
         merged = self.store.save_snapshots(merged)
-        existing_timestamps = self.store.load_signal_timestamps()
+        existing_timestamps = self.store.load_signal_timestamps(trade_date=trade_date)
 
         latest_payload: Dict[str, object] | None = None
         emitted = 0

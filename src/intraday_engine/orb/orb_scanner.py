@@ -16,10 +16,18 @@ from intraday_engine.fetch.zerodha_client import ZerodhaClient
 
 logger = logging.getLogger(__name__)
 
-ORB_VARIATION_PCT = 0.2
-QUOTE_BATCH_SIZE = 500
-MAX_WORKERS = 5
-RATE_LIMIT = 0.25  # sec between requests (~4/sec, Kite allows 3)
+
+def _orb_f(key: str, default: float) -> float:
+    from intraday_engine.core.tunables import get_float
+
+    return get_float("orb_scanner", key, default)
+
+
+def _orb_i(key: str, default: int) -> int:
+    from intraday_engine.core.tunables import get_int
+
+    return get_int("orb_scanner", key, default)
+
 
 _rate_lock = threading.Lock()
 _rate_last = 0.0
@@ -29,8 +37,9 @@ def _rate_limit() -> None:
     global _rate_last
     with _rate_lock:
         elapsed = time.monotonic() - _rate_last
-        if elapsed < RATE_LIMIT:
-            time.sleep(RATE_LIMIT - elapsed)
+        rl = _orb_f("RATE_LIMIT", 0.25)
+        if elapsed < rl:
+            time.sleep(rl - elapsed)
         _rate_last = time.monotonic()
 
 
@@ -38,9 +47,10 @@ def _last_completed_15min(trade_date: date) -> datetime:
     now = datetime.now()
     if now.date() != trade_date:
         return datetime.combine(trade_date, datetime.min.time()).replace(hour=15, minute=30)
-    block = (now.minute // 15) * 15
-    boundary = now.replace(minute=block, second=0, microsecond=0)
-    return boundary - timedelta(minutes=15)
+    return min(
+        datetime.combine(trade_date, datetime.min.time()).replace(hour=15, minute=30),
+        now.replace(second=0, microsecond=0),
+    )
 
 
 def _orb_ranges_path(data_dir: Path, trade_date: date) -> Path:
@@ -78,7 +88,17 @@ def _fetch_candles_15min(
         return None
     _rate_limit()
     try:
-        return client.historical_data(token, from_dt, to_dt, interval="15minute")
+        rows = client.historical_data(token, from_dt, to_dt, interval="15minute")
+        cutoff = _last_completed_15min(trade_date)
+        completed: list[dict[str, Any]] = []
+        for row in rows or []:
+            ts = row.get("date")
+            if ts is None:
+                continue
+            base = ts.replace(tzinfo=None) if getattr(ts, "tzinfo", None) is not None else ts
+            if base + timedelta(minutes=15) <= cutoff:
+                completed.append(row)
+        return completed
     except Exception as e:
         logger.debug("Candles fetch failed token=%s: %s", token, e)
         return None
@@ -103,7 +123,7 @@ def _fetch_all_candles_parallel(
         candles = _fetch_candles_15min(client, int(token), trade_date)
         return stock_name, candles
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+    with ThreadPoolExecutor(max_workers=_orb_i("MAX_WORKERS", 5)) as ex:
         futures = {ex.submit(_fetch_one, (nse, name)): name for nse, name in symbols}
         for fut in as_completed(futures):
             try:
@@ -117,14 +137,43 @@ def _fetch_all_candles_parallel(
 
 def _fetch_quotes_bulk(client: ZerodhaClient, symbols: list[str]) -> dict[str, dict[str, Any]]:
     quotes: dict[str, dict[str, Any]] = {}
-    for i in range(0, len(symbols), QUOTE_BATCH_SIZE):
-        batch = symbols[i : i + QUOTE_BATCH_SIZE]
+    qbs = _orb_i("QUOTE_BATCH_SIZE", 500)
+    for i in range(0, len(symbols), qbs):
+        batch = symbols[i : i + qbs]
         try:
             batch_quotes = client.quote(batch)
             quotes.update(batch_quotes)
         except Exception as e:
             logger.warning("Quote batch failed: %s", e)
     return quotes
+
+
+def _candle_close_timestamp(candle: dict[str, Any], interval_minutes: int) -> str:
+    ts = candle.get("date")
+    if ts is None:
+        return ""
+    if hasattr(ts, "replace"):
+        base = ts.replace(tzinfo=None) if getattr(ts, "tzinfo", None) is not None else ts
+    else:
+        base = datetime.fromisoformat(str(ts).replace("Z", "")[:19])
+    return (base + timedelta(minutes=interval_minutes)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _first_orb_break(
+    candles: list[dict[str, Any]],
+    upper_break: float,
+    lower_break: float,
+) -> tuple[str, dict[str, Any] | None]:
+    """Return (signal, first break candle) scanning from session start."""
+    for candle in candles:
+        close_ = float(candle.get("close", 0) or 0)
+        if close_ <= 0:
+            continue
+        if close_ >= upper_break:
+            return "BUY", candle
+        if close_ <= lower_break:
+            return "SELL", candle
+    return "NO_TRADE", None
 
 
 def _is_bullish_pinbar(o: float, h: float, l: float, c: float) -> bool:
@@ -202,32 +251,24 @@ def run_orb_scan(
         all_candles = _fetch_all_candles_parallel(client, symbols, trade_date)
 
     quotes = _fetch_quotes_bulk(client, nse_symbols)
-    variation = ORB_VARIATION_PCT / 100.0
+    variation = _orb_f("ORB_VARIATION_PCT", 0.2) / 100.0
     signals: list[dict[str, Any]] = []
-    now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
     for stock_name, candles in all_candles.items():
         if not candles or stock_name not in ranges:
             continue
         or_high = ranges[stock_name]["or_high"]
         or_low = ranges[stock_name]["or_low"]
-        last_candle = candles[-1]
-        latest_close = float(last_candle.get("close", 0) or 0)
-        if latest_close <= 0:
-            continue
-
-        o = float(last_candle.get("open", 0) or 0)
-        h = float(last_candle.get("high", 0) or 0)
-        l_ = float(last_candle.get("low", 0) or 0)
-        c = latest_close
-
         upper_break = or_high * (1 - variation)
         lower_break = or_low * (1 + variation)
-        signal = "NO_TRADE"
-        if latest_close >= upper_break:
-            signal = "BUY"
-        elif latest_close <= lower_break:
-            signal = "SELL"
+        signal, break_candle = _first_orb_break(candles[1:], upper_break, lower_break)
+        if signal == "NO_TRADE" or break_candle is None:
+            continue
+
+        break_close = float(break_candle.get("close", 0) or 0)
+        if break_close <= 0:
+            continue
+        candle_close_ts = _candle_close_timestamp(break_candle, 15)
 
         nse_sym = f"NSE:{stock_name}"
         oi = float(quotes.get(nse_sym, {}).get("oi", 0) or 0)
@@ -236,17 +277,17 @@ def run_orb_scan(
         signals.append({
             "stock": stock_name,
             "signal": signal,
-            "price": round(latest_close, 2),
+            "price": round(break_close, 2),
             "or_high": round(or_high, 2),
             "or_low": round(or_low, 2),
             "upper_break": round(upper_break, 2),
             "lower_break": round(lower_break, 2),
-            "timestamp": now_str,
+            "timestamp": candle_close_ts,
             "oi": oi,
             "oi_day_high": oi_day_high,
             "reasons": f"ORB: OR {or_low:.1f}-{or_high:.1f}" + (
-                f" | close ≥ {upper_break:.1f}" if signal == "BUY" else
-                f" | close ≤ {lower_break:.1f}" if signal == "SELL" else ""
+                f" | first close ≥ {upper_break:.1f}" if signal == "BUY" else
+                f" | first close ≤ {lower_break:.1f}" if signal == "SELL" else ""
             ),
         })
 
@@ -276,12 +317,12 @@ def run_pinbar_scan(
 
     bullish: list[dict[str, Any]] = []
     bearish: list[dict[str, Any]] = []
-    now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
     for stock_name, candles in all_candles.items():
         if not candles:
             continue
         last = candles[-1]
+        candle_close_ts = _candle_close_timestamp(last, 15)
         o = float(last.get("open", 0) or 0)
         h = float(last.get("high", 0) or 0)
         l_ = float(last.get("low", 0) or 0)
@@ -302,7 +343,7 @@ def run_pinbar_scan(
                 "high": round(h, 2),
                 "low": round(l_, 2),
                 "close": round(c, 2),
-                "timestamp": now_str,
+                "timestamp": candle_close_ts,
                 "oi": oi,
                 "reasons": "Long lower wick, small body, rejection at low",
             })
@@ -316,7 +357,7 @@ def run_pinbar_scan(
                 "high": round(h, 2),
                 "low": round(l_, 2),
                 "close": round(c, 2),
-                "timestamp": now_str,
+                "timestamp": candle_close_ts,
                 "oi": oi,
                 "reasons": "Long upper wick, small body, rejection at high",
             })

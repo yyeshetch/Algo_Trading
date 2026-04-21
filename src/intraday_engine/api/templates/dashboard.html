@@ -14,6 +14,8 @@
     .btn-refresh:hover { background: #2563eb; }
     .btn-execute { background: #22c55e; color: white; }
     .btn-execute:hover { background: #16a34a; }
+    .btn-secondary { background: #52525b; color: #fafafa; }
+    .btn-secondary:hover { background: #71717a; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .lots-row { display: flex; align-items: center; gap: 0.5rem; }
     .lots-row input { width: 4rem; padding: 0.5rem; border: 1px solid #3f3f46; border-radius: 6px; background: #18181b; color: #e4e4e7; font-size: 1rem; }
@@ -102,6 +104,12 @@
     .signal-counts .buy { background: #14532d; color: #86efac; }
     .signal-counts .sell { background: #7f1d1d; color: #fecaca; }
     .signal-counts .no { background: #3f3f46; color: #a1a1aa; }
+    tr.signal-row-invalidated td:not(.monitor-cell) { text-decoration: line-through; color: #71717a; }
+    .monitor-cell { text-decoration: none !important; color: #e4e4e7; }
+    .btn-signal-monitor { padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #52525b; color: #fafafa; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
+    .btn-signal-monitor:hover { background: #71717a; }
+    .btn-signal-monitor.secondary { background: #3f3f46; }
+    .btn-signal-monitor:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -123,6 +131,7 @@
       </select>
     </div>
     <button class="btn btn-refresh" id="btnRefresh">Refresh</button>
+    <button class="btn btn-secondary" type="button" id="btnRefreshMonitor" title="Reload signals and trade summary from disk/API (no full cycle)">Refresh monitor</button>
     <div class="lots-row">
       <label for="lots">Lots:</label>
       <input type="number" id="lots" min="1" max="100" value="2">
@@ -155,6 +164,7 @@
               <th>Opt Entry</th>
               <th>Opt SL</th>
               <th>Opt Target</th>
+              <th>Monitor</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -214,6 +224,10 @@
       <h2 style="margin: 0;">Day at a Glance</h2>
       <button class="btn btn-refresh" id="btnRefreshAnalysis" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Refresh</button>
     </div>
+    <div id="hugeMoveCard" class="card" style="margin-bottom: 1rem; border-left: 4px solid #7c3aed;">
+      <h3 style="margin: 0 0 0.5rem; font-size: 0.95rem;">Huge Move (100+ pts)</h3>
+      <div id="hugeMoveContent"><p style="color:#71717a;font-size:0.85rem;">Run Refresh to load option chain analysis.</p></div>
+    </div>
     <div id="dayOverview" class="card" style="margin-bottom: 1rem;"></div>
     <div class="card" style="margin-bottom: 1rem;">
       <h3 style="margin: 0 0 0.5rem; font-size: 0.95rem;">Signal timeline — click a block to drill down</h3>
@@ -250,6 +264,7 @@
     const status = document.getElementById('status');
     const tbody = document.getElementById('tbody');
     const btnRefresh = document.getElementById('btnRefresh');
+    const btnRefreshMonitor = document.getElementById('btnRefreshMonitor');
     const btnExecute = document.getElementById('btnExecute');
     const lotsInput = document.getElementById('lots');
     const underlyingSelect = document.getElementById('underlying');
@@ -314,6 +329,27 @@
       if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
       return String(v);
     }
+    function shiftIsoTs(ts, minutes = 0) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return String(ts);
+      d.setMinutes(d.getMinutes() + minutes);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    function shortTs(ts, closeMinutes = 0) {
+      const shifted = shiftIsoTs(ts, closeMinutes);
+      if (!shifted) return '—';
+      const m = String(shifted).match(/T(\d{2}:\d{2})/);
+      return m ? m[1] : String(shifted).slice(-8, -3);
+    }
+    function fullTs(ts, closeMinutes = 0) {
+      const shifted = shiftIsoTs(ts, closeMinutes);
+      return shifted ? shifted.replace('T', ' ') : '—';
+    }
+
+    let lastSignals = [];
+    let invalidationSupported = false;
 
     async function loadSignals() {
       try {
@@ -321,9 +357,19 @@
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || 'Failed to load');
         const signals = data.signals || [];
-        tbody.innerHTML = signals.map((s, i) => `
-          <tr>
-            <td>${fmt(s.timestamp)}</td>
+        invalidationSupported = !!data.invalidation_supported;
+        lastSignals = signals;
+        tbody.innerHTML = signals.map((s, i) => {
+          const rowClass = s.invalidated ? 'signal-row-invalidated' : '';
+          let monitorCol = '—';
+          if (invalidationSupported) {
+            monitorCol = s.invalidated
+              ? `<button type="button" class="btn-signal-monitor secondary" data-act="reinstate" data-idx="${i}">Undo</button>`
+              : `<button type="button" class="btn-signal-monitor" data-act="invalidate" data-idx="${i}">Strike</button>`;
+          }
+          return `
+          <tr class="${rowClass}">
+            <td>${fullTs(s.timestamp, 5)}</td>
             <td class="${sigClass(s.signal)}">${fmt(s.signal)}</td>
             <td>${fmt(s.entry)}</td>
             <td>${fmt(s.target)}</td>
@@ -336,14 +382,47 @@
             <td>${fmt(s.option_entry)}</td>
             <td>${fmt(s.option_sl)}</td>
             <td>${fmt(s.option_target)}</td>
-          </tr>
-        `).join('');
+            <td class="monitor-cell">${monitorCol}</td>
+          </tr>`;
+        }).join('');
         const d = getTradeDate();
         setStatus('Loaded ' + signals.length + ' signals' + (d !== new Date().toISOString().slice(0, 10) ? ' for ' + d : '') + '.', null);
+        return true;
       } catch (e) {
         setStatus('Error: ' + e.message, false);
+        return false;
       }
     }
+
+    tbody.addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-act][data-idx]');
+      if (!btn || !tbody.contains(btn)) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      const act = btn.dataset.act;
+      const s = lastSignals[idx];
+      if (!s || !invalidationSupported) return;
+      btn.disabled = true;
+      try {
+        const path = act === 'invalidate' ? '/api/signals/invalidate' : '/api/signals/reinstate';
+        const r = await fetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            underlying: getUnderlying(),
+            trade_date: getTradeDate(),
+            timestamp: s.timestamp,
+            signal: s.signal,
+          }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || 'Request failed');
+        await loadSignals();
+        setStatus(act === 'invalidate' ? 'Signal struck out. Execute uses the next actionable signal.' : 'Signal reinstated.', true);
+      } catch (e) {
+        setStatus('Error: ' + e.message, false);
+        btn.disabled = false;
+      }
+    });
 
     btnRefresh.addEventListener('click', async () => {
       btnRefresh.disabled = true;
@@ -358,12 +437,29 @@
         if (!r.ok) throw new Error(data.detail || 'Refresh failed');
         setStatus('Refresh complete.', true);
         await loadSignals();
+        if (data.huge_move) renderHugeMove(data.huge_move);
       } catch (e) {
         setStatus('Error: ' + e.message, false);
       } finally {
         btnRefresh.disabled = false;
       }
     });
+
+    if (btnRefreshMonitor) {
+      btnRefreshMonitor.addEventListener('click', async () => {
+        btnRefreshMonitor.disabled = true;
+        setStatus('Reloading monitor…', null);
+        try {
+          const ok = await loadSignals();
+          try {
+            await loadTradeSummary();
+          } catch (_) { /* tab may not need it */ }
+          if (ok) setStatus('Monitor reloaded (signals + trade summary).', true);
+        } finally {
+          btnRefreshMonitor.disabled = false;
+        }
+      });
+    }
 
     btnExecute.addEventListener('click', async () => {
       const lots = parseInt(lotsInput.value, 10) || 2;
@@ -394,11 +490,11 @@
         const id = 'panel-' + t.dataset.tab;
         document.getElementById(id).classList.add('active');
         if (t.dataset.tab === 'trade-summary') loadTradeSummary();
-        if (t.dataset.tab === 'analysis') loadAnalysis();
+        if (t.dataset.tab === 'analysis') { loadAnalysis(); loadHugeMove(); }
       });
     });
     document.getElementById('btnRefreshSummary').addEventListener('click', loadTradeSummary);
-    document.getElementById('btnRefreshAnalysis').addEventListener('click', () => { loadAnalysis(); });
+    document.getElementById('btnRefreshAnalysis').addEventListener('click', () => { loadAnalysis(); loadHugeMove(); });
     if (underlyingSelect) {
       underlyingSelect.addEventListener('change', () => {
         loadSignals();
@@ -475,6 +571,66 @@
       return 'badge-neutral';
     }
 
+    function renderHugeMove(hm) {
+      const el = document.getElementById('hugeMoveContent');
+      if (!el || !hm) return;
+      const dirCls = hm.direction === 'BULLISH' ? 'badge-bull' : hm.direction === 'BEARISH' ? 'badge-bear' : 'badge-neutral';
+      const reasons = (hm.reasons || []).map(r => `<li>${r}</li>`).join('');
+      el.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 0.75rem;">
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">Direction</div>
+            <div class="val"><span class="badge ${dirCls}">${fmt(hm.direction)}</span></div>
+          </div>
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">Confidence</div>
+            <div class="val">${((hm.confidence || 0) * 100).toFixed(0)}%</div>
+          </div>
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">P(Huge Up)</div>
+            <div class="val pnl-positive">${((hm.prob_huge_up || 0) * 100).toFixed(0)}%</div>
+          </div>
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">P(Huge Down)</div>
+            <div class="val pnl-negative">${((hm.prob_huge_down || 0) * 100).toFixed(0)}%</div>
+          </div>
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">PCR (OI)</div>
+            <div class="val small">${fmt(hm.pcr_oi)}</div>
+          </div>
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">PCR (Vol)</div>
+            <div class="val small">${fmt(hm.pcr_volume)}</div>
+          </div>
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">Max Pain</div>
+            <div class="val small">${fmt(hm.max_pain) || '—'}</div>
+          </div>
+          <div class="day-card" style="padding: 0.6rem;">
+            <div class="label">Spot vs MP</div>
+            <div class="val small ${(hm.spot_vs_max_pain || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(hm.spot_vs_max_pain) != null ? hm.spot_vs_max_pain + ' pts' : '—'}</div>
+          </div>
+          ${hm.suggested_strike ? `<div class="day-card" style="padding: 0.6rem;"><div class="label">Suggested Strike</div><div class="val small">${hm.suggested_strike}</div></div>` : ''}
+        </div>
+        ${reasons ? `<p style="margin: 0; font-size: 0.8rem; color: #a1a1aa;"><strong>Reasons:</strong></p><ul style="margin: 0.25rem 0 0; padding-left: 1.25rem; font-size: 0.8rem; color: #a1a1aa;">${reasons}</ul>` : ''}
+      `;
+    }
+
+    async function loadHugeMove() {
+      const el = document.getElementById('hugeMoveContent');
+      if (!el) return;
+      el.innerHTML = '<p style="color:#71717a;font-size:0.85rem;">Loading option chain analysis…</p>';
+      try {
+        const r = await fetch(apiUrl('/api/huge-move'));
+        const d = await r.json();
+        if (d.huge_move) renderHugeMove(d.huge_move);
+        else if (d.message) el.innerHTML = `<p style="color:#71717a;font-size:0.85rem;">${d.message}</p>`;
+        else el.innerHTML = '<p style="color:#71717a;font-size:0.85rem;">Run Refresh to load option chain analysis.</p>';
+      } catch (e) {
+        el.innerHTML = `<p style="color:#f87171;font-size:0.85rem;">Error: ${e.message}</p>`;
+      }
+    }
+
     function rangeBarPct(support, resistance, spot) {
       if (!support || !resistance || support >= resistance) return 50;
       return Math.max(0, Math.min(100, ((spot - support) / (resistance - support)) * 100));
@@ -507,7 +663,7 @@
       });
       const dominantBias = Object.entries(biasCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
       const latestActionable = summaries.filter(s => s.signal === 'BUY' || s.signal === 'SELL').pop();
-      const latestTime = latestActionable ? (latestActionable.timestamp || '').replace('T', ' ').slice(11, 16) : '—';
+      const latestTime = latestActionable ? shortTs(latestActionable.timestamp || '', 5) : '—';
       const spotVsOpen = open ? (spot > open ? 'above' : spot < open ? 'below' : 'flat') : '—';
       const spotVsOpenCls = spotVsOpen === 'above' ? 'badge-bull' : spotVsOpen === 'below' ? 'badge-bear' : 'badge-neutral';
       el.innerHTML = `
@@ -563,7 +719,7 @@
       el.innerHTML = summaries.map((s, i) => {
         const sig = (s.signal || 'NO_TRADE').toUpperCase();
         const cls = sig === 'BUY' ? 'buy' : sig === 'SELL' ? 'sell' : 'no';
-        const time = (s.timestamp || '').replace('T', ' ').slice(11, 16);
+        const time = shortTs(s.timestamp || '', 5);
         return `<div class="candle-block ${cls}" data-ts="${s.timestamp || ''}" data-i="${i}" title="${time} ${sig}"></div>`;
       }).join('');
       el.querySelectorAll('.candle-block').forEach(block => {
@@ -596,7 +752,7 @@
           const putChg = opt.put_change_pct != null ? opt.put_change_pct : 0;
           const score = s.scores?.final_score != null ? s.scores.final_score : null;
           return `<tr class="analysis-row" data-ts="${s.timestamp || ''}" style="cursor:pointer">
-            <td>${fmt(s.timestamp)?.replace('T', ' ').slice(11, 16) || '—'}</td>
+            <td>${shortTs(fmt(s.timestamp), 5)}</td>
             <td class="${sigClass(s.signal)}">${fmt(s.signal)?.replace('_','') || '—'}</td>
             <td class="num">${fmt(pa.spot)}</td>
             <td class="num">${fmt(pa.support)}</td>
@@ -642,7 +798,7 @@
       const biasCls = badgeClass(s.bias);
       const momCls = badgeClass(pa.momentum);
       el.innerHTML = `
-        <h2 style="margin: 0 0 1rem;">Detail: ${fmt(s.timestamp)} <span class="badge ${sigClass(s.signal)}" style="margin-left:0.5rem">${fmt(s.signal)}</span></h2>
+        <h2 style="margin: 0 0 1rem;">Detail: ${fullTs(s.timestamp, 5)} <span class="badge ${sigClass(s.signal)}" style="margin-left:0.5rem">${fmt(s.signal)}</span></h2>
         <div class="analysis-grid">
           <div>
             <h3 style="margin: 0 0 0.5rem;">Price Action</h3>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tunables — config.json</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 1.5rem; background: #0f0f12; color: #e4e4e7; max-width: 960px; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.5rem; font-weight: 600; }
+    .sub { color: #a1a1aa; font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.5; }
+    .sub a { color: #60a5fa; }
+    .controls { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; align-items: center; }
+    .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary { background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; }
+    .btn-secondary:hover { background: #3f3f46; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { font-size: 0.875rem; min-height: 1.25rem; }
+    .status.err { color: #f87171; }
+    .status.ok { color: #4ade80; }
+    fieldset { border: 1px solid #27272a; border-radius: 8px; margin: 0 0 1rem; padding: 1rem 1rem 0.5rem; background: #18181b; }
+    legend { padding: 0 0.5rem; font-weight: 600; font-size: 0.95rem; color: #a1a1aa; }
+    .row { display: grid; grid-template-columns: minmax(180px, 1fr) 120px 1fr; gap: 0.75rem; align-items: start; margin-bottom: 0.75rem; }
+    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+    .row label { font-size: 0.8rem; color: #d4d4d8; }
+    .row .help { font-size: 0.75rem; color: #71717a; grid-column: 1 / -1; margin-top: -0.35rem; }
+    .row input, .row select { padding: 0.45rem 0.5rem; border: 1px solid #3f3f46; border-radius: 6px; background: #0f0f12; color: #e4e4e7; font-size: 0.9rem; width: 100%; max-width: 200px; }
+    .env-tag { font-size: 0.65rem; color: #a78bfa; margin-left: 0.35rem; }
+    .meta-box { background: #27272a; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8rem; color: #a1a1aa; margin-bottom: 1rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Strategy tunables</h1>
+  <p class="sub">Values are stored in <code>config.json</code> at the project root. Standard JSON does not allow <code>//</code> comments; each field includes a <strong>help</strong> string instead. For <code>settings.*</code>, if the listed environment variable is set in <code>.env</code>, it overrides the value here when the app builds <code>Settings</code>. After saving, restart schedulers or CLI processes so they reload the file.</p>
+  <p class="sub"><a href="/">← Main dashboard</a> &nbsp;·&nbsp; <a href="/stocks">Stocks</a></p>
+
+  <div class="controls">
+    <button type="button" class="btn btn-primary" id="btnSave">Save to config.json</button>
+    <button type="button" class="btn btn-secondary" id="btnReload">Reload from server</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div id="meta" class="meta-box" style="display:none;"></div>
+  <div id="formRoot"></div>
+
+  <script>
+    function isLeaf(node) {
+      return node && typeof node === 'object' && 'value' in node && 'type' in node;
+    }
+
+    let workingCopy = null;
+
+    function coerceInput(type, raw) {
+      if (type === 'int') return parseInt(String(raw).trim(), 10);
+      if (type === 'float') return parseFloat(String(raw).trim());
+      return String(raw);
+    }
+
+    function renderLeaf(path, key, node, container) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const label = document.createElement('label');
+      label.textContent = key;
+      if (node.env) {
+        const sp = document.createElement('span');
+        sp.className = 'env-tag';
+        sp.textContent = 'env: ' + node.env;
+        label.appendChild(sp);
+      }
+      const input = document.createElement('input');
+      input.dataset.path = path;
+      input.dataset.type = node.type || 'float';
+      if (node.type === 'int') input.type = 'number';
+      else if (node.type === 'float') input.type = 'number';
+      else input.type = 'text';
+      input.step = node.type === 'int' ? '1' : 'any';
+      input.value = node.value;
+      const help = document.createElement('div');
+      help.className = 'help';
+      help.textContent = node.help || '';
+      row.appendChild(label);
+      row.appendChild(input);
+      row.appendChild(document.createElement('div'));
+      row.appendChild(help);
+      container.appendChild(row);
+    }
+
+    function renderSection(title, obj, pathPrefix, container) {
+      const fs = document.createElement('fieldset');
+      const leg = document.createElement('legend');
+      leg.textContent = title;
+      fs.appendChild(leg);
+      for (const [k, v] of Object.entries(obj)) {
+        if (k.startsWith('_')) continue;
+        const p = pathPrefix ? pathPrefix + '.' + k : k;
+        if (isLeaf(v)) {
+          renderLeaf(p, k, v, fs);
+        } else if (v && typeof v === 'object') {
+          renderSection(k, v, p, fs);
+        }
+      }
+      container.appendChild(fs);
+    }
+
+    function setByPath(obj, parts, newVal) {
+      let cur = obj;
+      for (let i = 0; i < parts.length - 1; i++) {
+        cur = cur[parts[i]];
+        if (!cur) return;
+      }
+      const last = parts[parts.length - 1];
+      if (cur[last] && typeof cur[last] === 'object' && 'value' in cur[last]) {
+        cur[last].value = newVal;
+      }
+    }
+
+    function collectFromDom(root, cfg) {
+      root.querySelectorAll('input[data-path]').forEach((inp) => {
+        const path = inp.dataset.path;
+        const type = inp.dataset.type || 'float';
+        const parts = path.split('.');
+        let v = coerceInput(type, inp.value);
+        if (type === 'int' && !Number.isFinite(v)) v = 0;
+        if (type === 'float' && !Number.isFinite(v)) v = 0;
+        setByPath(cfg, parts, v);
+      });
+    }
+
+    function renderAll(cfg) {
+      const root = document.getElementById('formRoot');
+      const meta = document.getElementById('meta');
+      root.innerHTML = '';
+      if (cfg._meta) {
+        meta.style.display = 'block';
+        meta.textContent = typeof cfg._meta === 'object' ? JSON.stringify(cfg._meta, null, 2) : String(cfg._meta);
+      } else meta.style.display = 'none';
+      for (const [k, v] of Object.entries(cfg)) {
+        if (k.startsWith('_') || k === 'version') continue;
+        if (isLeaf(v)) {
+          const wrap = document.createElement('div');
+          renderLeaf(k, k, v, wrap);
+          root.appendChild(wrap.firstElementChild);
+        } else if (v && typeof v === 'object') {
+          renderSection(k, v, k, root);
+        }
+      }
+    }
+
+    function setStatus(msg, cls) {
+      const el = document.getElementById('status');
+      el.textContent = msg || '';
+      el.className = 'status' + (cls ? ' ' + cls : '');
+    }
+
+    async function loadCfg() {
+      setStatus('Loading…');
+      const r = await fetch('/api/tunables');
+      if (!r.ok) {
+        setStatus('Failed to load: ' + r.status, 'err');
+        return;
+      }
+      workingCopy = await r.json();
+      renderAll(workingCopy);
+      setStatus('Loaded.', 'ok');
+    }
+
+    document.getElementById('btnReload').addEventListener('click', loadCfg);
+
+    document.getElementById('btnSave').addEventListener('click', async () => {
+      if (!workingCopy) return;
+      collectFromDom(document.getElementById('formRoot'), workingCopy);
+      setStatus('Saving…');
+      const r = await fetch('/api/tunables', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(workingCopy),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setStatus((data.detail || r.statusText || 'Save failed'), 'err');
+        return;
+      }
+      setStatus(data.message || 'Saved.', 'ok');
+      await loadCfg();
+    });
+
+    loadCfg();
+  </script>
+</body>
+</html>

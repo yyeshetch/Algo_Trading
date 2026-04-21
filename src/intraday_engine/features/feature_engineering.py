@@ -48,9 +48,12 @@ def compute_features(df: pd.DataFrame) -> Dict[str, float]:
     put_oi_change_pct = _safe_pct_change(put_oi_last, put_oi_first)
 
     # Futures OI + price interpretation: OI up + price up = longs adding (bullish)
+    from intraday_engine.core.tunables import get_float
+
     fut_oi_available = fut_oi_first > 0 and fut_oi_last > 0
-    fut_oi_up = fut_oi_change_pct > 1.0
-    fut_oi_down = fut_oi_change_pct < -1.0
+    oi_th = get_float("feature_engineering", "FUT_OI_CHANGE_THRESHOLD_PCT", 1.0)
+    fut_oi_up = fut_oi_change_pct > oi_th
+    fut_oi_down = fut_oi_change_pct < -oi_th
     first_fut = float(first.get("future_ltp", 0) or first.get("future_close", 0) or 0)
     fut_price_up = first_fut > 0 and future_ltp > first_fut
     fut_price_down = first_fut > 0 and future_ltp < first_fut

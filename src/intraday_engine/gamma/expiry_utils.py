@@ -7,18 +7,20 @@ from datetime import date
 
 # Nifty weekly: Tuesday. Monthly: last Tuesday.
 # Bank Nifty weekly: Friday. Monthly: last Wednesday.
-NIFTY_WEEKLY_EXPIRY_WEEKDAY = 1  # Tuesday (0=Monday, 6=Sunday)
-BANKNIFTY_WEEKLY_EXPIRY_WEEKDAY = 4  # Friday
 
 
 def is_nifty_expiry_day(trade_date: date) -> bool:
     """True if trade_date is a Nifty weekly expiry day (Tuesday)."""
-    return trade_date.weekday() == NIFTY_WEEKLY_EXPIRY_WEEKDAY
+    from intraday_engine.core.tunables import get_int
+
+    return trade_date.weekday() == get_int("expiry_calendar", "NIFTY_WEEKLY_EXPIRY_WEEKDAY", 1)
 
 
 def is_banknifty_expiry_day(trade_date: date) -> bool:
     """True if trade_date is a Bank Nifty weekly expiry day (Friday)."""
-    return trade_date.weekday() == BANKNIFTY_WEEKLY_EXPIRY_WEEKDAY
+    from intraday_engine.core.tunables import get_int
+
+    return trade_date.weekday() == get_int("expiry_calendar", "BANKNIFTY_WEEKLY_EXPIRY_WEEKDAY", 4)
 
 
 def is_expiry_day(trade_date: date, underlying: str = "NIFTY") -> bool:

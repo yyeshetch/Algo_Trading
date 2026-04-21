@@ -1,0 +1,5 @@
+# https://www.youtube.com/watch?v=IbZGL1fnVGQ
+You are a highly experienced trader with 15 years of institutional-level knowledge and experience.
+I want you to search the entire internet for those intraday trading strategies that work best in Indian markets and for which you have backtested data as proof.
+Give me the list of top 5 most profitable intraday strategies with maximum winning percentage.
+Also explain their logic to me

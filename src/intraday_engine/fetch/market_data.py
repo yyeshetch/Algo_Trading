@@ -28,7 +28,7 @@ class MarketDataFetcher:
         spot_quote = spot_quote_raw[self.settings.spot_symbol]
         spot_token = int(spot_quote["instrument_token"])
         spot_rows = self.client.historical_data(spot_token, from_dt, to_dt)
-        spot_df = _to_candle_df(spot_rows, "spot")
+        spot_df = _drop_incomplete_candles(_to_candle_df(spot_rows, "spot"), trade_date, 5)
         if spot_df.empty:
             raise RuntimeError("No spot candles returned for today's session window.")
 
@@ -40,9 +40,21 @@ class MarketDataFetcher:
         ce_token = int(deriv_quotes[symbols.ce_symbol]["instrument_token"])
         pe_token = int(deriv_quotes[symbols.pe_symbol]["instrument_token"])
 
-        fut_df = _to_candle_df(self.client.historical_data(fut_token, from_dt, to_dt, oi=True), "future", include_oi=True)
-        ce_df = _to_candle_df(self.client.historical_data(ce_token, from_dt, to_dt, oi=True), "call", include_oi=True)
-        pe_df = _to_candle_df(self.client.historical_data(pe_token, from_dt, to_dt, oi=True), "put", include_oi=True)
+        fut_df = _drop_incomplete_candles(
+            _to_candle_df(self.client.historical_data(fut_token, from_dt, to_dt, oi=True), "future", include_oi=True),
+            trade_date,
+            5,
+        )
+        ce_df = _drop_incomplete_candles(
+            _to_candle_df(self.client.historical_data(ce_token, from_dt, to_dt, oi=True), "call", include_oi=True),
+            trade_date,
+            5,
+        )
+        pe_df = _drop_incomplete_candles(
+            _to_candle_df(self.client.historical_data(pe_token, from_dt, to_dt, oi=True), "put", include_oi=True),
+            trade_date,
+            5,
+        )
 
         merged = spot_df.merge(fut_df, on="timestamp", how="inner")
         ce_cols = ["timestamp", "call_close", "call_volume"]
@@ -120,17 +132,16 @@ class MarketDataFetcher:
 
 
 def _market_window(trade_date: date | None) -> tuple[datetime, datetime]:
-    if trade_date is not None:
-        session_start = datetime.combine(trade_date, datetime.min.time()).replace(hour=9, minute=15)
-        # 15:30 to include the final 5-min candle (15:25–15:30); market closes at 3:30 PM
-        session_end = datetime.combine(trade_date, datetime.min.time()).replace(hour=15, minute=30)
-        return session_start, session_end
-
     now = datetime.now()
-    session_start = now.replace(hour=9, minute=15, second=0, microsecond=0)
-    current_boundary = now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0)
-    previous_completed = current_boundary - timedelta(minutes=5)
-    return session_start, previous_completed
+    target_date = trade_date or now.date()
+    session_start = datetime.combine(target_date, datetime.min.time()).replace(hour=9, minute=15)
+    # 15:30 includes the final 5-minute candle (15:25–15:30).
+    session_end = datetime.combine(target_date, datetime.min.time()).replace(hour=15, minute=30)
+    if target_date < now.date():
+        return session_start, session_end
+    if target_date > now.date():
+        return session_start, session_start - timedelta(minutes=5)
+    return session_start, min(session_end, now.replace(second=0, microsecond=0))
 
 
 def _to_candle_df(rows: list[dict[str, object]], prefix: str, include_oi: bool = False) -> pd.DataFrame:
@@ -153,6 +164,25 @@ def _to_candle_df(rows: list[dict[str, object]], prefix: str, include_oi: bool =
     if include_oi and "oi" in raw.columns:
         cols[f"{prefix}_oi"] = raw["oi"].astype(float)
     return pd.DataFrame(cols)
+
+
+def _drop_incomplete_candles(
+    df: pd.DataFrame,
+    trade_date: date | None,
+    interval_minutes: int,
+) -> pd.DataFrame:
+    if df.empty:
+        return df
+    now = datetime.now()
+    target_date = trade_date or now.date()
+    if target_date != now.date():
+        return df
+    cutoff = min(
+        datetime.combine(target_date, datetime.min.time()).replace(hour=15, minute=30),
+        now.replace(second=0, microsecond=0),
+    )
+    completed_mask = df["timestamp"] + pd.to_timedelta(interval_minutes, unit="m") <= cutoff
+    return df.loc[completed_mask].reset_index(drop=True)
 
 
 def _session_vwap(price: pd.Series, volume: pd.Series) -> pd.Series:

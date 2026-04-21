@@ -59,6 +59,27 @@ class Settings:
             spot_symbol = os.getenv("SPOT_SYMBOL", "NSE:NIFTY 50").strip()
             option_strike_step = int(os.getenv("OPTION_STRIKE_STEP", "50"))
             lot_size = int(os.getenv("LOT_SIZE", "50"))
+
+        from intraday_engine.core.tunables import get_float, get_int, get_str
+
+        def _ei(env_key: str, tk: str, default: int) -> int:
+            v = os.getenv(env_key)
+            if v is not None and str(v).strip() != "":
+                return int(v)
+            return get_int("settings", tk, default)
+
+        def _ef(env_key: str, tk: str, default: float) -> float:
+            v = os.getenv(env_key)
+            if v is not None and str(v).strip() != "":
+                return float(v)
+            return get_float("settings", tk, default)
+
+        def _es_log(env_key: str, tk: str, default: str) -> str:
+            v = os.getenv(env_key)
+            if v is not None and str(v).strip() != "":
+                return v.strip().upper()
+            return get_str("settings", tk, default).strip().upper()
+
         return Settings(
             kite_api_key=_required("KITE_API_KEY"),
             kite_access_token=_required("KITE_ACCESS_TOKEN"),
@@ -66,19 +87,19 @@ class Settings:
             spot_symbol=spot_symbol.strip(),
             option_strike_step=option_strike_step,
             lot_size=lot_size,
-            poll_interval_minutes=int(os.getenv("POLL_INTERVAL_MINUTES", "5")),
-            lookback_bars=int(os.getenv("LOOKBACK_BARS", "20")),
-            min_rr=float(os.getenv("MIN_RR", "1.8")),
-            min_confidence=float(os.getenv("MIN_CONFIDENCE", "0.70")),
-            min_confidence_neutral_day=float(os.getenv("MIN_CONFIDENCE_NEUTRAL_DAY", "0.85")),
-            max_stop_pct=float(os.getenv("MAX_STOP_PCT", "0.45")),
-            max_stop_pct_short=float(os.getenv("MAX_STOP_PCT_SHORT", "0.65")),
-            option_stop_ratio=float(os.getenv("OPTION_STOP_RATIO", "0.35")),
-            min_day_range_pct=float(os.getenv("MIN_DAY_RANGE_PCT", "0.40")),
+            poll_interval_minutes=_ei("POLL_INTERVAL_MINUTES", "poll_interval_minutes", 5),
+            lookback_bars=_ei("LOOKBACK_BARS", "lookback_bars", 20),
+            min_rr=_ef("MIN_RR", "min_rr", 1.8),
+            min_confidence=_ef("MIN_CONFIDENCE", "min_confidence", 0.70),
+            min_confidence_neutral_day=_ef("MIN_CONFIDENCE_NEUTRAL_DAY", "min_confidence_neutral_day", 0.85),
+            max_stop_pct=_ef("MAX_STOP_PCT", "max_stop_pct", 0.45),
+            max_stop_pct_short=_ef("MAX_STOP_PCT_SHORT", "max_stop_pct_short", 0.65),
+            option_stop_ratio=_ef("OPTION_STOP_RATIO", "option_stop_ratio", 0.35),
+            min_day_range_pct=_ef("MIN_DAY_RANGE_PCT", "min_day_range_pct", 0.40),
             data_dir=data_dir,
-            log_level=os.getenv("LOG_LEVEL", "INFO").strip().upper(),
-            daily_sl_rupees=float(os.getenv("DAILY_SL_RUPEES", "4000")),
-            default_sl_points=float(os.getenv("DEFAULT_SL_POINTS", "10")),
+            log_level=_es_log("LOG_LEVEL", "log_level", "INFO"),
+            daily_sl_rupees=_ef("DAILY_SL_RUPEES", "daily_sl_rupees", 4000.0),
+            default_sl_points=_ef("DEFAULT_SL_POINTS", "default_sl_points", 10.0),
         )
 
 

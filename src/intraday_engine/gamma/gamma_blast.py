@@ -81,6 +81,15 @@ class GammaBlastDetector:
         return self._evaluate(snapshot)
 
     def _evaluate(self, snapshot: OptionChainSnapshot) -> GammaBlastSignal:
+        from intraday_engine.core.tunables import get_float
+
+        pcr_bull = get_float("gamma_blast", "PCR_BULLISH_MAX", 0.7)
+        pcr_bear = get_float("gamma_blast", "PCR_BEARISH_MIN", 1.3)
+        conf_after = get_float("gamma_blast", "CONFIDENCE_AFTER_1345", 0.7)
+        conf_before = get_float("gamma_blast", "CONFIDENCE_BEFORE_1345", 0.4)
+        pcr_w = get_float("gamma_blast", "PCR_DEV_WEIGHT", 0.6)
+        time_w = get_float("gamma_blast", "TIME_FACTOR_WEIGHT", 0.4)
+
         now = datetime.now().time()
         cutoff = time(13, 45)
         is_after_1345 = now >= cutoff
@@ -96,37 +105,32 @@ class GammaBlastDetector:
         # Put-call ratio (OI-based): PE_OI / CE_OI
         pcr = total_pe_oi / total_ce_oi if total_ce_oi > 0 else 0.0
 
-        # Direction from PCR
-        # PCR < 0.7: bullish (more CE OI, call buying pressure)
-        # PCR > 1.3: bearish (more PE OI, put buying pressure)
-        # 0.7–1.3: neutral
-        if pcr < 0.7:
+        if pcr < pcr_bull:
             direction = "BULLISH"
             suggested = self._best_otm_ce(ce_strikes, snapshot.spot_price)
-        elif pcr > 1.3:
+        elif pcr > pcr_bear:
             direction = "BEARISH"
             suggested = self._best_otm_pe(pe_strikes, snapshot.spot_price)
         else:
             direction = "NEUTRAL"
             suggested = snapshot.atm_strike
 
-        # Confidence: stronger PCR deviation = higher confidence
         if direction == "BULLISH":
-            pcr_dev = min(1.0, (0.7 - pcr) / 0.7) if pcr < 0.7 else 0.0
+            pcr_dev = min(1.0, (pcr_bull - pcr) / pcr_bull) if pcr < pcr_bull else 0.0
         elif direction == "BEARISH":
-            pcr_dev = min(1.0, (pcr - 1.3) / 1.3) if pcr > 1.3 else 0.0
+            pcr_dev = min(1.0, (pcr - pcr_bear) / pcr_bear) if pcr > pcr_bear else 0.0
         else:
             pcr_dev = 0.0
 
-        time_factor = 0.7 if is_after_1345 else 0.4  # Higher confidence after 1:45 PM
-        confidence = min(1.0, (pcr_dev * 0.6 + time_factor * 0.4))
+        time_factor = conf_after if is_after_1345 else conf_before
+        confidence = min(1.0, (pcr_dev * pcr_w + time_factor * time_w))
 
         if direction == "BULLISH":
-            reason = f"PCR {pcr:.2f} < 0.7 (CE-heavy) | CE OI {total_ce_oi:,.0f} vs PE OI {total_pe_oi:,.0f}"
+            reason = f"PCR {pcr:.2f} < {pcr_bull} (CE-heavy) | CE OI {total_ce_oi:,.0f} vs PE OI {total_pe_oi:,.0f}"
         elif direction == "BEARISH":
-            reason = f"PCR {pcr:.2f} > 1.3 (PE-heavy) | PE OI {total_pe_oi:,.0f} vs CE OI {total_ce_oi:,.0f}"
+            reason = f"PCR {pcr:.2f} > {pcr_bear} (PE-heavy) | PE OI {total_pe_oi:,.0f} vs CE OI {total_ce_oi:,.0f}"
         else:
-            reason = f"PCR {pcr:.2f} in neutral range 0.7–1.3"
+            reason = f"PCR {pcr:.2f} in neutral range {pcr_bull}–{pcr_bear}"
 
         if is_after_1345:
             reason += " | Best window (post 1:45 PM on expiry day)"

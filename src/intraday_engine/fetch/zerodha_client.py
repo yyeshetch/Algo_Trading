@@ -8,6 +8,7 @@ from kiteconnect import KiteConnect
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from intraday_engine.core.config import Settings
+from intraday_engine.core.underlyings import filter_liquid_fno_stocks
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,8 @@ class ZerodhaClient:
         self.kite.set_access_token(settings.kite_access_token)
         self._nfo_cache: List[Dict[str, object]] = []
         self._cache_refreshed_at: datetime | None = None
+        self._nse_eq_cache: List[Dict[str, object]] = []
+        self._nse_eq_cache_refreshed_at: datetime | None = None
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=8), reraise=True)
     def quote(self, symbols: List[str]) -> Dict[str, Dict[str, object]]:
@@ -67,6 +70,16 @@ class ZerodhaClient:
             logger.warning("Could not fetch day P&L: %s", e)
             return None
 
+    def get_positions(self) -> List[Dict[str, object]]:
+        """Return net positions (list). Empty list if fetch fails."""
+        try:
+            pos_data = self.kite.positions()
+            if isinstance(pos_data, dict):
+                return pos_data.get("net", []) or []
+        except Exception as e:
+            logger.debug("Could not fetch positions: %s", e)
+        return []
+
     def get_trade_summary(self) -> Dict[str, object] | None:
         """Return day P&L, positions, and orders. None if fetch fails."""
         try:
@@ -113,24 +126,32 @@ class ZerodhaClient:
         price: float | None = None,
     ) -> str:
         """Place a market order (or SL-M). Returns order_id."""
-        if tradingsymbol.startswith("NFO:"):
-            tradingsymbol = tradingsymbol[4:]
-        if exchange.upper() != "NFO":
+        if tradingsymbol.startswith("NFO:") or tradingsymbol.startswith("NSE:"):
+            tradingsymbol = tradingsymbol.split(":", 1)[-1]
+        exchange = str(exchange or "NFO").upper()
+        if exchange not in ("NFO", "NSE", "BSE"):
             exchange = "NFO"
         ot = order_type.upper() if isinstance(order_type, str) else order_type
-        if ot == "SL-M":
-            ot = self.kite.ORDER_TYPE_SLM
-        elif ot == "MARKET":
-            ot = self.kite.ORDER_TYPE_MARKET
-        elif ot == "SL":
-            ot = self.kite.ORDER_TYPE_SL
+        order_type_map = {
+            "SL-M": self.kite.ORDER_TYPE_SLM,
+            "MARKET": self.kite.ORDER_TYPE_MARKET,
+            "LIMIT": self.kite.ORDER_TYPE_LIMIT,
+            "SL": self.kite.ORDER_TYPE_SL,
+        }
+        ot = order_type_map.get(ot, ot)
+        product_map = {
+            "MIS": self.kite.PRODUCT_MIS,
+            "CNC": self.kite.PRODUCT_CNC,
+            "NRML": self.kite.PRODUCT_NRML,
+        }
+        product_val = product_map.get(str(product).upper(), self.kite.PRODUCT_MIS)
         params: Dict[str, object] = {
             "variety": self.kite.VARIETY_REGULAR,
             "tradingsymbol": tradingsymbol,
             "exchange": exchange,
             "transaction_type": transaction_type.upper(),
             "quantity": quantity,
-            "product": self.kite.PRODUCT_MIS if product == "MIS" else product,
+            "product": product_val,
             "order_type": ot,
         }
         if trigger_price is not None:
@@ -196,7 +217,10 @@ class ZerodhaClient:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=8), reraise=True)
     def nfo_instruments(self) -> List[Dict[str, object]]:
         now = datetime.now()
-        if self._cache_refreshed_at and (now - self._cache_refreshed_at) < timedelta(hours=6):
+        from intraday_engine.core.tunables import get_int
+
+        cache_h = get_int("zerodha_client", "NFO_INSTRUMENTS_CACHE_HOURS", 6)
+        if self._cache_refreshed_at and (now - self._cache_refreshed_at) < timedelta(hours=cache_h):
             return self._nfo_cache
 
         logger.info("Refreshing NFO instruments cache.")
@@ -206,7 +230,7 @@ class ZerodhaClient:
         return records
 
     def fno_stock_names(self) -> List[str]:
-        """Return sorted list of F&O stock underlying names (excludes indices NIFTY, BANKNIFTY)."""
+        """Return live FnO stock names restricted to the allowed liquid-stock universe."""
         indices = {"NIFTY", "BANKNIFTY"}
         names: set[str] = set()
         for r in self.nfo_instruments():
@@ -216,5 +240,37 @@ class ZerodhaClient:
             inst_type = r.get("instrument_type")
             if name and inst_type == "FUT" and name not in indices:
                 names.add(str(name).strip())
-        return sorted(names)
+        return filter_liquid_fno_stocks(names)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=8), reraise=True)
+    def nse_eq_instruments(self) -> List[Dict[str, object]]:
+        """All NSE equity instruments (cached). Used for NIFTY 500 / cash scans."""
+        now = datetime.now()
+        from intraday_engine.core.tunables import get_int
+
+        cache_h = get_int("zerodha_client", "NFO_INSTRUMENTS_CACHE_HOURS", 6)
+        if self._nse_eq_cache_refreshed_at and (now - self._nse_eq_cache_refreshed_at) < timedelta(hours=cache_h):
+            return self._nse_eq_cache
+
+        logger.info("Refreshing NSE EQ instruments cache.")
+        records = self.kite.instruments("NSE")
+        self._nse_eq_cache = records
+        self._nse_eq_cache_refreshed_at = now
+        return records
+
+    def nse_eq_token_map(self) -> Dict[str, int]:
+        """Map NSE equity tradingsymbol -> instrument_token."""
+        out: Dict[str, int] = {}
+        for r in self.nse_eq_instruments():
+            if not isinstance(r, dict):
+                continue
+            if str(r.get("instrument_type", "")).upper() != "EQ":
+                continue
+            if str(r.get("exchange", "")).upper() != "NSE":
+                continue
+            sym = r.get("tradingsymbol")
+            tok = r.get("instrument_token")
+            if sym and tok is not None:
+                out[str(sym).strip()] = int(tok)
+        return out
 
