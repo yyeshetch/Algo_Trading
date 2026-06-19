@@ -19,6 +19,12 @@ from intraday_engine.gamma.huge_move_predictor import HugeMovePredictor
 from intraday_engine.position_monitor import run as run_position_monitor
 from intraday_engine.research.nifty500_accumulation_scanner import print_scan_report, run_nifty500_accumulation_scan
 from intraday_engine.research.tomorrow_watchlist_scanner import run_tomorrow_watchlist_scan
+from intraday_engine.research.silent_accumulation_scanner import run_silent_accumulation_scan
+from intraday_engine.research.fii_dii_trends import run_fii_dii_trends_scan
+from intraday_engine.research.relative_strength_scanner import run_relative_strength_scan
+from intraday_engine.research.fundamentals_screener import run_fundamentals_scan
+from intraday_engine.research.stock_news_scanner import run_news_scan
+from intraday_engine.research.combined_signals_scanner import run_combined_scan
 from intraday_engine.storage import DataStore
 from intraday_engine.utils.logging_setup import setup_logging
 
@@ -172,6 +178,99 @@ def main() -> None:
         default=None,
         help="Optional max symbols to scan (with --tomorrow-watchlist), for testing.",
     )
+    parser.add_argument(
+        "--silent-accumulation",
+        action="store_true",
+        help="Scan NIFTY 500 daily bars for silent (Wyckoff-style) institutional accumulation.",
+    )
+    parser.add_argument(
+        "--silent-top",
+        type=int,
+        default=25,
+        help="Top-N to keep in silent-accumulation output JSON. Default 25.",
+    )
+    parser.add_argument(
+        "--silent-no-nse",
+        action="store_true",
+        help="Skip NSE delivery%% / bulk-deals download (OHLCV-only signals).",
+    )
+    parser.add_argument(
+        "--fii-dii-snapshot",
+        action="store_true",
+        help="Refresh FII/DII + participant-OI 30-day trends JSON.",
+    )
+    parser.add_argument(
+        "--relative-strength",
+        action="store_true",
+        help="Scan NIFTY 500 daily bars for stocks outperforming NIFTY 50 (RS line).",
+    )
+    parser.add_argument(
+        "--rs-top",
+        type=int,
+        default=50,
+        help="Top-N outperformers to keep in RS output JSON. Default 50.",
+    )
+    parser.add_argument(
+        "--rs-include-all",
+        action="store_true",
+        help="Include underperformers in RS output (default keeps only outperformers).",
+    )
+    parser.add_argument(
+        "--fundamentals",
+        action="store_true",
+        help="Scrape screener.in fundamentals for NIFTY 500 -> data/analysis/fundamentals/*.csv.",
+    )
+    parser.add_argument(
+        "--fundamentals-workers",
+        type=int,
+        default=4,
+        help="Parallel workers for fundamentals scrape (default 4; keep low to be polite).",
+    )
+    parser.add_argument(
+        "--fundamentals-limit",
+        type=int,
+        default=None,
+        help="Optional cap on symbols (for smoke tests).",
+    )
+    parser.add_argument(
+        "--fundamentals-cache-hours",
+        type=int,
+        default=24,
+        help="Reuse per-symbol screener.in cache younger than this (default 24h).",
+    )
+    parser.add_argument(
+        "--fundamentals-force",
+        action="store_true",
+        help="Ignore per-symbol cache and re-scrape every stock.",
+    )
+    parser.add_argument(
+        "--stock-news",
+        action="store_true",
+        help="Pull Google News RSS for NIFTY 500 + score sentiment -> data/analysis/news/*.csv.",
+    )
+    parser.add_argument(
+        "--news-workers",
+        type=int,
+        default=8,
+        help="Parallel workers for news scrape (default 8).",
+    )
+    parser.add_argument(
+        "--news-lookback-days",
+        type=int,
+        default=7,
+        help="Only consider headlines published within the last N days (default 7).",
+    )
+    parser.add_argument(
+        "--news-limit",
+        type=int,
+        default=None,
+        help="Optional cap on symbols (for smoke tests).",
+    )
+    parser.add_argument(
+        "--combined-signals",
+        action="store_true",
+        help="Join latest institutional volume + fundamentals + news into one ranked CSV.",
+    )
     args = parser.parse_args()
     selected_date = _parse_date(args.date) if args.date else None
     underlying = args.underlying or None
@@ -200,6 +299,115 @@ def main() -> None:
             trade_date=selected_date or date.today(),
         )
         print_scan_report(rows)
+        return
+
+    if args.silent_accumulation:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        payload = run_silent_accumulation_scan(
+            settings=settings,
+            top_n=args.silent_top,
+            use_nse_data=not args.silent_no_nse,
+            trade_date=selected_date or date.today(),
+        )
+        rows = payload.get("rows", [])
+        print(
+            f"Silent accumulation: {len(rows)} top candidates of {payload.get('passed', 0)} passed "
+            f"({payload.get('scanned', 0)} scanned). NSE data: {payload.get('nse_data_status')}"
+        )
+        for r in rows[:15]:
+            print(
+                f"  {r.get('stock'):12} score={r.get('score'):>5}  "
+                f"OBV+{r.get('obv_slope_pct'):>5}%  CMF={r.get('cmf'):>6}  "
+                f"U/D={r.get('up_down_vol_ratio')} deliv={r.get('avg_delivery_pct')}"
+            )
+        return
+
+    if args.fii_dii_snapshot:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        payload = run_fii_dii_trends_scan(settings=settings, trade_date=selected_date or date.today())
+        s = payload.get("summary", {})
+        print(
+            f"FII/DII: {len(payload.get('fii_dii') or [])} sessions, "
+            f"OI rows: {len(payload.get('participant_oi') or [])}"
+        )
+        print(f"  FII net 5d/30d: {s.get('fii_net_5d')} / {s.get('fii_net_30d')}")
+        print(f"  DII net 5d/30d: {s.get('dii_net_5d')} / {s.get('dii_net_30d')}")
+        return
+
+    if args.relative_strength:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        payload = run_relative_strength_scan(
+            settings=settings,
+            top_n=args.rs_top,
+            only_outperformers=not args.rs_include_all,
+            trade_date=selected_date or date.today(),
+        )
+        rows = payload.get("rows", [])
+        np_ = payload.get("nifty_pct_change", {})
+        print(
+            f"Relative strength: {len(rows)} shown, {payload.get('passed', 0)} outperformers of "
+            f"{payload.get('scanned', 0)} scanned. NIFTY 5d/20d/60d: "
+            f"{np_.get('5d')}% / {np_.get('20d')}% / {np_.get('60d')}%"
+        )
+        for r in rows[:15]:
+            print(
+                f"  {r.get('stock'):12} strength={r.get('strength_score'):>6}  "
+                f"RS20d={r.get('rs_slope_20d_pct')}%  vsN20d={r.get('excess_20d')}%"
+            )
+        return
+
+    if args.fundamentals:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        sym_path = Path(args.nifty500_symbols_file) if args.nifty500_symbols_file else None
+        payload = run_fundamentals_scan(
+            settings=settings,
+            symbols_file=sym_path,
+            trade_date=selected_date or date.today(),
+            cache_max_age_hours=args.fundamentals_cache_hours,
+            max_workers=args.fundamentals_workers,
+            stock_limit=args.fundamentals_limit,
+            force_refresh=args.fundamentals_force,
+        )
+        print(
+            f"Fundamentals: scanned={payload['scanned']} ok={payload['ok']} "
+            f"failed={payload['failed']} -> {payload['output_csv']}"
+        )
+        return
+
+    if args.stock_news:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        sym_path = Path(args.nifty500_symbols_file) if args.nifty500_symbols_file else None
+        payload = run_news_scan(
+            settings=settings,
+            symbols_file=sym_path,
+            trade_date=selected_date or date.today(),
+            lookback_days=args.news_lookback_days,
+            max_workers=args.news_workers,
+            stock_limit=args.news_limit,
+        )
+        print(
+            f"News: scanned={payload['scanned']} ok={payload['ok']} "
+            f"failed={payload['failed']} -> {payload['output_csv']}"
+        )
+        return
+
+    if args.combined_signals:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        payload = run_combined_scan(
+            settings=settings,
+            trade_date=selected_date or date.today(),
+        )
+        print(
+            f"Combined: universe={payload['universe']} "
+            f"(inst={payload['with_institutional']}, fund={payload['with_fundamentals']}, "
+            f"news={payload['with_news']}) -> {payload['output_csv']}"
+        )
         return
 
     if args.tomorrow_watchlist:

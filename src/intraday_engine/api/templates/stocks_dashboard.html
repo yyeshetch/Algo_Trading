@@ -180,6 +180,19 @@
     .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .iv-dot {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: help;
+      transition: transform 0.1s ease;
+      box-sizing: border-box;
+    }
+    .iv-dot:hover { transform: scale(1.8); z-index: 5; position: relative; }
+    .iv-dot-hit { box-shadow: 0 0 6px rgba(16,185,129,0.6); }
+    .iv-strip { padding: 2px 0; }
     .chk { display: flex; align-items: center; gap: 0.5rem; }
     .chk input { accent-color: var(--accent); }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; }
@@ -218,128 +231,25 @@
     </nav>
     <header class="header">
       <h1>F&O Stock Signals</h1>
-      <p class="sub">15-min timeframe • Spot + Futures (options when available) • 15-min ORB (0.2% variation)</p>
+      <p class="sub">F&amp;O research scanners • 30-min analysis • EOD indicators • multi-timeframe watchlist</p>
     </header>
     <div class="toolbar">
-      <button class="btn btn-primary" id="btnRefreshAll">Refresh All Tabs (15m/1H/1D)</button>
+      <button class="btn btn-primary" id="btnRefreshAll">Refresh Tomorrow Watchlist</button>
       <span class="status" id="refreshAllStatus"></span>
       <span class="status" id="refreshAllMeta">Last shared refresh: —</span>
-      <span class="status" style="color: var(--text-muted);">
-        Single refresh updates 15-min signals, Intraday Signals, and Watchlist for Tomorrow.
-      </span>
     </div>
     <div class="tabs">
-      <button class="tab active" data-tab="signals">15-min Signals</button>
-      <button class="tab" data-tab="intraday">Intraday Signals</button>
-      <button class="tab" data-tab="30min">30-min Analysis</button>
+      <button class="tab active" data-tab="30min">30-min Analysis</button>
       <button class="tab" data-tab="eod">EOD FnO Analysis</button>
       <button class="tab" data-tab="tomorrow">Watchlist for Tomorrow</button>
+      <button class="tab" data-tab="silent">Silent Accumulation</button>
+      <button class="tab" data-tab="fiidii">FII/DII &amp; OI Trends</button>
+      <button class="tab" data-tab="rs">RS vs NIFTY</button>
+      <button class="tab" data-tab="intraday-rs">Intraday RS</button>
+      <button class="tab" data-tab="instvol">Institutional Volume</button>
+      <button class="tab" data-tab="combined">Combined Signals</button>
     </div>
-    <div id="panel-signals" class="tab-panel active">
-      <div class="toolbar">
-        <span class="status" id="status">Uses data from shared refresh.</span>
-      </div>
-      <div id="content">
-      <div class="loading" id="loading">Loading stored signals…</div>
-      <div id="results" class="grid" style="display:none;">
-        <div class="panel buy">
-          <div class="panel-head">▲ BUY Signals</div>
-          <div class="panel-body">
-            <table id="buyTable">
-              <thead><tr><th>Stock</th><th>Strategy</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Status</th><th>RSI 60m</th><th>RSI 15m</th><th>Fut OI %</th><th>RS vs NIFTY</th><th>ORB</th><th>Pinbar</th><th>Bias Vol x</th><th>Bias Vol</th><th>20 SMA Vol</th><th>Mom UP</th><th>Fut &gt; VWAP</th><th>Calls Exp</th><th>Puts Dec</th><th>Trig Near High</th><th>Break Res</th><th>Reasons</th></tr></thead>
-              <tbody></tbody>
-            </table>
-            <div class="empty" id="buyEmpty" style="display:none;">No BUY signals. Click Refresh to fetch 15-min data.</div>
-          </div>
-        </div>
-        <div class="panel sell">
-          <div class="panel-head">▼ SELL Signals</div>
-          <div class="panel-body">
-            <table id="sellTable">
-              <thead><tr><th>Stock</th><th>Strategy</th><th>Entry</th><th>Target</th><th>SL</th><th>Conf</th><th>Time</th><th>Status</th><th>RSI 60m</th><th>RSI 15m</th><th>Fut OI %</th><th>RS vs NIFTY</th><th>ORB</th><th>Pinbar</th><th>Bias Vol x</th><th>Bias Vol</th><th>20 SMA Vol</th><th>Mom DOWN</th><th>Fut &lt; VWAP</th><th>Calls Dec</th><th>Puts Exp</th><th>Trig Near Low</th><th>Break Sup</th><th>Reasons</th></tr></thead>
-              <tbody></tbody>
-            </table>
-            <div class="empty" id="sellEmpty" style="display:none;">No SELL signals. Click Refresh to fetch 15-min data.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    </div>
-    <div id="panel-intraday" class="tab-panel">
-      <div class="toolbar">
-        <span class="status" id="intradayStatus">Uses data from shared refresh.</span>
-      </div>
-      <div id="intradayMeta" class="card" style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);"></div>
-      <div id="intradayLoading" class="loading">Loading stored intraday signals…</div>
-      <div id="intradayContent" style="display: none;">
-        <div class="card" style="margin-bottom: 1rem;">
-          <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">Watchlist Rules</h2>
-          <p style="font-size: 0.85rem; color: var(--text-muted);">
-            BUY watchlist: 60m RSI &gt; 55 and 15m RSI &gt; 55. SELL watchlist: 60m RSI &lt; 45 and 15m RSI &lt; 45.
-            Watchlists update only on hourly slots from 9:15 AM to 3:15 PM. Intraday BUY/SELL signals are generated only for symbols already in the matching watchlist.
-          </p>
-        </div>
-        <div class="grid" style="margin-bottom: 1rem;">
-          <div class="panel buy">
-            <div class="panel-head">BUY Watchlist</div>
-            <div class="panel-body">
-              <table id="watchBuyTable">
-                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>Time</th></tr></thead>
-                <tbody></tbody>
-              </table>
-              <div class="empty" id="watchBuyEmpty" style="display:none;">No BUY watchlist symbols.</div>
-            </div>
-          </div>
-          <div class="panel sell">
-            <div class="panel-head">SELL Watchlist</div>
-            <div class="panel-body">
-              <table id="watchSellTable">
-                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>Time</th></tr></thead>
-                <tbody></tbody>
-              </table>
-              <div class="empty" id="watchSellEmpty" style="display:none;">No SELL watchlist symbols.</div>
-            </div>
-          </div>
-        </div>
-        <div class="grid" style="margin-bottom: 1rem;">
-          <div class="panel buy">
-            <div class="panel-head">BUY Signals</div>
-            <div class="panel-body">
-              <table id="intradayBuyTable">
-                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>RSI 5m</th><th>ORB</th><th>PDH</th><th>VWAP</th><th>Vol 2×</th><th>OI↓</th><th>Swing</th><th>Vol Bias</th><th>Liquidity Grab</th><th>Grab Status</th><th>Time</th></tr></thead>
-                <tbody></tbody>
-              </table>
-              <div class="empty" id="intradayBuyEmpty" style="display:none;">No BUY signals for this run.</div>
-            </div>
-          </div>
-          <div class="panel sell">
-            <div class="panel-head">SELL Signals</div>
-            <div class="panel-body">
-              <table id="intradaySellTable">
-                <thead><tr><th>Stock</th><th>Price</th><th>RSI 60m</th><th>RSI 15m</th><th>RSI 5m</th><th>OR ↓</th><th>PDL</th><th>&lt;VWAP</th><th>Vol 2×</th><th>OI↑</th><th>Swing</th><th>Vol Bias</th><th>Liquidity Grab</th><th>Grab Status</th><th>Time</th></tr></thead>
-                <tbody></tbody>
-              </table>
-              <div class="empty" id="intradaySellEmpty" style="display:none;">No SELL signals for this run.</div>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">All Scanned Symbols</h2>
-          <div style="overflow-x: auto; max-height: 420px; overflow-y: auto;">
-            <table id="intradayAllTable">
-              <thead>
-                <tr>
-                  <th>Stock</th><th>Watchlist</th><th>Signal</th><th>RSI 60/15/5</th>
-                  <th>BUY gates</th><th>SELL gates</th><th>Vol Bias</th><th>Liquidity Grab</th><th>Grab Status</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="panel-30min" class="tab-panel">
+    <div id="panel-30min" class="tab-panel active">
       <div class="toolbar">
         <div class="limit-row">
           <label for="stock30">Stock:</label>
@@ -497,19 +407,431 @@
         </div>
       </div>
     </div>
+
+    <div id="panel-silent" class="tab-panel">
+      <div class="toolbar">
+        <button type="button" class="btn btn-primary" id="btnSilentRefresh">Refresh</button>
+        <label style="font-size: 0.85rem; color: var(--text-muted);">
+          <input type="checkbox" id="silentUseNse" checked> Include NSE delivery % &amp; bulk-deal data
+        </label>
+        <span class="status" id="silentStatus">Click Refresh to scan NIFTY 500 daily bars.</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
+        Daily-bar Wyckoff/footprint scan: rising OBV inside flat price range, persistent positive CMF, up-day vs down-day volume ratio &gt; 1.3, closes in upper third, higher swing lows. Adds NSE delivery % trend and FII/MF bulk-deal buys when available. Higher score = stealthier accumulation.
+      </p>
+      <div id="silentLoading" class="loading" style="display:none;">Loading silent-accumulation results…</div>
+      <div id="silentEmpty" class="empty" style="display:none;">No saved scan yet. Click Refresh.</div>
+      <div id="silentContent" style="display:none;">
+        <div id="silentMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head">Top stealth-accumulation candidates (sorted by score)</div>
+          <div class="panel-body" style="max-height: 720px; overflow: auto;">
+            <table id="silentTable" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>Stock</th>
+                  <th class="num">Score</th>
+                  <th class="num">Price</th>
+                  <th class="num">Range</th>
+                  <th class="num">Width %</th>
+                  <th class="num">OBV +%</th>
+                  <th class="num">CMF</th>
+                  <th class="num">Up/Dn Vol</th>
+                  <th class="num">Upper⅓ %</th>
+                  <th>HL</th>
+                  <th class="num">Avg Deliv %</th>
+                  <th>Deliv Trend</th>
+                  <th class="num">Inst Buys</th>
+                  <th>Components</th>
+                  <th>Reasons</th>
+                </tr>
+              </thead>
+              <tbody id="silentTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-fiidii" class="tab-panel">
+      <div class="toolbar">
+        <button class="btn btn-primary" id="btnFiidiiRefresh">Refresh</button>
+        <span class="status" id="fiidiiStatus">Click Refresh to fetch latest FII/DII + participant OI.</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
+        Last 30 days. <strong>Top:</strong> Cash-segment net FII vs DII (₹ crore). <strong>Bottom:</strong> Participant-wise net F&amp;O Open Interest (Index Future longs minus shorts) for Client / FII / Pro / DII. Data from NSE public reports — may be empty if NSE rate-limited the download.
+      </p>
+      <div id="fiidiiLoading" class="loading" style="display:none;">Loading…</div>
+      <div id="fiidiiEmpty" class="empty" style="display:none;">No FII/DII data available. Click Refresh.</div>
+      <div id="fiidiiContent" style="display:none;">
+        <!-- Today's numbers, large and clear -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+          <div class="card" style="padding: 1rem 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);">
+            <div style="font-size:0.78rem; color:var(--text-muted);">FII (cash, today) <span id="heroFiiDate" style="opacity:0.7;"></span></div>
+            <div id="heroFii" class="num" style="font-size: 1.9rem; font-weight: 700; line-height:1.15; margin-top:0.25rem;">—</div>
+            <div id="heroFiiTrend" style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">—</div>
+          </div>
+          <div class="card" style="padding: 1rem 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);">
+            <div style="font-size:0.78rem; color:var(--text-muted);">DII (cash, today) <span id="heroDiiDate" style="opacity:0.7;"></span></div>
+            <div id="heroDii" class="num" style="font-size: 1.9rem; font-weight: 700; line-height:1.15; margin-top:0.25rem;">—</div>
+            <div id="heroDiiTrend" style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">—</div>
+          </div>
+          <div class="card" style="padding: 1rem 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);">
+            <div style="font-size:0.78rem; color:var(--text-muted);">Combined institutional (FII + DII)</div>
+            <div id="heroNet" class="num" style="font-size: 1.9rem; font-weight: 700; line-height:1.15; margin-top:0.25rem;">—</div>
+            <div id="heroNetTrend" style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">—</div>
+          </div>
+        </div>
+
+        <!-- Cash-flow stacked bars + cumulative side by side -->
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:0.5rem; margin-bottom: 0.4rem;">
+            <h3 style="margin: 0; font-size: 0.95rem;">Cash equity flow — daily stacked + cumulative</h3>
+            <span id="fiidiiChartMeta" style="font-size:0.75rem; color:var(--text-muted);">Last 6 trading sessions · bars = daily net · lines = cumulative</span>
+          </div>
+          <div style="position:relative; width:100%; height:300px;">
+            <canvas id="fiidiiChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Participant OI stacked bars over time (the cross-participant trend view) -->
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:0.5rem; margin-bottom: 0.4rem;">
+            <h3 style="margin: 0; font-size: 0.95rem;">F&amp;O positioning trend by client type — all segments (net long contracts)</h3>
+            <div style="display:flex; gap:0.9rem; align-items:center; font-size:0.75rem; color:var(--text-muted);">
+              <span style="display:inline-flex; align-items:center; gap:0.35rem;">
+                <span style="display:inline-block; width:14px; height:10px; background:rgba(16,185,129,0.22); border:1px solid #10b981; border-radius:2px;"></span>
+                ↑ Net Long (Buying / bullish positioning)
+              </span>
+              <span style="display:inline-flex; align-items:center; gap:0.35rem;">
+                <span style="display:inline-block; width:14px; height:10px; background:rgba(239,68,68,0.22); border:1px solid #ef4444; border-radius:2px;"></span>
+                ↓ Net Short (Selling / bearish positioning)
+              </span>
+            </div>
+          </div>
+          <p style="font-size:0.78rem; color:var(--text-muted); margin: 0 0 0.7rem;">For each segment, daily net (long − short) is stacked per participant. Bars above the zero line mean participants are collectively <strong style="color:#10b981;">long → buying side</strong>; bars below zero mean they are collectively <strong style="color:#ef4444;">short → selling side</strong>. Each color = one participant.</p>
+          <div id="participantOiGrid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+                <strong style="font-size:0.82rem;">Index Futures</strong>
+                <span style="font-size:0.7rem; color:var(--text-muted);">directional bet on the index</span>
+              </div>
+              <div style="position:relative; width:100%; height:260px;">
+                <canvas id="participantOiChart_idx_fut"></canvas>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+                <strong style="font-size:0.82rem;">Stock Futures</strong>
+                <span style="font-size:0.7rem; color:var(--text-muted);">single-stock directional bet</span>
+              </div>
+              <div style="position:relative; width:100%; height:260px;">
+                <canvas id="participantOiChart_stk_fut"></canvas>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+                <strong style="font-size:0.82rem;">Index Calls</strong>
+                <span style="font-size:0.7rem; color:var(--text-muted);">long call = bullish · short call = bearish/range</span>
+              </div>
+              <div style="position:relative; width:100%; height:260px;">
+                <canvas id="participantOiChart_idx_call"></canvas>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+                <strong style="font-size:0.82rem;">Index Puts</strong>
+                <span style="font-size:0.7rem; color:var(--text-muted);">long put = bearish/hedge · short put = bullish</span>
+              </div>
+              <div style="position:relative; width:100%; height:260px;">
+                <canvas id="participantOiChart_idx_put"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today's positioning snapshot -->
+        <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.4rem;">
+            <h3 style="margin: 0; font-size: 0.95rem;">Today's positioning snapshot (Index Futures)</h3>
+            <span id="oiAsOf" style="font-size: 0.78rem; color: var(--text-muted);">—</span>
+          </div>
+          <table id="participantOiTable" style="width:100%; font-size: 0.85rem;">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Participant</th>
+                <th class="num">Long</th>
+                <th class="num">Short</th>
+                <th>Long vs Short</th>
+                <th class="num">Net %</th>
+                <th class="num">Δ d/d</th>
+              </tr>
+            </thead>
+            <tbody id="participantOiTbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Detail table -->
+        <details class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem;">
+          <summary style="cursor:pointer; font-size: 0.9rem; font-weight: 600;">Daily detail table (last 30 sessions)</summary>
+          <div style="overflow-x: auto; margin-top: 0.6rem;">
+            <table id="fiidiiTable" style="font-size: 0.8rem;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th class="num">FII Buy</th>
+                  <th class="num">FII Sell</th>
+                  <th class="num">FII Net</th>
+                  <th class="num">DII Buy</th>
+                  <th class="num">DII Sell</th>
+                  <th class="num">DII Net</th>
+                  <th class="num">Combined</th>
+                </tr>
+              </thead>
+              <tbody id="fiidiiTbody"></tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div id="panel-rs" class="tab-panel">
+      <div class="toolbar">
+        <button type="button" class="btn btn-primary" id="btnRsRefresh">Refresh</button>
+        <label style="font-size: 0.85rem; color: var(--text-muted);">
+          <input type="checkbox" id="rsOnlyOuter" checked> Only outperformers (RS slope &gt; 0)
+        </label>
+        <span class="status" id="rsStatus">Uses cached daily bars under data/NIFTY500.</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
+        Mansfield-style RS vs NIFTY 50 daily. Sparkline shows the RS line (stock/NIFTY normalized). Strength score = weighted blend of 5d/20d/60d RS slope + 20d/60d excess return over NIFTY. Sortable by clicking column headers.
+      </p>
+      <div id="rsLoading" class="loading" style="display:none;">Loading RS results…</div>
+      <div id="rsEmpty" class="empty" style="display:none;">No saved RS scan yet. Click Refresh.</div>
+      <div id="rsContent" style="display:none;">
+        <div id="rsMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head">Outperformers vs NIFTY 50 (sorted by strength)</div>
+          <div class="panel-body" style="max-height: 720px; overflow: auto;">
+            <table id="rsTable" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Stock</th>
+                  <th class="num">Price</th>
+                  <th class="num" data-sort="strength_score">Strength</th>
+                  <th>RS line (60d)</th>
+                  <th class="num">RS</th>
+                  <th class="num" data-sort="rs_slope_5d_pct">RS 5d%</th>
+                  <th class="num" data-sort="rs_slope_20d_pct">RS 20d%</th>
+                  <th class="num" data-sort="rs_slope_60d_pct">RS 60d%</th>
+                  <th data-sort="excess_20d">vs NIFTY 5/20/60d</th>
+                  <th class="num">Pctile</th>
+                </tr>
+              </thead>
+              <tbody id="rsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-intraday-rs" class="tab-panel">
+      <div class="toolbar">
+        <button type="button" class="btn btn-primary" id="btnIntradayRsRefresh">Refresh</button>
+        <span class="status" id="intradayRsStatus">Uses cached 15-min bars under data/NIFTY500 + live NIFTY 50 15-min.</span>
+        <span class="status" id="intradayRsMeta" style="color: var(--text-muted);">—</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
+        Today's intraday move per NIFTY 500 stock vs NIFTY 50, computed from the first 15-min open to the latest 15-min close.
+        <strong style="color:#10b981;">Stronger</strong> = beating NIFTY today; <strong style="color:#ef4444;">Weaker</strong> = lagging NIFTY today.
+        Sparkline is the per-bar intraday RS ratio (100 baseline = matching NIFTY since open).
+      </p>
+      <div id="intradayRsLoading" class="loading" style="display:none;">Loading intraday RS…</div>
+      <div id="intradayRsEmpty" class="empty" style="display:none;">No saved intraday RS yet. Click Refresh.</div>
+      <div id="intradayRsContent" class="grid" style="display:none;">
+        <div class="panel buy" style="box-shadow: var(--shadow);">
+          <div class="panel-head">▲ Stronger than NIFTY (intraday)</div>
+          <div class="panel-body" style="max-height: 720px; overflow: auto;">
+            <table id="intradayRsStrongerTable" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Stock</th>
+                  <th class="num">Price</th>
+                  <th class="num">Open</th>
+                  <th class="num" data-sort="pct_today">Stock %</th>
+                  <th class="num" data-sort="nifty_pct_today">NIFTY %</th>
+                  <th class="num" data-sort="excess_pct">Excess</th>
+                  <th>Intraday RS</th>
+                  <th class="num">Bars</th>
+                  <th>Last bar</th>
+                </tr>
+              </thead>
+              <tbody id="intradayRsStrongerTbody"></tbody>
+            </table>
+            <div class="empty" id="intradayRsStrongerEmpty" style="display:none;">No stocks stronger than NIFTY right now.</div>
+          </div>
+        </div>
+        <div class="panel sell" style="box-shadow: var(--shadow);">
+          <div class="panel-head">▼ Weaker than NIFTY (intraday)</div>
+          <div class="panel-body" style="max-height: 720px; overflow: auto;">
+            <table id="intradayRsWeakerTable" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Stock</th>
+                  <th class="num">Price</th>
+                  <th class="num">Open</th>
+                  <th class="num" data-sort="pct_today">Stock %</th>
+                  <th class="num" data-sort="nifty_pct_today">NIFTY %</th>
+                  <th class="num" data-sort="excess_pct">Excess</th>
+                  <th>Intraday RS</th>
+                  <th class="num">Bars</th>
+                  <th>Last bar</th>
+                </tr>
+              </thead>
+              <tbody id="intradayRsWeakerTbody"></tbody>
+            </table>
+            <div class="empty" id="intradayRsWeakerEmpty" style="display:none;">No stocks weaker than NIFTY right now.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-instvol" class="tab-panel">
+      <div class="toolbar">
+        <button type="button" class="btn btn-primary" id="btnInstVolRefresh">Refresh (1y daily for NIFTY 500)</button>
+        <label style="font-size: 0.85rem; color: var(--text-muted); display:inline-flex; align-items:center; gap:0.35rem;">
+          Recent days:
+          <select id="instVolRecentDays" style="padding: 0.2rem 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem;">
+            <option value="30">30</option>
+            <option value="45">45</option>
+            <option value="60" selected>60</option>
+            <option value="90">90</option>
+            <option value="120">120</option>
+          </select>
+        </label>
+        <label style="font-size: 0.85rem; color: var(--text-muted); display:inline-flex; align-items:center; gap:0.35rem;">
+          Filter:
+          <select id="instVolLabelFilter" style="padding: 0.2rem 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem;">
+            <option value="all" selected>Any label</option>
+            <option value="ever">Highest Ever</option>
+            <option value="year">Highest in Year</option>
+            <option value="6_months">Highest in 6 Months</option>
+            <option value="quarter">Highest in Quarter</option>
+            <option value="month">Highest in Month</option>
+          </select>
+        </label>
+        <span class="status" id="instVolStatus">Click Refresh to scrape daily bars and label institutional-volume candles.</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; max-width: 1100px;">
+        Each stock shows a strip of the last N trading days as dots (oldest → newest). A
+        <strong style="color:#10b981;">green</strong> dot means that day's volume was the highest in at least one
+        lookback window: <strong>month</strong> (21d) → <strong>quarter</strong> (63d) →
+        <strong>6 months</strong> (126d) → <strong>year</strong> (252d) → <strong>ever</strong>. Darker / more
+        saturated green = wider window broken. Hover any dot for the exact date, OHLC, volume, and the labels.
+      </p>
+      <div id="instVolLegend" style="display:flex; flex-wrap:wrap; gap:0.45rem; margin-bottom: 0.9rem; font-size:0.75rem; align-items:center;"></div>
+      <div id="instVolLoading" class="loading" style="display:none;">Loading institutional-volume scan…</div>
+      <div id="instVolEmpty" class="empty" style="display:none;">No saved scan yet. Click Refresh.</div>
+      <div id="instVolContent" style="display:none;">
+        <div id="instVolMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head">NIFTY 500 — institutional-volume dot map (last N sessions)</div>
+          <div class="panel-body" style="max-height: 760px; overflow: auto;">
+            <table id="instVolTable" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>Stock</th>
+                  <th class="num">Close</th>
+                  <th>Last N sessions (oldest → newest)</th>
+                  <th class="num">Hits</th>
+                  <th>Top label</th>
+                </tr>
+              </thead>
+              <tbody id="instVolTbody"></tbody>
+            </table>
+            <div class="empty" id="instVolNoRows" style="display:none;">No stocks match the selected filter.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-combined" class="tab-panel">
+      <div class="toolbar">
+        <button class="btn btn-primary" id="btnCombinedRefresh">Rebuild Combined</button>
+        <button class="btn" id="btnCombinedRefreshFund">Refresh Fundamentals (slow)</button>
+        <button class="btn" id="btnCombinedRefreshNews">Refresh News</button>
+        <label style="font-size: 0.85rem; color: var(--text-muted); display:inline-flex; align-items:center; gap:0.35rem;">
+          Min score:
+          <select id="combinedMinScore" style="padding: 0.2rem 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem;">
+            <option value="0" selected>any</option>
+            <option value="20">≥ 20</option>
+            <option value="40">≥ 40</option>
+            <option value="55">≥ 55</option>
+            <option value="70">≥ 70</option>
+          </select>
+        </label>
+        <label style="font-size: 0.85rem; color: var(--text-muted); display:inline-flex; align-items:center; gap:0.35rem;">
+          Source filter:
+          <select id="combinedSourceFilter" style="padding: 0.2rem 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem;">
+            <option value="all" selected>any source</option>
+            <option value="inst_only">institutional only</option>
+            <option value="inst_fund">institutional + fundamentals</option>
+            <option value="inst_news">institutional + news</option>
+            <option value="all_three">all three present</option>
+          </select>
+        </label>
+        <input id="combinedStockFilter" type="search" placeholder="Filter symbol…" style="padding: 0.2rem 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem; width: 140px;" />
+        <span class="status" id="combinedStatus">Loads cached combined CSV. Use Rebuild after fresh fundamentals/news/institutional scans.</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; max-width: 1100px;">
+        Joins three independent agents — <strong>Institutional Volume</strong> (50%) + <strong>Fundamentals</strong> (35%) + <strong>News sentiment</strong> (15%) — into a single ranked watchlist across NIFTY 500.
+        Institutional sub-score rewards recent high-volume prints; fundamentals from screener.in (PE / ROE / ROCE / D-E / growth / promoter & pledged); news from Google News RSS with bullish/bearish keyword scoring.
+      </p>
+      <div id="combinedLoading" class="loading" style="display:none;">Loading combined scan…</div>
+      <div id="combinedEmpty" class="empty" style="display:none;">No combined scan yet. Click Rebuild.</div>
+      <div id="combinedContent" style="display:none;">
+        <div id="combinedMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head">NIFTY 500 — confluence ranked</div>
+          <div class="panel-body" style="max-height: 820px; overflow: auto;">
+            <table id="combinedTable" style="font-size: 0.8rem;">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Stock</th>
+                  <th class="num">LTP</th>
+                  <th class="num" title="Composite weighted score">Combined</th>
+                  <th class="num" title="Institutional volume sub-score">Inst</th>
+                  <th>Inst label</th>
+                  <th class="num" title="Fundamental score">Fund</th>
+                  <th class="num" title="News sentiment score">News</th>
+                  <th class="num">PE</th>
+                  <th class="num">ROE</th>
+                  <th class="num">ROCE</th>
+                  <th class="num">D/E</th>
+                  <th class="num" title="3y profit CAGR">Profit 3y</th>
+                  <th class="num" title="Promoter holding %">Promo</th>
+                  <th class="num" title="Pledged promoter shares %">Pledged</th>
+                  <th class="num" title="Recent news articles in window">News#</th>
+                  <th>Latest headline</th>
+                </tr>
+              </thead>
+              <tbody id="combinedTbody"></tbody>
+            </table>
+            <div class="empty" id="combinedNoRows" style="display:none;">No stocks match filters.</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     const btnRefreshAll = document.getElementById('btnRefreshAll');
     const refreshAllStatus = document.getElementById('refreshAllStatus');
     const refreshAllMeta = document.getElementById('refreshAllMeta');
-    const status = document.getElementById('status');
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const buyTbody = document.querySelector('#buyTable tbody');
-    const sellTbody = document.querySelector('#sellTable tbody');
-    const buyEmpty = document.getElementById('buyEmpty');
-    const sellEmpty = document.getElementById('sellEmpty');
-
     function fmt(v) {
       if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
       return String(v);
@@ -592,111 +914,6 @@
       return `<span class="${cls}">${prefix}${n.toFixed(2)}%</span>`;
     }
 
-    function strategyLabel(v) {
-      const s = fmt(v);
-      if (s === 'FAILED_BIAS') return 'Failed Bias';
-      if (s === 'DIRECTIONAL') return 'Directional';
-      return s;
-    }
-
-    function reasonHas(s, needle) {
-      const reasons = String(s?.reasons || '').toLowerCase();
-      return reasons.includes(String(needle || '').toLowerCase());
-    }
-
-    function flagOrReason(s, field, needle) {
-      return asBool(s?.[field]) || reasonHas(s, needle);
-    }
-
-    function signalStatusCell(s) {
-      if (asBool(s?.active_now)) return '<span class="badge badge-bull">LIVE</span>';
-      if (s?.fresh_until) return `<span class="badge badge-neutral" title="Expired after ${shortTs(fmt(s.fresh_until))}">EXPIRED</span>`;
-      return '<span class="badge badge-neutral">HIST</span>';
-    }
-
-    function renderRow(s, isBuy) {
-      const conf = (s.confidence != null ? parseFloat(s.confidence) : 0);
-      const timeText = s.trigger_timestamp
-        ? shortTs(fmt(s.trigger_timestamp))
-        : shortTs(fmt(s.timestamp), 15);
-      const details = isBuy
-        ? `
-        <td class="num">${volCell(s.bias_volume_multiple ?? s.volume_multiple)}</td>
-        <td class="num">${volumeValue(s.bias_volume)}</td>
-        <td class="num">${biasSmaVolumeValue(s)}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'momentum_up', '15-min momentum is UP'), '15-min momentum is UP')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'futures_above_vwap', 'Futures are rising above VWAP'), 'Futures are rising above VWAP')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'calls_expanding', 'Calls are expanding'), 'Calls are expanding')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'puts_decaying', 'puts are decaying'), 'Puts are decaying')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'trigger_near_high', 'Trigger candle closed near its high'), 'Trigger candle closed near its high')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'break_resistance', 'Price is breaking session resistance'), 'Price is breaking session resistance')}</td>`
-        : `
-        <td class="num">${volCell(s.bias_volume_multiple ?? s.volume_multiple)}</td>
-        <td class="num">${volumeValue(s.bias_volume)}</td>
-        <td class="num">${biasSmaVolumeValue(s)}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'momentum_down', '15-min momentum is DOWN'), '15-min momentum is DOWN')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'futures_below_vwap', 'Futures are weakening below VWAP'), 'Futures are weakening below VWAP')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'calls_decaying', 'calls are decaying'), 'Calls are decaying')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'puts_expanding', 'Puts are expanding'), 'Puts are expanding')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'trigger_near_low', 'Trigger candle closed near its low'), 'Trigger candle closed near its low')}</td>
-        <td class="num">${tickCrossCell(flagOrReason(s, 'break_support', 'Price is breaking session support'), 'Price is breaking session support')}</td>`;
-      return `<tr>
-        <td class="stock">${fmt(s.stock)}</td>
-        <td>${strategyLabel(s.strategy_label || s.pattern || s.strategy)}</td>
-        <td class="num">${fmt(s.entry)}</td>
-        <td class="num">${fmt(s.target)}</td>
-        <td class="num">${fmt(s.stop_loss)}</td>
-        <td class="num ${confClass(conf)}">${conf ? (conf * 100).toFixed(0) + '%' : '—'}</td>
-        <td class="ts">${timeText}</td>
-        <td>${signalStatusCell(s)}</td>
-        <td class="num">${numValue(s.rsi_60m)}</td>
-        <td class="num">${numValue(s.rsi_15m)}</td>
-        <td class="num">${signedPctCell(s.future_oi_change_pct)}</td>
-        <td class="num">${signedPctCell(s.relative_strength_nifty)}</td>
-        <td class="ts">${tickCrossCell(asBool(s.orb_active), fmt(s.orb_signal))}</td>
-        <td class="ts">${tickCrossCell(asBool(s.pinbar_active), fmt(s.pinbar_pattern || s.pinbar_signal))}</td>
-        ${details}
-        <td class="reasons">${fmt(s.reasons) || '—'}</td>
-      </tr>`;
-    }
-
-    function signalSortTime(s) {
-      if (s.trigger_timestamp) {
-        const ts = Date.parse(fmt(s.trigger_timestamp));
-        return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
-      }
-      if (s.timestamp) {
-        const ts = Date.parse(shiftIsoTs(fmt(s.timestamp), 15));
-        return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
-      }
-      return Number.MAX_SAFE_INTEGER;
-    }
-
-    async function loadSignals() {
-      loading.style.display = 'block';
-      loading.textContent = 'Loading stored signals…';
-      results.style.display = 'none';
-      setStatus('', null);
-      try {
-        const r = await fetch('/api/stocks/signals');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'Failed');
-        const buy = [...(d.buy || [])].sort((a, b) => signalSortTime(b) - signalSortTime(a));
-        const sell = [...(d.sell || [])].sort((a, b) => signalSortTime(b) - signalSortTime(a));
-        buyTbody.innerHTML = buy.map(s => renderRow(s, true)).join('');
-        sellTbody.innerHTML = sell.map(s => renderRow(s, false)).join('');
-        buyEmpty.style.display = buy.length ? 'none' : 'block';
-        sellEmpty.style.display = sell.length ? 'none' : 'block';
-        loading.style.display = 'none';
-        results.style.display = 'grid';
-        setStatus(`${buy.length} BUY, ${sell.length} SELL from stored data.`, true);
-      } catch (e) {
-        loading.textContent = 'No stored signals. Click Refresh to fetch 15-min data.';
-        loading.style.display = 'block';
-        setStatus('Error: ' + e.message, false);
-      }
-    }
-
     function setRefreshAllStatus(msg, ok) {
       if (!refreshAllStatus) return;
       refreshAllStatus.textContent = msg;
@@ -719,46 +936,21 @@
 
     async function refreshAllTabs() {
       if (btnRefreshAll) btnRefreshAll.disabled = true;
-      setRefreshAllStatus('Refreshing shared 15m/1H/1D data…', null);
-      setStatus('Refreshing from shared data pipeline…', null);
-      if (intradayStatus) {
-        intradayStatus.textContent = 'Refreshing from shared data pipeline…';
-        intradayStatus.className = 'status';
-      }
-      if (twStatus) {
-        twStatus.textContent = 'Refreshing from shared data pipeline…';
-        twStatus.className = 'status';
-      }
+      setRefreshAllStatus('Refreshing tomorrow watchlist…', null);
       try {
         const r = await fetch('/api/stocks/refresh-all', { method: 'POST' });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.detail || 'Refresh failed');
-        await Promise.all([
-          loadSignals(),
-          loadIntradaySignals(),
-          loadTomorrowWatchlist(),
-        ]);
-        const stocksN = d?.stocks?.processed ?? 0;
-        const intradayBuy = d?.intraday?.buy_signals ?? 0;
-        const intradaySell = d?.intraday?.sell_signals ?? 0;
+        await loadTomorrowWatchlist();
         const twPicks = d?.tomorrow_watchlist?.picks ?? 0;
+        const scanned = d?.tomorrow_watchlist?.scanned ?? 0;
         setRefreshAllStatus(
-          `Updated: ${stocksN} stocks, intraday ${intradayBuy}/${intradaySell} BUY/SELL, tomorrow picks ${twPicks}.`,
+          `Updated: ${twPicks} picks from ${scanned} symbols scanned.`,
           true
         );
         setRefreshAllMeta(new Date().toISOString(), d?.trade_date);
-        setStatus(`Loaded from shared refresh (${stocksN} stocks).`, true);
       } catch (e) {
         setRefreshAllStatus('Error: ' + e.message, false);
-        setStatus('Error: ' + e.message, false);
-        if (intradayStatus) {
-          intradayStatus.textContent = 'Error: ' + e.message;
-          intradayStatus.className = 'status err';
-        }
-        if (twStatus) {
-          twStatus.textContent = 'Error: ' + e.message;
-          twStatus.className = 'status err';
-        }
       } finally {
         if (btnRefreshAll) btnRefreshAll.disabled = false;
       }
@@ -766,161 +958,9 @@
 
     btnRefreshAll?.addEventListener('click', refreshAllTabs);
 
-    function setStatus(msg, ok) {
-      status.textContent = msg;
-      status.className = 'status ' + (ok === true ? 'ok' : ok === false ? 'err' : '');
-    }
-
-    loadSignals();
-
-    // Intraday Signals tab
-    const intradayStatus = document.getElementById('intradayStatus');
-    const intradayLoading = document.getElementById('intradayLoading');
-    const intradayContent = document.getElementById('intradayContent');
-    const intradayMeta = document.getElementById('intradayMeta');
-    const watchBuyTbody = document.querySelector('#watchBuyTable tbody');
-    const watchSellTbody = document.querySelector('#watchSellTable tbody');
-    const intradayBuyTbody = document.querySelector('#intradayBuyTable tbody');
-    const intradaySellTbody = document.querySelector('#intradaySellTable tbody');
-    const intradayAllTbody = document.querySelector('#intradayAllTable tbody');
-    const watchBuyEmpty = document.getElementById('watchBuyEmpty');
-    const watchSellEmpty = document.getElementById('watchSellEmpty');
-    const intradayBuyEmpty = document.getElementById('intradayBuyEmpty');
-    const intradaySellEmpty = document.getElementById('intradaySellEmpty');
-
-    function yn(x, cls = 'sig-buy') {
-      return x ? `<span class="${cls}">✓</span>` : '<span style="color:var(--neutral)">—</span>';
-    }
-
-    function gateScore(c) {
-      const vals = Object.values(c || {});
-      if (!vals.length) return '0/0';
-      return `${vals.filter(Boolean).length}/${vals.length}`;
-    }
-
-    function renderWatchRow(s) {
-      return `<tr>
-        <td class="stock">${fmt(s.stock)}</td>
-        <td class="num">${fmt(s.price)}</td>
-        <td class="num">${fmt(s.rsi_60m)}</td>
-        <td class="num">${fmt(s.rsi_15m)}</td>
-        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
-      </tr>`;
-    }
-
-    function renderIntradayBuyRow(s) {
-      const c = s.buy_confirmations || {};
-      return `<tr>
-        <td class="stock">${fmt(s.stock)}</td>
-        <td class="num">${fmt(s.price)}</td>
-        <td class="num">${fmt(s.rsi_60m)}</td>
-        <td class="num">${fmt(s.rsi_15m)}</td>
-        <td class="num">${fmt(s.rsi_5m)}</td>
-        <td class="num">${yn(c.orb_5m)}</td>
-        <td class="num">${yn(c.pdh_breakout)}</td>
-        <td class="num">${yn(c.above_vwap_5m)}</td>
-        <td class="num">${yn(c.volume_2x_sma20)}</td>
-        <td class="num">${yn(c.futures_oi_drop)}</td>
-        <td class="num">${yn(c.swing_high_breakout)}</td>
-        <td><span class="badge ${badgeClass30(s.volume_bias)}">${biasText(s.volume_bias)}</span></td>
-        <td class="num">${fmt(s.liquidity_grab)}</td>
-        <td>${fmt(s.liquidity_grab_status)}${s.liquidity_grab_hit_at ? ' @ ' + shortTs(s.liquidity_grab_hit_at) : ''}</td>
-        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
-      </tr>`;
-    }
-
-    function renderIntradaySellRow(s) {
-      const c = s.sell_confirmations || {};
-      return `<tr>
-        <td class="stock">${fmt(s.stock)}</td>
-        <td class="num">${fmt(s.price)}</td>
-        <td class="num">${fmt(s.rsi_60m)}</td>
-        <td class="num">${fmt(s.rsi_15m)}</td>
-        <td class="num">${fmt(s.rsi_5m)}</td>
-        <td class="num">${yn(c.orb_5m_breakdown, 'sig-sell')}</td>
-        <td class="num">${yn(c.pdl_breakdown, 'sig-sell')}</td>
-        <td class="num">${yn(c.below_vwap_5m, 'sig-sell')}</td>
-        <td class="num">${yn(c.volume_2x_sma20, 'sig-sell')}</td>
-        <td class="num">${yn(c.futures_oi_rise, 'sig-sell')}</td>
-        <td class="num">${yn(c.swing_low_breakdown, 'sig-sell')}</td>
-        <td><span class="badge ${badgeClass30(s.volume_bias)}">${biasText(s.volume_bias)}</span></td>
-        <td class="num">${fmt(s.liquidity_grab)}</td>
-        <td>${fmt(s.liquidity_grab_status)}${s.liquidity_grab_hit_at ? ' @ ' + shortTs(s.liquidity_grab_hit_at) : ''}</td>
-        <td class="ts">${shortTs(fmt(s.timestamp))}</td>
-      </tr>`;
-    }
-
-    function renderIntradayAllRow(s) {
-      const watchCls = s.watchlist_side === 'BUY' ? 'sig-buy' : s.watchlist_side === 'SELL' ? 'sig-sell' : 'sig-no';
-      const sigCls = s.signal === 'BUY' ? 'sig-buy' : s.signal === 'SELL' ? 'sig-sell' : 'sig-no';
-      return `<tr>
-        <td class="stock">${fmt(s.stock)}</td>
-        <td class="${watchCls}">${fmt(s.watchlist_side)}</td>
-        <td class="${sigCls}">${fmt(s.signal)}</td>
-        <td class="num">${fmt(s.rsi_60m)} / ${fmt(s.rsi_15m)} / ${fmt(s.rsi_5m)}</td>
-        <td class="num">${gateScore(s.buy_confirmations)}</td>
-        <td class="num">${gateScore(s.sell_confirmations)}</td>
-        <td><span class="badge ${badgeClass30(s.volume_bias)}">${biasText(s.volume_bias)}</span></td>
-        <td class="num">${fmt(s.liquidity_grab)}</td>
-        <td>${fmt(s.liquidity_grab_status)}${s.liquidity_grab_hit_at ? ' @ ' + shortTs(s.liquidity_grab_hit_at) : ''}</td>
-      </tr>`;
-    }
-
-    async function loadIntradaySignals() {
-      if (!intradayLoading || !intradayContent) return;
-      intradayLoading.style.display = 'block';
-      intradayContent.style.display = 'none';
-      intradayStatus.textContent = '';
-      try {
-        const r = await fetch('/api/stocks/intraday-signals');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'Load failed');
-        const buyWatch = d.buy_watchlist || [];
-        const sellWatch = d.sell_watchlist || [];
-        const buySignals = d.buy_signals || [];
-        const sellSignals = d.sell_signals || [];
-        const signals = d.signals || [];
-
-        watchBuyTbody.innerHTML = buyWatch.map(renderWatchRow).join('');
-        watchSellTbody.innerHTML = sellWatch.map(renderWatchRow).join('');
-        intradayBuyTbody.innerHTML = buySignals.map(renderIntradayBuyRow).join('');
-        intradaySellTbody.innerHTML = sellSignals.map(renderIntradaySellRow).join('');
-        intradayAllTbody.innerHTML = signals.map(renderIntradayAllRow).join('');
-
-        watchBuyEmpty.style.display = buyWatch.length ? 'none' : 'block';
-        watchSellEmpty.style.display = sellWatch.length ? 'none' : 'block';
-        intradayBuyEmpty.style.display = buySignals.length ? 'none' : 'block';
-        intradaySellEmpty.style.display = sellSignals.length ? 'none' : 'block';
-
-        const lr = d.last_run_at ? fmt(d.last_run_at).replace('T', ' ') : '—';
-        const nr = d.next_refresh_at ? fmt(d.next_refresh_at).replace('T', ' ') : '—';
-        const wu = d.watchlist_updated_at ? fmt(d.watchlist_updated_at).replace('T', ' ') : '—';
-        const ws = d.watchlist_slot_at ? shortTs(fmt(d.watchlist_slot_at)) : '—';
-        const we = d.watchlist_slot_end_at ? shortTs(fmt(d.watchlist_slot_end_at)) : '—';
-        const nw = d.next_watchlist_update_at ? fmt(d.next_watchlist_update_at).replace('T', ' ') : '—';
-        const failed = (d.failed_symbols || []).length;
-        intradayMeta.innerHTML = `<strong>Last run:</strong> ${lr} &nbsp;|&nbsp; <strong>Watchlist rebuilt at:</strong> ${wu} &nbsp;|&nbsp; <strong>Active slot:</strong> ${ws} - ${we} &nbsp;|&nbsp; <strong>Next slot:</strong> ${nw} &nbsp;|&nbsp; <strong>Next refresh (suggested):</strong> ${nr} &nbsp;|&nbsp; <strong>Universe:</strong> ${(d.symbols_scanned || []).length} symbols` + (failed ? ` &nbsp;|&nbsp; <strong>Failed:</strong> ${failed}` : '');
-        intradayLoading.style.display = 'none';
-        intradayContent.style.display = 'block';
-        intradayStatus.textContent = `${buyWatch.length} BUY watchlist • ${sellWatch.length} SELL watchlist • ${buySignals.length} BUY signals • ${sellSignals.length} SELL signals`;
-        intradayStatus.className = 'status ok';
-      } catch (e) {
-        intradayLoading.textContent = 'Could not load. Click Refresh after the server has stored a run.';
-        intradayStatus.textContent = 'Error: ' + e.message;
-        intradayStatus.className = 'status err';
-      }
-    }
-
     // Open 30min tab from hash (#30min)
     if (window.location.hash === '#30min') {
       document.querySelector('.tab[data-tab="30min"]')?.click();
-    }
-    if (
-      window.location.hash === '#intraday' ||
-      window.location.hash === '#intraday-buy' ||
-      window.location.hash === '#intraday-sell'
-    ) {
-      document.querySelector('.tab[data-tab="intraday"]')?.click();
     }
     if (window.location.hash === '#tomorrow' || window.location.hash === '#watchlist-tomorrow') {
       document.querySelector('.tab[data-tab="tomorrow"]')?.click();
@@ -934,8 +974,13 @@
         t.classList.add('active');
         document.getElementById('panel-' + t.dataset.tab).classList.add('active');
         if (t.dataset.tab === '30min') loadStocksFor30min();
-        if (t.dataset.tab === 'intraday') loadIntradaySignals();
         if (t.dataset.tab === 'tomorrow') loadTomorrowWatchlist();
+        if (t.dataset.tab === 'silent') loadSilentAccumulation();
+        if (t.dataset.tab === 'fiidii') loadFiiDiiTrends();
+        if (t.dataset.tab === 'rs') loadRelativeStrength();
+        if (t.dataset.tab === 'intraday-rs') loadIntradayRs();
+        if (t.dataset.tab === 'instvol') loadInstitutionalVolume();
+        if (t.dataset.tab === 'combined') loadCombinedSignals();
       });
     });
 
@@ -1314,6 +1359,1345 @@
         </table>
         ${s.reasons ? '<h3 style="margin: 1rem 0 0.5rem;">Reasons</h3><p style="font-size: 0.85rem; color: var(--text-muted);">' + fmt(s.reasons) + '</p>' : ''}
       `;
+    }
+
+    // ---------- Silent Accumulation ----------
+    const btnSilentRefresh = document.getElementById('btnSilentRefresh');
+    const silentStatus = document.getElementById('silentStatus');
+    const silentLoading = document.getElementById('silentLoading');
+    const silentEmpty = document.getElementById('silentEmpty');
+    const silentContent = document.getElementById('silentContent');
+    const silentMeta = document.getElementById('silentMeta');
+    const silentTbody = document.getElementById('silentTbody');
+    const silentUseNse = document.getElementById('silentUseNse');
+
+    function fmtNum(v, dp = 2) {
+      if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
+      const n = parseFloat(v);
+      if (Number.isNaN(n)) return String(v);
+      return n.toFixed(dp);
+    }
+
+    async function postRefreshJson(url, label) {
+      const r = await fetch(url, { method: 'POST' });
+      const text = await r.text();
+      let d = {};
+      if (text) {
+        try {
+          d = JSON.parse(text);
+        } catch (e) {
+          throw new Error(`${label || 'Refresh'} returned invalid JSON (${text.length} bytes)`);
+        }
+      }
+      if (!r.ok) throw new Error(d.detail || `${label || 'Refresh'} failed (${r.status})`);
+      return d;
+    }
+
+    function refreshStamp(d) {
+      const ts = d && d.generated_at ? String(d.generated_at).replace('T', ' ') : '';
+      return ts ? ` · updated ${ts}` : '';
+    }
+    function deltaCls(v) { return (parseFloat(v) || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'; }
+    function trendBadge(t) {
+      if (t === 'rising') return '<span class="badge sig-buy">rising</span>';
+      if (t === 'falling') return '<span class="badge sig-sell">falling</span>';
+      if (t === 'flat') return '<span class="badge">flat</span>';
+      return '<span style="color:var(--neutral)">—</span>';
+    }
+    function componentBars(comp) {
+      if (!comp) return '';
+      const max = { obv_slope: 25, cmf: 20, up_down_vol: 15, close_upper_third: 10, structure: 10, delivery: 15, institutional_deals: 15 };
+      const labels = { obv_slope: 'OBV', cmf: 'CMF', up_down_vol: 'U/D', close_upper_third: 'Up⅓', structure: 'Str', delivery: 'Del', institutional_deals: 'Inst' };
+      return Object.entries(max).map(([k, m]) => {
+        const v = parseFloat(comp[k] || 0);
+        const pct = Math.max(0, Math.min(100, (v / m) * 100));
+        const color = pct >= 60 ? 'var(--buy)' : pct >= 30 ? '#d4a017' : 'var(--neutral)';
+        return `<div style="display:flex; align-items:center; gap:0.3rem; font-size:0.7rem;">
+          <span style="width:32px; color:var(--text-muted)">${labels[k]}</span>
+          <div style="flex:1; background:#1f1f24; height:6px; border-radius:3px; overflow:hidden;">
+            <div style="width:${pct}%; height:100%; background:${color};"></div>
+          </div>
+          <span class="num" style="width:32px; color:var(--text-muted)">${v.toFixed(0)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function renderSilentRow(r) {
+      const reasonsTxt = (r.reasons || []).join(' • ');
+      const reasonsTrunc = reasonsTxt.length > 110 ? reasonsTxt.slice(0, 108) + '…' : reasonsTxt;
+      const range = `${fmtNum(r.range_low)}–${fmtNum(r.range_high)}`;
+      return `<tr>
+        <td class="stock"><strong>${fmt(r.stock)}</strong></td>
+        <td class="num"><strong>${fmtNum(r.score, 1)}</strong></td>
+        <td class="num">${fmtNum(r.current_price)}</td>
+        <td class="num" style="white-space:nowrap;">${range}</td>
+        <td class="num">${fmtNum(r.range_width_pct, 1)}</td>
+        <td class="num ${deltaCls(r.obv_slope_pct)}">${fmtNum(r.obv_slope_pct, 1)}</td>
+        <td class="num ${deltaCls(r.cmf)}">${fmtNum(r.cmf, 3)}</td>
+        <td class="num">${fmtNum(r.up_down_vol_ratio)}</td>
+        <td class="num">${fmtNum(r.close_upper_third_pct, 0)}</td>
+        <td>${r.higher_lows ? '<span class="sig-buy">✓</span>' : '<span style="color:var(--neutral)">—</span>'}</td>
+        <td class="num">${r.avg_delivery_pct == null ? '—' : fmtNum(r.avg_delivery_pct, 0)}</td>
+        <td>${trendBadge(r.delivery_trend)}</td>
+        <td class="num">${r.institutional_bulk_buys || 0}${r.institutional_bulk_sells ? ' / -' + r.institutional_bulk_sells : ''}</td>
+        <td style="min-width:160px;">${componentBars(r.components)}</td>
+        <td title="${reasonsTxt.replace(/"/g, '&quot;')}" style="font-size:0.78rem; color:var(--text-muted); max-width:340px;">${reasonsTrunc}</td>
+      </tr>`;
+    }
+
+    async function loadSilentAccumulation() {
+      silentLoading.style.display = 'block';
+      silentEmpty.style.display = 'none';
+      silentContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/silent-accumulation');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        renderSilentPayload(d);
+      } catch (e) {
+        silentLoading.style.display = 'none';
+        silentEmpty.style.display = 'block';
+        silentEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    function renderSilentPayload(d) {
+      const rows = d.rows || [];
+      silentLoading.style.display = 'none';
+      if (!rows.length) {
+        silentEmpty.style.display = 'block';
+        silentEmpty.textContent = d.message || 'No saved scan.';
+        silentContent.style.display = 'none';
+        return;
+      }
+      silentEmpty.style.display = 'none';
+      silentContent.style.display = 'block';
+      const nseLbl = d.nse_data_status === 'ok' ? '<span class="status ok">NSE delivery + bulk-deal data ✓</span>'
+                  : d.nse_data_status === 'blocked' ? '<span class="status warn">NSE blocked the request — OHLCV-only signals</span>'
+                  : `<span class="status">NSE data: ${d.nse_data_status || '—'}</span>`;
+      silentMeta.innerHTML =
+        `<strong>Generated:</strong> ${fmt(d.generated_at).replace('T', ' ')} &nbsp;|&nbsp; ` +
+        `<strong>Trade date:</strong> ${fmt(d.trade_date)} &nbsp;|&nbsp; ` +
+        `<strong>Scanned:</strong> ${fmt(d.scanned)} &nbsp;|&nbsp; <strong>Passed filters:</strong> ${fmt(d.passed)} &nbsp;|&nbsp; ` +
+        nseLbl;
+      silentTbody.innerHTML = rows.map(renderSilentRow).join('');
+      silentStatus.textContent = `${rows.length} candidates shown${refreshStamp(d)}.`;
+      silentStatus.className = 'status ok';
+    }
+
+    btnSilentRefresh?.addEventListener('click', async () => {
+      btnSilentRefresh.disabled = true;
+      silentStatus.textContent = 'Scanning NIFTY 500 daily bars… (may take 30–60s)';
+      silentStatus.className = 'status';
+      silentLoading.style.display = 'block';
+      silentEmpty.style.display = 'none';
+      silentContent.style.display = 'none';
+      try {
+        const useNse = silentUseNse.checked ? 'true' : 'false';
+        const d = await postRefreshJson(
+          `/api/stocks/silent-accumulation/refresh?use_nse_data=${useNse}`,
+          'Silent accumulation'
+        );
+        renderSilentPayload(d);
+      } catch (e) {
+        silentLoading.style.display = 'none';
+        silentEmpty.style.display = 'block';
+        silentEmpty.textContent = 'Refresh error: ' + e.message;
+        silentStatus.textContent = 'Error: ' + e.message;
+        silentStatus.className = 'status err';
+      } finally {
+        btnSilentRefresh.disabled = false;
+      }
+    });
+
+    // ---------- Institutional Volume ----------
+    const btnInstVolRefresh = document.getElementById('btnInstVolRefresh');
+    const instVolRecentDays = document.getElementById('instVolRecentDays');
+    const instVolLabelFilter = document.getElementById('instVolLabelFilter');
+    const instVolStatus = document.getElementById('instVolStatus');
+    const instVolLoading = document.getElementById('instVolLoading');
+    const instVolEmpty = document.getElementById('instVolEmpty');
+    const instVolContent = document.getElementById('instVolContent');
+    const instVolMeta = document.getElementById('instVolMeta');
+    const instVolTbody = document.getElementById('instVolTbody');
+    const instVolNoRows = document.getElementById('instVolNoRows');
+    const instVolLegend = document.getElementById('instVolLegend');
+
+    let _instVolPayload = null;
+
+    // Tier shades use a single green hue (per user request) with intensity = label tier.
+    const INST_VOL_LABELS = [
+      { key: 'month',    short: 'Month',   full: 'Highest volume in the month (21 days)',     rank: 0, color: 'rgba(16,185,129,0.40)', border: 'rgba(16,185,129,0.60)' },
+      { key: 'quarter',  short: 'Quarter', full: 'Highest volume in the quarter (63 days)',   rank: 1, color: 'rgba(16,185,129,0.65)', border: 'rgba(16,185,129,0.80)' },
+      { key: '6_months', short: '6 Mo',    full: 'Highest volume in 6 months (126 days)',     rank: 2, color: 'rgba(16,185,129,0.80)', border: '#10b981' },
+      { key: 'year',     short: 'Year',    full: 'Highest volume in a year (252 days)',       rank: 3, color: '#10b981',               border: '#34d399' },
+      { key: 'ever',     short: 'Ever',    full: 'Highest volume ever (full cached history)', rank: 4, color: '#10b981',               border: '#a7f3d0' },
+    ];
+    const INST_VOL_EMPTY_DOT = { color: 'transparent', border: '#3f3f47' };
+
+    function instVolLabelMeta(key) {
+      return INST_VOL_LABELS.find(l => l.key === key) || { key, short: key, full: key, rank: -1, color: '#6b7280', border: '#6b7280' };
+    }
+
+    function instVolLabelBadge(label) {
+      const m = instVolLabelMeta(label);
+      return `<span class="badge" title="${m.full}" style="background:${m.color}; color:#0c0c0f; border:1px solid ${m.border}; padding:1px 6px; border-radius:10px; font-size:0.68rem; margin-right:3px; white-space:nowrap; font-weight:600;">${m.short}</span>`;
+    }
+
+    function instVolFmtVol(v) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return '—';
+      if (n >= 1e7) return (n / 1e7).toFixed(2) + ' Cr';
+      if (n >= 1e5) return (n / 1e5).toFixed(2) + ' L';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + ' K';
+      return n.toFixed(0);
+    }
+
+    function instVolLegendHtml(counts) {
+      const tiers = INST_VOL_LABELS.map(l => {
+        const c = (counts && counts[l.key]) || 0;
+        return `<span style="display:inline-flex; align-items:center; gap:0.35rem;">
+          <span style="width:11px; height:11px; border-radius:50%; background:${l.color}; border:1px solid ${l.border}; box-shadow:0 0 0 1px rgba(0,0,0,0.4) inset;"></span>
+          <span style="color:var(--text-muted);">${l.short} · ${c}</span>
+        </span>`;
+      }).join('');
+      const empty = `<span style="display:inline-flex; align-items:center; gap:0.35rem;">
+        <span style="width:11px; height:11px; border-radius:50%; background:${INST_VOL_EMPTY_DOT.color}; border:1.5px solid ${INST_VOL_EMPTY_DOT.border}; box-sizing:border-box;"></span>
+        <span style="color:var(--text-muted);">no signal</span>
+      </span>`;
+      return empty + tiers;
+    }
+
+    function instVolDot(candle) {
+      const labels = candle && candle.labels;
+      if (!labels || !labels.length) {
+        const tip = candle && candle.date
+          ? `${candle.date} · close ${numValue(candle.close)} · vol ${instVolFmtVol(candle.volume)} (${numValue(candle.volume_multiple)}× 20d avg)`
+          : 'no data';
+        return `<span class="iv-dot" title="${tip.replace(/"/g, '&quot;')}" style="background:${INST_VOL_EMPTY_DOT.color}; border:1.5px solid ${INST_VOL_EMPTY_DOT.border};"></span>`;
+      }
+      // Widest applicable label drives the shade
+      const top = candle.top_label || labels[labels.length - 1];
+      const m = instVolLabelMeta(top);
+      const shorts = labels.slice().sort((a, b) => instVolLabelMeta(a).rank - instVolLabelMeta(b).rank).map(k => instVolLabelMeta(k).short).join(' · ');
+      const pct = (parseFloat(candle.pct_change) >= 0 ? '+' : '') + numValue(candle.pct_change);
+      const tip = `${candle.date}\n${shorts}\nClose ${numValue(candle.close)} (${pct}%)\nVol ${instVolFmtVol(candle.volume)} (${numValue(candle.volume_multiple)}× 20d avg)`;
+      return `<span class="iv-dot iv-dot-hit" title="${tip.replace(/"/g, '&quot;')}" style="background:${m.color}; border:1px solid ${m.border}; box-shadow:0 0 4px ${m.border};"></span>`;
+    }
+
+    function instVolStrip(candles) {
+      const dots = (candles || []).map(instVolDot).join('');
+      return `<div class="iv-strip" style="display:flex; gap:2px; align-items:center; flex-wrap:nowrap;">${dots}</div>`;
+    }
+
+    function instVolStockTier(candles) {
+      // Returns the widest label tier observed on any day; -1 if none.
+      let best = -1;
+      let bestKey = '';
+      for (const c of (candles || [])) {
+        for (const k of (c.labels || [])) {
+          const r = instVolLabelMeta(k).rank;
+          if (r > best) { best = r; bestKey = k; }
+        }
+      }
+      return { rank: best, key: bestKey };
+    }
+
+    function renderInstVolRows() {
+      if (!_instVolPayload) return;
+      const filter = instVolLabelFilter.value;
+      const rows = (_instVolPayload.rows || []).slice();
+
+      // Sort stocks by widest tier desc → number of hits desc → stock name asc
+      const enriched = rows.map(r => {
+        const tier = instVolStockTier(r.candles);
+        const hits = (r.candles || []).reduce((acc, c) => acc + ((c.labels && c.labels.length) ? 1 : 0), 0);
+        return { ...r, _tier: tier, _hits: hits };
+      });
+      enriched.sort((a, b) => {
+        if (b._tier.rank !== a._tier.rank) return b._tier.rank - a._tier.rank;
+        if (b._hits !== a._hits) return b._hits - a._hits;
+        return String(a.stock).localeCompare(String(b.stock));
+      });
+
+      const parts = [];
+      let shown = 0;
+      for (const r of enriched) {
+        if (filter !== 'all') {
+          const hasLabel = (r.candles || []).some(c => (c.labels || []).includes(filter));
+          if (!hasLabel) continue;
+        }
+        const stripHtml = instVolStrip(r.candles);
+        const topBadge = r._tier.key ? instVolLabelBadge(r._tier.key) : '<span style="color:var(--neutral)">—</span>';
+        parts.push(`<tr>
+          <td class="stock"><strong>${fmt(r.stock)}</strong>
+            <div style="font-size:0.7rem; color:var(--text-muted);">${fmt(r.last_date)} · ${fmt(r.bars_available)} bars</div>
+          </td>
+          <td class="num">${numValue(r.last_close)}</td>
+          <td>${stripHtml}</td>
+          <td class="num"><strong>${r._hits}</strong></td>
+          <td>${topBadge}</td>
+        </tr>`);
+        shown += 1;
+      }
+      instVolTbody.innerHTML = parts.join('');
+      instVolNoRows.style.display = shown ? 'none' : 'block';
+      instVolStatus.textContent = `${shown} stock${shown === 1 ? '' : 's'} shown${refreshStamp(_instVolPayload)}.`;
+      instVolStatus.className = 'status ok';
+    }
+
+    function renderInstVolPayload(d) {
+      _instVolPayload = d || null;
+      instVolLoading.style.display = 'none';
+      const rows = (d && d.rows) || [];
+      if (!rows.length) {
+        instVolEmpty.style.display = 'block';
+        instVolEmpty.textContent = (d && d.message) || 'No saved scan.';
+        instVolContent.style.display = 'none';
+        instVolLegend.innerHTML = '';
+        return;
+      }
+      instVolEmpty.style.display = 'none';
+      instVolContent.style.display = 'block';
+      const lc = (d && d.label_counts) || {};
+      instVolLegend.innerHTML = instVolLegendHtml(lc);
+      instVolMeta.innerHTML =
+        `<strong>Generated:</strong> ${fmt(d.generated_at).replace('T', ' ')} &nbsp;|&nbsp; ` +
+        `<strong>Trade date:</strong> ${fmt(d.trade_date)} &nbsp;|&nbsp; ` +
+        `<strong>Universe:</strong> ${fmt(d.universe || 'NIFTY500')} &nbsp;|&nbsp; ` +
+        `<strong>Scanned:</strong> ${fmt(d.scanned)} &nbsp;|&nbsp; ` +
+        `<strong>Stocks with labelled candles:</strong> ${fmt(d.passed)} &nbsp;|&nbsp; ` +
+        `<strong>Failed:</strong> ${fmt(d.failed_count || 0)} &nbsp;|&nbsp; ` +
+        `<strong>Recent window:</strong> ${fmt(d.recent_days)}d`;
+      renderInstVolRows();
+    }
+
+    async function loadInstitutionalVolume() {
+      instVolLoading.style.display = 'block';
+      instVolEmpty.style.display = 'none';
+      instVolContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/institutional-volume');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        renderInstVolPayload(d);
+      } catch (e) {
+        instVolLoading.style.display = 'none';
+        instVolEmpty.style.display = 'block';
+        instVolEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    instVolLabelFilter?.addEventListener('change', renderInstVolRows);
+
+    btnInstVolRefresh?.addEventListener('click', async () => {
+      btnInstVolRefresh.disabled = true;
+      instVolStatus.textContent = 'Scraping ~1y of daily bars for NIFTY 500… first run can take a few minutes.';
+      instVolStatus.className = 'status';
+      instVolLoading.style.display = 'block';
+      instVolEmpty.style.display = 'none';
+      instVolContent.style.display = 'none';
+      try {
+        const recent = encodeURIComponent(instVolRecentDays.value || '10');
+        const d = await postRefreshJson(
+          `/api/stocks/institutional-volume/refresh?recent_days=${recent}`,
+          'Institutional volume'
+        );
+        renderInstVolPayload(d);
+      } catch (e) {
+        instVolLoading.style.display = 'none';
+        instVolEmpty.style.display = 'block';
+        instVolEmpty.textContent = 'Refresh error: ' + e.message;
+        instVolStatus.textContent = 'Error: ' + e.message;
+        instVolStatus.className = 'status err';
+      } finally {
+        btnInstVolRefresh.disabled = false;
+      }
+    });
+
+    // ---------- Combined Signals (Institutional + Fundamentals + News) ----------
+    const btnCombinedRefresh = document.getElementById('btnCombinedRefresh');
+    const btnCombinedRefreshFund = document.getElementById('btnCombinedRefreshFund');
+    const btnCombinedRefreshNews = document.getElementById('btnCombinedRefreshNews');
+    const combinedMinScore = document.getElementById('combinedMinScore');
+    const combinedSourceFilter = document.getElementById('combinedSourceFilter');
+    const combinedStockFilter = document.getElementById('combinedStockFilter');
+    const combinedStatus = document.getElementById('combinedStatus');
+    const combinedLoading = document.getElementById('combinedLoading');
+    const combinedEmpty = document.getElementById('combinedEmpty');
+    const combinedContent = document.getElementById('combinedContent');
+    const combinedMeta = document.getElementById('combinedMeta');
+    const combinedTbody = document.getElementById('combinedTbody');
+    const combinedNoRows = document.getElementById('combinedNoRows');
+
+    let _combinedPayload = null;
+
+    function combinedScoreColor(v) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return 'var(--text-muted)';
+      if (n >= 60) return '#10b981';
+      if (n >= 40) return '#84cc16';
+      if (n >= 20) return '#eab308';
+      if (n >= 0) return 'var(--text-muted)';
+      return '#ef4444';
+    }
+    function combinedSmallNum(v, digits = 1) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return '—';
+      return n.toFixed(digits);
+    }
+    function combinedInstLabelBadge(label) {
+      if (!label) return '<span style="color:var(--text-muted)">—</span>';
+      const m = instVolLabelMeta(label);
+      return `<span class="badge" title="${m.full}" style="background:${m.color}; color:#0c0c0f; border:1px solid ${m.border}; padding:1px 6px; border-radius:10px; font-size:0.66rem; white-space:nowrap; font-weight:600;">${m.short}</span>`;
+    }
+
+    function renderCombinedRows() {
+      if (!_combinedPayload) return;
+      const rows = (_combinedPayload.rows || []).slice();
+      const minScore = parseFloat(combinedMinScore.value || '0');
+      const srcFilter = combinedSourceFilter.value;
+      const symQuery = (combinedStockFilter.value || '').trim().toUpperCase();
+
+      const filtered = [];
+      for (const r of rows) {
+        const cs = parseFloat(r.combined_score);
+        if (Number.isFinite(cs) && cs < minScore) continue;
+        if (symQuery && !String(r.stock || '').toUpperCase().includes(symQuery)) continue;
+        const hasInst = !!r.institutional_top_label || (parseFloat(r.institutional_signal) > 0);
+        const hasFund = r.fundamental_score != null && r.fundamental_score !== '';
+        const hasNews = r.news_score != null && r.news_score !== '';
+        if (srcFilter === 'inst_only' && !(hasInst && !hasFund && !hasNews)) continue;
+        if (srcFilter === 'inst_fund' && !(hasInst && hasFund)) continue;
+        if (srcFilter === 'inst_news' && !(hasInst && hasNews)) continue;
+        if (srcFilter === 'all_three' && !(hasInst && hasFund && hasNews)) continue;
+        filtered.push(r);
+      }
+
+      const parts = [];
+      filtered.forEach((r, i) => {
+        const cs = parseFloat(r.combined_score);
+        const newsHL = (r.latest_headline || '').toString().replace(/"/g, '&quot;');
+        const newsUrl = (r.latest_url || '').toString();
+        const reasons = (r.reasons || '').toString().replace(/"/g, '&quot;');
+        const inst = parseFloat(r.institutional_signal);
+        const fund = parseFloat(r.fundamental_score);
+        const news = parseFloat(r.news_score);
+        const promoter = parseFloat(r.promoter_holding);
+        const pledged = parseFloat(r.pledged_pct);
+        const headlineCell = newsHL
+          ? (newsUrl
+              ? `<a href="${newsUrl}" target="_blank" rel="noopener" title="${newsHL}" style="color: var(--text);">${newsHL.length > 90 ? newsHL.slice(0, 87) + '…' : newsHL}</a>`
+              : `<span title="${newsHL}">${newsHL.length > 90 ? newsHL.slice(0, 87) + '…' : newsHL}</span>`)
+          : '<span style="color:var(--text-muted)">—</span>';
+        parts.push(`<tr title="${reasons}">
+          <td class="num"><strong>${i + 1}</strong></td>
+          <td class="stock"><strong>${fmt(r.stock)}</strong>
+            <div style="font-size:0.68rem; color:var(--text-muted);">${fmt(r.last_date || '')}</div>
+          </td>
+          <td class="num">${combinedSmallNum(r.last_close, 2)}</td>
+          <td class="num"><strong style="color:${combinedScoreColor(cs)};">${combinedSmallNum(cs, 1)}</strong></td>
+          <td class="num">${combinedSmallNum(inst, 1)}</td>
+          <td>${combinedInstLabelBadge(r.institutional_top_label)}</td>
+          <td class="num">${combinedSmallNum(fund, 1)}</td>
+          <td class="num" style="color:${news > 5 ? '#10b981' : (news < -5 ? '#ef4444' : 'var(--text-muted)')};">${combinedSmallNum(news, 1)}</td>
+          <td class="num">${combinedSmallNum(r.pe, 1)}</td>
+          <td class="num">${combinedSmallNum(r.roe, 1)}</td>
+          <td class="num">${combinedSmallNum(r.roce, 1)}</td>
+          <td class="num">${combinedSmallNum(r.debt_to_equity, 2)}</td>
+          <td class="num">${combinedSmallNum(r.profit_growth_3y, 0)}</td>
+          <td class="num">${combinedSmallNum(promoter, 0)}</td>
+          <td class="num" style="color:${pledged > 10 ? '#ef4444' : (pledged > 1 ? '#eab308' : 'var(--text-muted)')};">${combinedSmallNum(pledged, 1)}</td>
+          <td class="num">${fmt(r.recent_articles)}</td>
+          <td style="max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${headlineCell}</td>
+        </tr>`);
+      });
+      combinedTbody.innerHTML = parts.join('');
+      combinedNoRows.style.display = parts.length ? 'none' : 'block';
+      combinedStatus.textContent = `${parts.length} of ${rows.length} stock${rows.length === 1 ? '' : 's'} shown.`;
+      combinedStatus.className = 'status ok';
+    }
+
+    function renderCombinedPayload(d) {
+      _combinedPayload = d || null;
+      combinedLoading.style.display = 'none';
+      const rows = (d && d.rows) || [];
+      if (!rows.length) {
+        combinedEmpty.style.display = 'block';
+        combinedEmpty.textContent = (d && d.message) || 'No combined scan available.';
+        combinedContent.style.display = 'none';
+        return;
+      }
+      combinedEmpty.style.display = 'none';
+      combinedContent.style.display = 'block';
+
+      // Quick stats
+      const withInst = rows.filter(r => r.institutional_top_label || parseFloat(r.institutional_signal) > 0).length;
+      const withFund = rows.filter(r => r.fundamental_score != null && r.fundamental_score !== '').length;
+      const withNews = rows.filter(r => r.news_score != null && r.news_score !== '').length;
+      const topScore = rows.length ? parseFloat(rows[0].combined_score) : NaN;
+      combinedMeta.innerHTML =
+        `<strong>Trade date:</strong> ${fmt(d.trade_date)} &nbsp;|&nbsp; ` +
+        `<strong>Universe:</strong> ${fmt(rows.length)} stocks &nbsp;|&nbsp; ` +
+        `<strong>With Institutional:</strong> ${withInst} &nbsp;|&nbsp; ` +
+        `<strong>With Fundamentals:</strong> ${withFund} &nbsp;|&nbsp; ` +
+        `<strong>With News:</strong> ${withNews} &nbsp;|&nbsp; ` +
+        `<strong>Top score:</strong> ${Number.isFinite(topScore) ? topScore.toFixed(1) : '—'} &nbsp;|&nbsp; ` +
+        `<strong>Source:</strong> <code style="font-size:0.78rem;">${fmt(d.source_csv || '—')}</code>`;
+      renderCombinedRows();
+    }
+
+    async function loadCombinedSignals() {
+      combinedLoading.style.display = 'block';
+      combinedEmpty.style.display = 'none';
+      combinedContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/combined-signals');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        renderCombinedPayload(d);
+      } catch (e) {
+        combinedLoading.style.display = 'none';
+        combinedEmpty.style.display = 'block';
+        combinedEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    combinedMinScore?.addEventListener('change', renderCombinedRows);
+    combinedSourceFilter?.addEventListener('change', renderCombinedRows);
+    combinedStockFilter?.addEventListener('input', renderCombinedRows);
+
+    async function _combinedRefresh(qs, msg) {
+      combinedStatus.textContent = msg;
+      combinedStatus.className = 'status';
+      combinedLoading.style.display = 'block';
+      combinedEmpty.style.display = 'none';
+      combinedContent.style.display = 'none';
+      try {
+        const r = await fetch(`/api/stocks/combined-signals/refresh${qs}`, { method: 'POST' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'refresh failed');
+        renderCombinedPayload(d);
+      } catch (e) {
+        combinedLoading.style.display = 'none';
+        combinedEmpty.style.display = 'block';
+        combinedEmpty.textContent = 'Refresh error: ' + e.message;
+        combinedStatus.textContent = 'Error: ' + e.message;
+        combinedStatus.className = 'status err';
+      }
+    }
+
+    btnCombinedRefresh?.addEventListener('click', async () => {
+      btnCombinedRefresh.disabled = true;
+      try {
+        await _combinedRefresh('', 'Rebuilding combined CSV from cached fundamentals + news + institutional…');
+      } finally { btnCombinedRefresh.disabled = false; }
+    });
+    btnCombinedRefreshFund?.addEventListener('click', async () => {
+      btnCombinedRefreshFund.disabled = true;
+      try {
+        await _combinedRefresh('?refresh_fundamentals=true', 'Scraping screener.in fundamentals for NIFTY 500… this can take several minutes.');
+      } finally { btnCombinedRefreshFund.disabled = false; }
+    });
+    btnCombinedRefreshNews?.addEventListener('click', async () => {
+      btnCombinedRefreshNews.disabled = true;
+      try {
+        await _combinedRefresh('?refresh_news=true', 'Fetching Google News RSS for NIFTY 500… ~2 minutes.');
+      } finally { btnCombinedRefreshNews.disabled = false; }
+    });
+
+    // ---------- FII/DII Trends ----------
+    const btnFiidiiRefresh = document.getElementById('btnFiidiiRefresh');
+    const fiidiiStatus = document.getElementById('fiidiiStatus');
+    const fiidiiLoading = document.getElementById('fiidiiLoading');
+    const fiidiiEmpty = document.getElementById('fiidiiEmpty');
+    const fiidiiContent = document.getElementById('fiidiiContent');
+    const fiidiiTbody = document.getElementById('fiidiiTbody');
+    let _fiidiiChart = null;
+
+    const FII_COLOR = '#f97316';   // orange — FII
+    const DII_COLOR = '#3b82f6';   // blue   — DII
+
+    function fmtCr(v, withSign = true) {
+      if (v == null || v === '' || isNaN(parseFloat(v))) return '—';
+      const n = parseFloat(v);
+      const abs = Math.abs(n);
+      const sign = withSign ? (n >= 0 ? '+' : '−') : (n < 0 ? '−' : '');
+      if (abs >= 100000) return `${sign}₹${(abs / 1000).toFixed(1)}K Cr`;
+      if (abs >= 1000)   return `${sign}₹${(abs / 1000).toFixed(2)}K Cr`;
+      return `${sign}₹${abs.toFixed(0)} Cr`;
+    }
+
+    function setHero(id, v) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (v == null || isNaN(parseFloat(v))) {
+        el.textContent = '—';
+        el.style.color = 'var(--text-muted)';
+        return;
+      }
+      const n = parseFloat(v);
+      el.textContent = fmtCr(n);
+      el.style.color = n >= 0 ? 'var(--buy)' : 'var(--sell)';
+    }
+
+    function consecutiveSign(values) {
+      if (!values || !values.length) return { sign: 0, n: 0 };
+      const last = values[values.length - 1];
+      const sign = Math.sign(last);
+      if (sign === 0) return { sign: 0, n: 0 };
+      let n = 0;
+      for (let i = values.length - 1; i >= 0; i--) {
+        if (Math.sign(values[i]) === sign) n++;
+        else break;
+      }
+      return { sign, n };
+    }
+
+    function trendLabel(values, who) {
+      if (!values || values.length < 2) return '';
+      const sumAll = values.reduce((s, v) => s + v, 0);
+      const cs = consecutiveSign(values);
+      const dir = cs.sign > 0 ? 'buying' : cs.sign < 0 ? 'selling' : 'flat';
+      const cls = cs.sign > 0 ? 'pnl-positive' : cs.sign < 0 ? 'pnl-negative' : '';
+      const streak = cs.n >= 2 ? `${cs.n}-day ${dir} streak` : `latest: ${dir}`;
+      return `${values.length}-day total: <span class="${cls}">${fmtCr(sumAll)}</span> · ${streak}`;
+    }
+
+    function fiidiiNetValue(v) {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function renderFiidiiCharts(rows) {
+      rows = (rows || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      const labels = rows.map(r => r.date);
+      const fii = rows.map(r => fiidiiNetValue(r.fii_net));
+      const dii = rows.map(r => fiidiiNetValue(r.dii_net));
+
+      let cf = 0, cd = 0;
+      const cumFii = fii.map(v => {
+        if (v == null) return null;
+        cf += v;
+        return cf;
+      });
+      const cumDii = dii.map(v => {
+        if (v == null) return null;
+        cd += v;
+        return cd;
+      });
+      const have = rows.filter(r => fiidiiNetValue(r.fii_net) != null || fiidiiNetValue(r.dii_net) != null).length;
+      const meta = document.getElementById('fiidiiChartMeta');
+      if (meta) {
+        meta.textContent = `Last ${rows.length} trading sessions (${have} with FII/DII data) · bars = daily net · lines = cumulative`;
+      }
+
+      // Combined: stacked bars for daily + line overlay for cumulative
+      const ctx = document.getElementById('fiidiiChart');
+      if (_fiidiiChart) _fiidiiChart.destroy();
+      _fiidiiChart = new Chart(ctx, {
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'bar', label: 'FII (daily)', data: fii, yAxisID: 'y',
+              backgroundColor: FII_COLOR, borderWidth: 0, stack: 'flow', order: 3,
+            },
+            {
+              type: 'bar', label: 'DII (daily)', data: dii, yAxisID: 'y',
+              backgroundColor: DII_COLOR, borderWidth: 0, stack: 'flow', order: 3,
+            },
+            {
+              type: 'line', label: 'FII cumulative', data: cumFii, yAxisID: 'y1',
+              borderColor: FII_COLOR, backgroundColor: 'transparent',
+              borderWidth: 2, pointRadius: 0, tension: 0.2, order: 1,
+            },
+            {
+              type: 'line', label: 'DII cumulative', data: cumDii, yAxisID: 'y1',
+              borderColor: DII_COLOR, backgroundColor: 'transparent',
+              borderWidth: 2, pointRadius: 0, tension: 0.2, order: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#e8e8ed', boxWidth: 12, font: { size: 11 } }, position: 'top', align: 'end' },
+            tooltip: {
+              callbacks: {
+                label: (c) => {
+                  if (c.parsed.y == null || !Number.isFinite(c.parsed.y)) return `${c.dataset.label}: no data`;
+                  return `${c.dataset.label}: ${fmtCr(c.parsed.y)}`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: { stacked: true, ticks: { color: '#8b8b95', maxRotation: 50, minRotation: 50, font: { size: 9 } }, grid: { display: false } },
+            y: {
+              stacked: true,
+              ticks: { color: '#8b8b95' },
+              grid: { color: '#2a2a30' },
+              title: { display: true, text: 'Daily (₹ Cr, stacked)', color: '#8b8b95', font: { size: 10 } },
+            },
+            y1: {
+              position: 'right',
+              ticks: { color: '#8b8b95' }, grid: { display: false },
+              title: { display: true, text: 'Cumulative (₹ Cr)', color: '#8b8b95', font: { size: 10 } },
+            },
+          },
+        },
+      });
+    }
+
+    const _participantOiCharts = {};  // segment -> Chart instance
+    let _participantOiData = null;
+
+    // Chart.js plugin: paint the plot area green above zero (buying / net long)
+    // and red below zero (selling / net short), so the bull/bear side is unmistakable.
+    const buySellZonePlugin = {
+      id: 'buySellZone',
+      beforeDatasetsDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea || !scales.y) return;
+        const yScale = scales.y;
+        const zeroY = yScale.getPixelForValue(0);
+        const top = chartArea.top;
+        const bottom = chartArea.bottom;
+        const left = chartArea.left;
+        const right = chartArea.right;
+        ctx.save();
+        // Bullish zone (above zero)
+        if (zeroY > top) {
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.07)';
+          ctx.fillRect(left, top, right - left, Math.min(zeroY, bottom) - top);
+        }
+        // Bearish zone (below zero)
+        if (zeroY < bottom) {
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.07)';
+          ctx.fillRect(left, Math.max(zeroY, top), right - left, bottom - Math.max(zeroY, top));
+        }
+        // Emphasised zero line
+        if (zeroY >= top && zeroY <= bottom) {
+          ctx.strokeStyle = '#6b7280';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(left, zeroY);
+          ctx.lineTo(right, zeroY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // Zone labels on the right edge
+          ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
+          ctx.textAlign = 'right';
+          if (zeroY - top > 18) {
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.85)';
+            ctx.fillText('▲ BUYING', right - 4, top + 11);
+          }
+          if (bottom - zeroY > 18) {
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('▼ SELLING', right - 4, bottom - 4);
+          }
+        }
+        ctx.restore();
+      },
+    };
+
+    function renderParticipantOiChart(segment, canvasId) {
+      if (!_participantOiData) return;
+      const rows = _participantOiData;
+      const dateSet = Array.from(new Set(rows.map(r => r.date))).sort();
+      const types = ['CLIENT', 'FII', 'PRO', 'DII'];
+      const colors = { CLIENT: '#a855f7', FII: FII_COLOR, PRO: '#d4a017', DII: DII_COLOR };
+      const longKey = `${segment}_long`;
+      const shortKey = `${segment}_short`;
+
+      // Index raw long/short per (date|client) for richer tooltips
+      const rawByKey = {};
+      rows.forEach(r => {
+        const ct = (r.client_type || '').toUpperCase();
+        rawByKey[`${r.date}|${ct}`] = {
+          L: parseFloat(r[longKey]) || 0,
+          S: parseFloat(r[shortKey]) || 0,
+        };
+      });
+
+      const datasets = types.map(ct => {
+        const data = dateSet.map(d2 => {
+          const r = rows.find(x => x.date === d2 && (x.client_type || '').toUpperCase() === ct);
+          if (!r) return 0;
+          return (parseFloat(r[longKey]) || 0) - (parseFloat(r[shortKey]) || 0);
+        });
+        return {
+          label: ct,
+          data,
+          backgroundColor: colors[ct],
+          borderWidth: 0,
+          stack: 'oi',
+        };
+      });
+
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      if (_participantOiCharts[segment]) _participantOiCharts[segment].destroy();
+      _participantOiCharts[segment] = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: dateSet, datasets },
+        plugins: [buySellZonePlugin],
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#e8e8ed', boxWidth: 10, font: { size: 10 } }, position: 'top', align: 'end' },
+            tooltip: {
+              callbacks: {
+                label: (c) => {
+                  const v = Number(c.parsed.y) || 0;
+                  const ct = c.dataset.label;
+                  const raw = rawByKey[`${c.label}|${ct}`] || { L: 0, S: 0 };
+                  const side = v > 0 ? 'NET LONG (buying)' : v < 0 ? 'NET SHORT (selling)' : 'flat';
+                  const sign = v >= 0 ? '+' : '−';
+                  return `${ct} → ${side}: ${sign}${Math.abs(v).toLocaleString('en-IN')}  ·  L ${raw.L.toLocaleString('en-IN')} / S ${raw.S.toLocaleString('en-IN')}`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: { stacked: true, ticks: { color: '#8b8b95', maxRotation: 50, minRotation: 50, font: { size: 8 } }, grid: { display: false } },
+            y: {
+              stacked: true,
+              ticks: { color: '#8b8b95', callback: (v) => (v / 1000).toFixed(0) + 'K', font: { size: 9 } },
+              grid: { color: '#2a2a30' },
+              title: { display: true, text: 'Net contracts (long − short)', color: '#8b8b95', font: { size: 9 } },
+            },
+          },
+        },
+      });
+    }
+
+    const PARTICIPANT_OI_SEGMENTS = [
+      ['idx_fut', 'participantOiChart_idx_fut'],
+      ['stk_fut', 'participantOiChart_stk_fut'],
+      ['idx_call', 'participantOiChart_idx_call'],
+      ['idx_put', 'participantOiChart_idx_put'],
+    ];
+
+    function renderAllParticipantOiCharts() {
+      PARTICIPANT_OI_SEGMENTS.forEach(([seg, canvasId]) => renderParticipantOiChart(seg, canvasId));
+    }
+
+    function renderParticipantOi(d) {
+      const rows = (d.participant_oi || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      _participantOiData = rows;
+      renderAllParticipantOiCharts();
+
+      const tbody = document.getElementById('participantOiTbody');
+      const asOfEl = document.getElementById('oiAsOf');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted); font-size:0.85rem;">No participant data.</td></tr>';
+        asOfEl.textContent = '';
+        return;
+      }
+      const types = ['FII', 'DII', 'PRO', 'CLIENT'];
+      const niceLabel = { FII: 'FII', DII: 'DII', CLIENT: 'Client (retail/HNI)', PRO: 'Proprietary' };
+      const lastDate = rows[rows.length - 1].date;
+      asOfEl.textContent = lastDate ? `as of ${lastDate}` : '';
+
+      // For Δ d/d we need yesterday's snapshot per client type
+      const byClientDate = {};
+      rows.forEach(r => {
+        const ct = (r.client_type || '').toUpperCase();
+        if (!byClientDate[ct]) byClientDate[ct] = [];
+        byClientDate[ct].push(r);
+      });
+
+      const fmtN = (v) => {
+        const n = Number(v) || 0;
+        return n.toLocaleString('en-IN');
+      };
+
+      tbody.innerHTML = types.map(ct => {
+        const series = byClientDate[ct] || [];
+        if (!series.length) {
+          return `<tr><td>${niceLabel[ct]}</td><td colspan="5" style="color:var(--text-muted);">—</td></tr>`;
+        }
+        const cur = series[series.length - 1];
+        const prev = series.length > 1 ? series[series.length - 2] : null;
+        const L = parseFloat(cur.idx_fut_long) || 0;
+        const S = parseFloat(cur.idx_fut_short) || 0;
+        const tot = L + S;
+        const netPct = tot > 0 ? ((L - S) / tot) * 100 : 0;
+        const netCls = netPct >= 5 ? 'pnl-positive' : netPct <= -5 ? 'pnl-negative' : '';
+
+        let delta = null;
+        if (prev) {
+          const pL = parseFloat(prev.idx_fut_long) || 0;
+          const pS = parseFloat(prev.idx_fut_short) || 0;
+          const pTot = pL + pS;
+          const prevNet = pTot > 0 ? ((pL - pS) / pTot) * 100 : 0;
+          delta = netPct - prevNet;
+        }
+        const deltaCell = delta == null ? '—' :
+          `<span class="${delta >= 0 ? 'pnl-positive' : 'pnl-negative'}">${delta >= 0 ? '+' : ''}${delta.toFixed(1)} pp</span>`;
+
+        // Long vs Short bar — both anchored at center, longs grow right, shorts grow left
+        const denom = Math.max(L, S, 1);
+        const longW = (L / denom) * 50;
+        const shortW = (S / denom) * 50;
+        const tip = `Long ${fmtN(L)} · Short ${fmtN(S)}`;
+        const bar = `<div title="${tip}" style="position:relative; height:14px; background:#1f1f24; border-radius:7px; overflow:hidden; min-width:160px;">
+          <div style="position:absolute; top:0; left:50%; transform:translateX(-0.5px); width:1px; height:100%; background:#3a3a42;"></div>
+          <div style="position:absolute; top:0; left:${(50 - shortW).toFixed(2)}%; width:${shortW.toFixed(2)}%; height:100%; background:${DII_COLOR}33; border-right:2px solid ${DII_COLOR === '#3b82f6' && ct === 'DII' ? DII_COLOR : '#ef4444'};"></div>
+          <div style="position:absolute; top:0; left:50%; width:${longW.toFixed(2)}%; height:100%; background:#10b98133; border-left:2px solid #10b981;"></div>
+        </div>`;
+
+        return `<tr>
+          <td><strong>${niceLabel[ct]}</strong></td>
+          <td class="num">${fmtN(L)}</td>
+          <td class="num">${fmtN(S)}</td>
+          <td>${bar}</td>
+          <td class="num ${netCls}"><strong>${netPct >= 0 ? '+' : ''}${netPct.toFixed(1)}%</strong></td>
+          <td class="num">${deltaCell}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderFiidiiPayload(d) {
+      const rows = (d.fii_dii || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      fiidiiLoading.style.display = 'none';
+      if (!rows.length && !(d.participant_oi || []).length) {
+        fiidiiEmpty.style.display = 'block';
+        fiidiiEmpty.textContent = d.message || 'No NSE data available (NSE may have rate-limited the download). Click Refresh to retry.';
+        fiidiiContent.style.display = 'none';
+        return;
+      }
+      fiidiiEmpty.style.display = 'none';
+      fiidiiContent.style.display = 'block';
+
+      const chartRows = (d.fii_dii_chart || d.fii_dii || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      const dataRows = rows.filter(r => fiidiiNetValue(r.fii_net) != null || fiidiiNetValue(r.dii_net) != null);
+      const trendRows = chartRows.filter(r => fiidiiNetValue(r.fii_net) != null || fiidiiNetValue(r.dii_net) != null);
+      const fii = trendRows.map(r => fiidiiNetValue(r.fii_net) || 0);
+      const dii = trendRows.map(r => fiidiiNetValue(r.dii_net) || 0);
+      const net = fii.map((v, i) => v + (dii[i] || 0));
+
+      const last = dataRows[dataRows.length - 1] || {};
+      setHero('heroFii', last.fii_net);
+      setHero('heroDii', last.dii_net);
+      setHero('heroNet', (parseFloat(last.fii_net) || 0) + (parseFloat(last.dii_net) || 0));
+      document.getElementById('heroFiiDate').textContent = last.date ? '· ' + last.date : '';
+      document.getElementById('heroDiiDate').textContent = last.date ? '· ' + last.date : '';
+      document.getElementById('heroFiiTrend').innerHTML = trendLabel(fii);
+      document.getElementById('heroDiiTrend').innerHTML = trendLabel(dii);
+      document.getElementById('heroNetTrend').innerHTML = trendLabel(net);
+
+      // descending order for table (newest first)
+      const tableRows = rows.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      fiidiiTbody.innerHTML = tableRows.map(r => {
+        const cls = (v) => deltaCls(v);
+        const combined = (parseFloat(r.fii_net) || 0) + (parseFloat(r.dii_net) || 0);
+        return `<tr>
+          <td>${fmt(r.date)}</td>
+          <td class="num">${fmtNum(r.fii_buy, 0)}</td>
+          <td class="num">${fmtNum(r.fii_sell, 0)}</td>
+          <td class="num ${cls(r.fii_net)}">${fmtNum(r.fii_net, 0)}</td>
+          <td class="num">${fmtNum(r.dii_buy, 0)}</td>
+          <td class="num">${fmtNum(r.dii_sell, 0)}</td>
+          <td class="num ${cls(r.dii_net)}">${fmtNum(r.dii_net, 0)}</td>
+          <td class="num ${cls(combined)}">${fmtNum(combined, 0)}</td>
+        </tr>`;
+      }).join('');
+
+      renderFiidiiCharts(chartRows);
+      renderParticipantOi(d);
+      const cov = (d.data_status && d.data_status.coverage) || {};
+      const oiHave = cov.participant_oi_have != null ? cov.participant_oi_have : '—';
+      const fiiHave = cov.fii_dii_have != null ? cov.fii_dii_have : dataRows.length;
+      const chartDays = d.data_status?.fii_dii_chart_days || chartRows.length || 6;
+      const tgt = cov.trading_days_requested || 30;
+      let status = `${dataRows.length} FII/DII cached · chart last ${chartDays} sessions · ${(d.participant_oi || []).length} OI rows · cache ${oiHave}/${tgt} OI, ${fiiHave}/${tgt} FII/DII`;
+      if (cov.participant_oi_fetched > 0) status += ` · fetched ${cov.participant_oi_fetched} OI file(s)`;
+      if (cov.fii_dii_missing && cov.fii_dii_missing.length) {
+        status += ` · FII/DII gaps: ${cov.fii_dii_missing.length} (NSE publishes live day only)`;
+      }
+      fiidiiStatus.textContent = status;
+      fiidiiStatus.className = 'status ok';
+    }
+
+    async function loadFiiDiiTrends() {
+      fiidiiLoading.style.display = 'block';
+      fiidiiEmpty.style.display = 'none';
+      fiidiiContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/fii-dii-trends');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        renderFiidiiPayload(d);
+      } catch (e) {
+        fiidiiLoading.style.display = 'none';
+        fiidiiEmpty.style.display = 'block';
+        fiidiiEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    btnFiidiiRefresh?.addEventListener('click', async () => {
+      btnFiidiiRefresh.disabled = true;
+      fiidiiStatus.textContent = 'Fetching NSE FII/DII + participant OI…';
+      fiidiiStatus.className = 'status';
+      fiidiiLoading.style.display = 'block';
+      fiidiiEmpty.style.display = 'none';
+      fiidiiContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/fii-dii-trends/refresh', { method: 'POST' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'refresh failed');
+        renderFiidiiPayload(d);
+      } catch (e) {
+        fiidiiLoading.style.display = 'none';
+        fiidiiEmpty.style.display = 'block';
+        fiidiiEmpty.textContent = 'Refresh error: ' + e.message;
+        fiidiiStatus.textContent = 'Error: ' + e.message;
+        fiidiiStatus.className = 'status err';
+      } finally {
+        btnFiidiiRefresh.disabled = false;
+      }
+    });
+
+    // ---------- Relative Strength ----------
+    const btnRsRefresh = document.getElementById('btnRsRefresh');
+    const rsStatus = document.getElementById('rsStatus');
+    const rsLoading = document.getElementById('rsLoading');
+    const rsEmpty = document.getElementById('rsEmpty');
+    const rsContent = document.getElementById('rsContent');
+    const rsMeta = document.getElementById('rsMeta');
+    const rsTbody = document.getElementById('rsTbody');
+    const rsOnlyOuter = document.getElementById('rsOnlyOuter');
+    let _rsRowsCache = [];
+    let _rsSortKey = 'strength_score';
+    let _rsSortDir = -1;
+
+    function sparklineSvg(values, width = 130, height = 32) {
+      // Mansfield RS line — baseline 100 = NIFTY. Above 100 = outperforming, below = under.
+      if (!values || !values.length) return '';
+      const baseline = 100;
+      const lo = Math.min.apply(null, values.concat([baseline]));
+      const hi = Math.max.apply(null, values.concat([baseline]));
+      const span = (hi - lo) || 1;
+      const yFor = (v) => height - ((v - lo) / span) * (height - 4) - 2;
+      const stepX = width / Math.max(1, values.length - 1);
+      const pts = values.map((v, i) => `${(i * stepX).toFixed(1)},${yFor(v).toFixed(1)}`).join(' ');
+      // Filled area between RS line and baseline — shows outperformance "shaded" visually.
+      const baseY = yFor(baseline);
+      const last = values[values.length - 1];
+      const isUp = last >= baseline;
+      const color = isUp ? '#10b981' : '#ef4444';
+      const fill = isUp ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)';
+      const areaPts = `0,${baseY.toFixed(1)} ${pts} ${width.toFixed(1)},${baseY.toFixed(1)}`;
+      return `<svg width="${width}" height="${height}" style="display:block;">
+        <polygon fill="${fill}" points="${areaPts}"/>
+        <line x1="0" y1="${baseY.toFixed(1)}" x2="${width}" y2="${baseY.toFixed(1)}" stroke="#3a3a42" stroke-width="0.8" stroke-dasharray="2,2"/>
+        <polyline fill="none" stroke="${color}" stroke-width="1.5" points="${pts}"/>
+        <circle cx="${width.toFixed(1)}" cy="${yFor(last).toFixed(1)}" r="2.5" fill="${color}"/>
+      </svg>`;
+    }
+
+    function excessBars(p5, p20, p60, width = 90, height = 28) {
+      // Tiny horizontal bar chart of excess returns vs NIFTY across 3 timeframes.
+      const arr = [p5, p20, p60].map(v => parseFloat(v) || 0);
+      const max = Math.max(0.5, Math.max.apply(null, arr.map(Math.abs)));
+      const labels = ['5d', '20d', '60d'];
+      const rowH = (height - 2) / 3;
+      const mid = width / 2;
+      const rows = arr.map((v, i) => {
+        const w = (Math.abs(v) / max) * (width / 2 - 14);
+        const x = v >= 0 ? mid : mid - w;
+        const color = v >= 0 ? '#10b981' : '#ef4444';
+        const y = i * rowH + 1;
+        return `<g>
+          <text x="2" y="${y + rowH * 0.7}" font-size="8" fill="#8b8b95">${labels[i]}</text>
+          <rect x="${x.toFixed(1)}" y="${(y + rowH * 0.2).toFixed(1)}" width="${w.toFixed(1)}" height="${(rowH * 0.6).toFixed(1)}" fill="${color}" opacity="0.85"/>
+        </g>`;
+      }).join('');
+      return `<svg width="${width}" height="${height}" style="display:block;">
+        <line x1="${mid}" y1="0" x2="${mid}" y2="${height}" stroke="#3a3a42" stroke-width="0.6"/>
+        ${rows}
+      </svg>`;
+    }
+
+    function renderRsRow(r, idx) {
+      const cls = (v) => deltaCls(v);
+      const tip = `5d: ${(parseFloat(r.excess_5d)||0).toFixed(2)}%  20d: ${(parseFloat(r.excess_20d)||0).toFixed(2)}%  60d: ${(parseFloat(r.excess_60d)||0).toFixed(2)}%  vs NIFTY`;
+      return `<tr>
+        <td class="num">${idx + 1}</td>
+        <td class="stock"><strong>${fmt(r.stock)}</strong></td>
+        <td class="num">${fmtNum(r.current_price)}</td>
+        <td class="num"><strong>${fmtNum(r.strength_score, 1)}</strong></td>
+        <td>${sparklineSvg(r.rs_line || [])}</td>
+        <td class="num">${fmtNum(r.rs_value, 1)}</td>
+        <td class="num ${cls(r.rs_slope_5d_pct)}">${fmtNum(r.rs_slope_5d_pct, 2)}</td>
+        <td class="num ${cls(r.rs_slope_20d_pct)}">${fmtNum(r.rs_slope_20d_pct, 2)}</td>
+        <td class="num ${cls(r.rs_slope_60d_pct)}">${fmtNum(r.rs_slope_60d_pct, 2)}</td>
+        <td title="${tip}">${excessBars(r.excess_5d, r.excess_20d, r.excess_60d)}</td>
+        <td class="num">${fmtNum(r.rs_rank_percentile, 0)}</td>
+      </tr>`;
+    }
+
+    function renderRsTable() {
+      const rows = _rsRowsCache.slice().sort((a, b) => {
+        const av = parseFloat(a[_rsSortKey] || 0);
+        const bv = parseFloat(b[_rsSortKey] || 0);
+        return (av - bv) * _rsSortDir;
+      });
+      rsTbody.innerHTML = rows.map((r, i) => renderRsRow(r, i)).join('');
+    }
+
+    function renderRsPayload(d) {
+      rsLoading.style.display = 'none';
+      const rows = d.rows || [];
+      if (!rows.length) {
+        rsEmpty.style.display = 'block';
+        rsEmpty.textContent = d.message || 'No RS rows.';
+        rsContent.style.display = 'none';
+        return;
+      }
+      rsEmpty.style.display = 'none';
+      rsContent.style.display = 'block';
+      const np = d.nifty_pct_change || {};
+      const fmtNif = (v) => v == null ? '—' : `<span class="${deltaCls(v)}">${(v >= 0 ? '+' : '') + Number(v).toFixed(2)}%</span>`;
+      rsMeta.innerHTML =
+        `<strong>Generated:</strong> ${fmt(d.generated_at).replace('T', ' ')} &nbsp;|&nbsp; ` +
+        `<strong>NIFTY:</strong> 5d ${fmtNif(np['5d'])} • 20d ${fmtNif(np['20d'])} • 60d ${fmtNif(np['60d'])} &nbsp;|&nbsp; ` +
+        `<strong>Outperformers:</strong> ${fmt(d.passed)} of ${fmt(d.scanned)}`;
+      _rsRowsCache = rows;
+      renderRsTable();
+      rsStatus.textContent = `${rows.length} outperformers shown (${fmt(d.passed)} passed / ${fmt(d.scanned)} scanned)${refreshStamp(d)}.`;
+      rsStatus.className = 'status ok';
+    }
+
+    document.querySelectorAll('#rsTable th[data-sort]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const k = th.dataset.sort;
+        if (_rsSortKey === k) _rsSortDir = -_rsSortDir;
+        else { _rsSortKey = k; _rsSortDir = -1; }
+        renderRsTable();
+      });
+    });
+
+    async function loadRelativeStrength() {
+      rsLoading.style.display = 'block';
+      rsEmpty.style.display = 'none';
+      rsContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/relative-strength');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        renderRsPayload(d);
+      } catch (e) {
+        rsLoading.style.display = 'none';
+        rsEmpty.style.display = 'block';
+        rsEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    btnRsRefresh?.addEventListener('click', async () => {
+      btnRsRefresh.disabled = true;
+      rsStatus.textContent = 'Computing RS for NIFTY 500…';
+      rsStatus.className = 'status';
+      rsLoading.style.display = 'block';
+      rsEmpty.style.display = 'none';
+      rsContent.style.display = 'none';
+      try {
+        const oo = rsOnlyOuter.checked ? 'true' : 'false';
+        const d = await postRefreshJson(
+          `/api/stocks/relative-strength/refresh?only_outperformers=${oo}`,
+          'Relative strength'
+        );
+        renderRsPayload(d);
+      } catch (e) {
+        rsLoading.style.display = 'none';
+        rsEmpty.style.display = 'block';
+        rsEmpty.textContent = 'Refresh error: ' + e.message;
+        rsStatus.textContent = 'Error: ' + e.message;
+        rsStatus.className = 'status err';
+      } finally {
+        btnRsRefresh.disabled = false;
+      }
+    });
+
+    // ---------- Intraday Relative Strength (15-min, vs NIFTY 50) ----------
+    const btnIntradayRsRefresh = document.getElementById('btnIntradayRsRefresh');
+    const intradayRsStatus = document.getElementById('intradayRsStatus');
+    const intradayRsMeta = document.getElementById('intradayRsMeta');
+    const intradayRsLoading = document.getElementById('intradayRsLoading');
+    const intradayRsEmpty = document.getElementById('intradayRsEmpty');
+    const intradayRsContent = document.getElementById('intradayRsContent');
+    const intradayRsStrongerTbody = document.getElementById('intradayRsStrongerTbody');
+    const intradayRsWeakerTbody = document.getElementById('intradayRsWeakerTbody');
+    const intradayRsStrongerEmpty = document.getElementById('intradayRsStrongerEmpty');
+    const intradayRsWeakerEmpty = document.getElementById('intradayRsWeakerEmpty');
+    let _intradayRsCache = { stronger: [], weaker: [] };
+    let _intradayRsSort = { stronger: { key: 'excess_pct', dir: -1 }, weaker: { key: 'excess_pct', dir: 1 } };
+
+    function intradayRsSparkline(values, width = 110, height = 28) {
+      // Intraday RS line, 100 baseline. Above = leading, below = lagging.
+      if (!values || !values.length) return '';
+      const baseline = 100;
+      const lo = Math.min.apply(null, values.concat([baseline]));
+      const hi = Math.max.apply(null, values.concat([baseline]));
+      const span = (hi - lo) || 1;
+      const yFor = (v) => height - ((v - lo) / span) * (height - 4) - 2;
+      const stepX = width / Math.max(1, values.length - 1);
+      const pts = values.map((v, i) => `${(i * stepX).toFixed(1)},${yFor(v).toFixed(1)}`).join(' ');
+      const baseY = yFor(baseline);
+      const last = values[values.length - 1];
+      const isUp = last >= baseline;
+      const color = isUp ? '#10b981' : '#ef4444';
+      const fill = isUp ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)';
+      const areaPts = `0,${baseY.toFixed(1)} ${pts} ${width.toFixed(1)},${baseY.toFixed(1)}`;
+      return `<svg width="${width}" height="${height}" style="display:block;">
+        <polygon fill="${fill}" points="${areaPts}"/>
+        <line x1="0" y1="${baseY.toFixed(1)}" x2="${width}" y2="${baseY.toFixed(1)}" stroke="#3a3a42" stroke-width="0.8" stroke-dasharray="2,2"/>
+        <polyline fill="none" stroke="${color}" stroke-width="1.5" points="${pts}"/>
+        <circle cx="${width.toFixed(1)}" cy="${yFor(last).toFixed(1)}" r="2.5" fill="${color}"/>
+      </svg>`;
+    }
+
+    function renderIntradayRsRow(r, idx) {
+      const cls = (v) => deltaCls(v);
+      const pct = (v) => {
+        const n = Number(v);
+        if (!isFinite(n)) return '—';
+        return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+      };
+      return `<tr>
+        <td class="num">${idx + 1}</td>
+        <td class="stock"><strong>${fmt(r.stock)}</strong></td>
+        <td class="num">${fmtNum(r.last_price)}</td>
+        <td class="num">${fmtNum(r.open_price)}</td>
+        <td class="num ${cls(r.pct_today)}">${pct(r.pct_today)}</td>
+        <td class="num ${cls(r.nifty_pct_today)}">${pct(r.nifty_pct_today)}</td>
+        <td class="num ${cls(r.excess_pct)}"><strong>${pct(r.excess_pct)}</strong></td>
+        <td>${intradayRsSparkline(r.rs_line || [])}</td>
+        <td class="num">${fmt(r.bars)}</td>
+        <td>${fmt(r.last_bar_ts)}</td>
+      </tr>`;
+    }
+
+    function renderIntradayRsSide(which) {
+      const tbody = which === 'stronger' ? intradayRsStrongerTbody : intradayRsWeakerTbody;
+      const emptyEl = which === 'stronger' ? intradayRsStrongerEmpty : intradayRsWeakerEmpty;
+      const cfg = _intradayRsSort[which];
+      const rows = (_intradayRsCache[which] || []).slice().sort((a, b) => {
+        const av = parseFloat(a[cfg.key] || 0);
+        const bv = parseFloat(b[cfg.key] || 0);
+        return (av - bv) * cfg.dir;
+      });
+      tbody.innerHTML = rows.map((r, i) => renderIntradayRsRow(r, i)).join('');
+      emptyEl.style.display = rows.length ? 'none' : 'block';
+    }
+
+    function renderIntradayRsPayload(d) {
+      intradayRsLoading.style.display = 'none';
+      const stronger = d.stronger || [];
+      const weaker = d.weaker || [];
+      const nifty = d.nifty || null;
+      const sessionDay = d.session_day || d.trade_date || '—';
+      if (!stronger.length && !weaker.length && !nifty) {
+        intradayRsEmpty.style.display = 'block';
+        intradayRsEmpty.textContent = d.message || 'No intraday RS data.';
+        intradayRsContent.style.display = 'none';
+        intradayRsMeta.textContent = '—';
+        return;
+      }
+      intradayRsEmpty.style.display = 'none';
+      intradayRsContent.style.display = 'grid';
+      if (nifty) {
+        const np = Number(nifty.pct_today || 0);
+        const npCls = np >= 0 ? 'pnl-positive' : 'pnl-negative';
+        const note = d.session_note
+          ? `<div style="margin-top:0.35rem; color:#eab308; font-size:0.8rem;">${d.session_note}</div>`
+          : '';
+        intradayRsMeta.innerHTML =
+          `<strong>Session:</strong> ${fmt(sessionDay)} &nbsp;|&nbsp; ` +
+          `<strong>NIFTY 50:</strong> <span class="${npCls}">${(np >= 0 ? '+' : '') + np.toFixed(2)}%</span> ` +
+          `(${fmtNum(nifty.open)} → ${fmtNum(nifty.last)}, ${fmt(nifty.bars)} bars, last ${fmt(nifty.last_bar_ts)}) &nbsp;|&nbsp; ` +
+          `<strong>Stronger:</strong> ${stronger.length} &nbsp;|&nbsp; <strong>Weaker:</strong> ${weaker.length}` +
+          note;
+      } else {
+        intradayRsMeta.textContent = d.message || d.session_note || '—';
+      }
+      _intradayRsCache = { stronger, weaker };
+      renderIntradayRsSide('stronger');
+      renderIntradayRsSide('weaker');
+      intradayRsStatus.textContent =
+        `${stronger.length + weaker.length} of ${fmt(d.scanned || (stronger.length + weaker.length))} stocks compared${refreshStamp(d)}.`;
+      intradayRsStatus.className = 'status ok';
+    }
+
+    document.querySelectorAll('#intradayRsStrongerTable th[data-sort]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const k = th.dataset.sort;
+        const cfg = _intradayRsSort.stronger;
+        if (cfg.key === k) cfg.dir = -cfg.dir; else { cfg.key = k; cfg.dir = -1; }
+        renderIntradayRsSide('stronger');
+      });
+    });
+    document.querySelectorAll('#intradayRsWeakerTable th[data-sort]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const k = th.dataset.sort;
+        const cfg = _intradayRsSort.weaker;
+        if (cfg.key === k) cfg.dir = -cfg.dir; else { cfg.key = k; cfg.dir = 1; }
+        renderIntradayRsSide('weaker');
+      });
+    });
+
+    async function loadIntradayRs() {
+      intradayRsLoading.style.display = 'block';
+      intradayRsEmpty.style.display = 'none';
+      intradayRsContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/intraday-rs');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        renderIntradayRsPayload(d);
+      } catch (e) {
+        intradayRsLoading.style.display = 'none';
+        intradayRsEmpty.style.display = 'block';
+        intradayRsEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    btnIntradayRsRefresh?.addEventListener('click', async () => {
+      btnIntradayRsRefresh.disabled = true;
+      intradayRsStatus.textContent = 'Computing intraday RS from 15-min cache…';
+      intradayRsStatus.className = 'status';
+      intradayRsLoading.style.display = 'block';
+      intradayRsEmpty.style.display = 'none';
+      intradayRsContent.style.display = 'none';
+      try {
+        const d = await postRefreshJson('/api/stocks/intraday-rs/refresh', 'Intraday RS');
+        renderIntradayRsPayload(d);
+      } catch (e) {
+        intradayRsLoading.style.display = 'none';
+        intradayRsEmpty.style.display = 'block';
+        intradayRsEmpty.textContent = 'Refresh error: ' + e.message;
+        intradayRsStatus.textContent = 'Error: ' + e.message;
+        intradayRsStatus.className = 'status err';
+      } finally {
+        btnIntradayRsRefresh.disabled = false;
+      }
+    });
+
+
+    // Allow opening new tabs by hash
+    if (['#silent', '#fiidii', '#rs', '#intraday-rs', '#instvol'].includes(window.location.hash)) {
+      const tab = window.location.hash.replace('#', '');
+      document.querySelector(`.tab[data-tab="${tab}"]`)?.click();
     }
   </script>
 </body>

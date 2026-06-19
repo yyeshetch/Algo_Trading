@@ -57,11 +57,25 @@ class MarketDataFetcher:
         )
 
         merged = spot_df.merge(fut_df, on="timestamp", how="inner")
-        ce_cols = ["timestamp", "call_close", "call_volume"]
+        ce_cols = [
+            "timestamp",
+            "call_open_raw",
+            "call_high_raw",
+            "call_low_raw",
+            "call_close",
+            "call_volume",
+        ]
         if "call_oi" in ce_df.columns:
             ce_cols.append("call_oi")
         merged = merged.merge(ce_df[ce_cols], on="timestamp", how="inner")
-        pe_cols = ["timestamp", "put_close", "put_volume"]
+        pe_cols = [
+            "timestamp",
+            "put_open_raw",
+            "put_high_raw",
+            "put_low_raw",
+            "put_close",
+            "put_volume",
+        ]
         if "put_oi" in pe_df.columns:
             pe_cols.append("put_oi")
         merged = merged.merge(pe_df[pe_cols], on="timestamp", how="inner")
@@ -83,6 +97,14 @@ class MarketDataFetcher:
         merged["future_ltp"] = merged["future_close"]
         merged["call_ltp"] = merged["call_close"]
         merged["put_ltp"] = merged["put_close"]
+        merged["call_open"] = merged["call_open_raw"]
+        merged["call_high"] = merged["call_high_raw"]
+        merged["call_low"] = merged["call_low_raw"]
+        merged["call_close"] = merged["call_close"]
+        merged["put_open"] = merged["put_open_raw"]
+        merged["put_high"] = merged["put_high_raw"]
+        merged["put_low"] = merged["put_low_raw"]
+        merged["put_close"] = merged["put_close"]
 
         merged["spot_open"] = spot_day_open
         merged["future_open"] = fut_day_open
@@ -115,8 +137,16 @@ class MarketDataFetcher:
             "future_vwap",
             "call_symbol",
             "call_ltp",
+            "call_open",
+            "call_high",
+            "call_low",
+            "call_close",
             "put_symbol",
             "put_ltp",
+            "put_open",
+            "put_high",
+            "put_low",
+            "put_close",
             "atm_strike",
             "ce_symbol",
             "pe_symbol",
@@ -128,6 +158,10 @@ class MarketDataFetcher:
             out_cols.append("call_oi")
         if "put_oi" in merged.columns:
             out_cols.append("put_oi")
+        if "call_volume" in merged.columns:
+            out_cols.append("call_volume")
+        if "put_volume" in merged.columns:
+            out_cols.append("put_volume")
         return merged[[c for c in out_cols if c in merged.columns]]
 
 

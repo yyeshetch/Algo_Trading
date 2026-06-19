@@ -147,6 +147,20 @@ def load_nifty500_symbols(symbols_file: Path | None, data_dir: Path) -> list[str
     ref = data_dir / "reference" / "nifty500_symbols.txt"
     if ref.exists():
         return load_symbols_from_file(ref)
+    csv_ref = data_dir / "reference" / "ind_nifty500list.csv"
+    if csv_ref.exists():
+        try:
+            df = pd.read_csv(csv_ref)
+            for col in df.columns:
+                if str(col).strip().lower() == "symbol":
+                    syms = (
+                        df[col].astype(str).str.strip().str.upper().dropna().unique().tolist()
+                    )
+                    syms = [s for s in syms if s and s != "NAN"]
+                    if syms:
+                        return syms
+        except Exception as e:
+            logger.debug("Could not parse ind_nifty500list.csv: %s", e)
     syms = download_nifty500_symbols()
     if syms:
         return syms

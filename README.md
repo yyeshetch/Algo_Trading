@@ -171,3 +171,15 @@ python3 -m intraday_engine.main --tomorrow-watchlist --tw-top 20 --tw-workers 4 
 
 
 PYTHONPATH=src python -m intraday_engine.backtest.uhv --data-dir data/NIFTY500 --output-dir data/backtesting/uhv_backtest
+
+
+
+python institutional_expansion_pivot.py --csv data/NIFTY500/AFCONS_15Min.csv
+
+python backtest_strategies.py --symbol AFCONS --exit rr
+
+python backtest_strategies.py --data-dir data/NIFTY500 --exit hybrid --output data/backtesting/orb_trades.csv
+
+python volume_breakout.py
+
+PYTHONPATH=src python3 -m intraday_engine.cli --uhv-bt

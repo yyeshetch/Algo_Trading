@@ -73,6 +73,36 @@
     .analysis-table .num { text-align: right; font-variant-numeric: tabular-nums; }
     .analysis-table .ind-yes { color: #4ade80; }
     .analysis-table .ind-no { color: #71717a; }
+    tr.ot-signal-row { background: rgba(34, 197, 94, 0.08); }
+    tr.ot-signal-row:hover { background: rgba(34, 197, 94, 0.14) !important; }
+    .ot-split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+    @media (max-width: 1100px) { .ot-split-grid { grid-template-columns: 1fr; } }
+    .ot-bar-analysis-stack { display: flex; flex-direction: column; gap: 1rem; }
+    .ot-bar-analysis-scroll { max-height: 290px; overflow: auto; border: 1px solid #27272a; border-radius: 6px; }
+    .ot-bar-analysis-scroll thead th { position: sticky; top: 0; z-index: 1; background: #18181b; box-shadow: 0 1px 0 #27272a; }
+    .ot-signal-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; }
+    .ot-signal-type-card { padding: 0.65rem 0.75rem; border-radius: 6px; border: 1px solid #27272a; background: #141417; }
+    .ot-signal-type-card h4 { margin: 0 0 0.35rem; font-size: 0.82rem; font-weight: 600; color: #e4e4e7; }
+    .ot-signal-type-card ul { margin: 0; padding-left: 1.1rem; font-size: 0.74rem; color: #a1a1aa; line-height: 1.45; }
+    .ot-signal-type-card li { margin-bottom: 0.15rem; }
+    .ot-cond-list { list-style: none; padding: 0; margin: 0; }
+    .ot-cond-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.35rem; }
+    .ot-cond-row span { flex: 1; font-size: 0.72rem; color: #a1a1aa; line-height: 1.35; }
+    .ot-toggle-btn {
+      flex-shrink: 0; min-width: 2.6rem; padding: 0.15rem 0.45rem; border: 1px solid #3f3f46;
+      border-radius: 999px; background: #27272a; color: #a1a1aa; font-size: 0.68rem; font-weight: 600; cursor: pointer;
+    }
+    .ot-toggle-btn.on { background: #166534; border-color: #15803d; color: #bbf7d0; }
+    .ot-toggle-btn.off { background: #3f3f46; border-color: #52525b; color: #d4d4d8; }
+    .ot-toggle-btn:hover { filter: brightness(1.08); }
+    .ot-cond-actions { display: flex; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; }
+    .ot-cond-actions button {
+      padding: 0.2rem 0.55rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid #3f3f46;
+      background: #27272a; color: #d4d4d8; cursor: pointer;
+    }
+    .ot-cond-actions button:hover { background: #3f3f46; }
+    .ot-panel-title { margin: 0 0 0.35rem; font-size: 0.9rem; font-weight: 600; }
+    .ot-panel-meta { margin: 0 0 0.5rem; font-size: 0.75rem; color: #71717a; }
     .opt-row { display: flex; gap: 1rem; align-items: stretch; }
     .opt-box { flex: 1; padding: 0.75rem; border-radius: 6px; border: 1px solid #27272a; }
     .opt-box.call { border-left: 3px solid #3b82f6; }
@@ -110,6 +140,50 @@
     .btn-signal-monitor:hover { background: #71717a; }
     .btn-signal-monitor.secondary { background: #3f3f46; }
     .btn-signal-monitor:disabled { opacity: 0.5; cursor: not-allowed; }
+    .mo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .mo-card { padding: 1rem; }
+    .mo-title { margin: 0 0 0.6rem; font-size: 0.95rem; font-weight: 600; color: #e4e4e7; }
+    .mo-empty { font-size: 0.85rem; color: #71717a; margin: 0; }
+    .mo-big-row { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+    .mo-big-row .price { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .mo-big-row .chg { font-size: 0.95rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .mo-sub { font-size: 0.75rem; color: #a1a1aa; margin-top: 0.35rem; }
+    .mo-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+    .mo-table th, .mo-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #27272a; text-align: right; }
+    .mo-table th:first-child, .mo-table td:first-child { text-align: left; }
+    .mo-table tbody tr:hover { background: #18181b; }
+    .mo-tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; background: #27272a; color: #a1a1aa; }
+    .mo-tag.up { background: #14532d; color: #86efac; }
+    .mo-tag.down { background: #7f1d1d; color: #fecaca; }
+    .mo-news-group { margin-bottom: 0.9rem; }
+    .mo-news-group h4 { margin: 0 0 0.35rem; font-size: 0.85rem; color: #e4e4e7; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+    .mo-news-group ul { margin: 0; padding-left: 1.1rem; }
+    .mo-news-group li { font-size: 0.82rem; line-height: 1.45; margin-bottom: 0.25rem; }
+    .mo-news-group li a { color: #93c5fd; text-decoration: none; }
+    .mo-news-group li a:hover { text-decoration: underline; }
+    .mo-news-group .src { color: #71717a; font-size: 0.72rem; margin-left: 0.35rem; }
+    .mo-sent { display: inline-block; padding: 0.08rem 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; background: #44403c; color: #d6d3d1; vertical-align: middle; }
+    .mo-sent.pos { background: #14532d; color: #86efac; }
+    .mo-sent.neg { background: #7f1d1d; color: #fecaca; }
+    .mo-sent.neu { background: #3f3f46; color: #d4d4d8; }
+    .mo-sent-banner { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.5rem 0.75rem; border-radius: 8px; background: #27272a; margin-bottom: 0.85rem; font-size: 0.85rem; }
+    .mo-sent-banner .label { color: #a1a1aa; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .mo-sent-banner .counts { color: #a1a1aa; font-size: 0.78rem; }
+    .mo-flow-card { background: #27272a; border-radius: 8px; padding: 0.65rem 0.8rem; }
+    .mo-flow-card .label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; }
+    .mo-flow-card .val { font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .mo-grade-summary { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+    .mo-grade { display: inline-block; padding: 0.12rem 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; }
+    .mo-grade.extremely_bearish { background: #450a0a; color: #fca5a5; }
+    .mo-grade.bearish { background: #7f1d1d; color: #fecaca; }
+    .mo-grade.neutral { background: #3f3f46; color: #d4d4d8; }
+    .mo-grade.bullish { background: #14532d; color: #86efac; }
+    .mo-grade.extremely_bullish { background: #052e16; color: #4ade80; }
+    .mo-grade.unknown { background: #27272a; color: #71717a; }
+    tr.mo-row-extremely_bearish { background: rgba(69, 10, 10, 0.15); }
+    tr.mo-row-bearish { background: rgba(127, 29, 29, 0.08); }
+    tr.mo-row-bullish { background: rgba(20, 83, 45, 0.08); }
+    tr.mo-row-extremely_bullish { background: rgba(5, 46, 22, 0.15); }
   </style>
 </head>
 <body>
@@ -117,6 +191,7 @@
     <h1 style="margin:0;">Intraday Direction Engine</h1>
     <a href="/stocks" style="color:#60a5fa;text-decoration:none;font-size:0.9rem;font-weight:500;">F&O Stock Scanner →</a>
     <a href="/stocks#30min" style="color:#60a5fa;text-decoration:none;font-size:0.9rem;font-weight:500;">30-min Analysis →</a>
+    <a href="/jobs" style="color:#60a5fa;text-decoration:none;font-size:0.9rem;font-weight:500;">Configured Jobs →</a>
   </div>
   <div class="controls">
     <div class="lots-row">
@@ -140,11 +215,163 @@
   </div>
   <div class="status" id="status"></div>
   <div class="tabs">
-    <button class="tab active" data-tab="signals">Signals</button>
+    <button class="tab active" data-tab="options-trading">Options Trading</button>
+    <button class="tab" data-tab="signals">Signals</button>
     <button class="tab" data-tab="trade-summary">Trade Summary</button>
     <button class="tab" data-tab="analysis">Analysis</button>
+    <button class="tab" data-tab="market-overview">Market Overview</button>
   </div>
-  <div id="panel-signals" class="tab-panel active">
+  <div id="panel-options-trading" class="tab-panel active">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <div>
+          <h2 style="margin:0 0 0.35rem;">Options Trading — Entry Signals</h2>
+          <p style="margin:0;font-size:0.82rem;color:#a1a1aa;max-width:720px;line-height:1.45;">
+            ATM CE &amp; PE from <code>Index_Analysis.csv</code> (5-min bars) · see signal rules below.
+          </p>
+        </div>
+        <button class="btn btn-refresh" id="btnRefreshOptionsTrading" style="padding:0.4rem 0.85rem;font-size:0.85rem;">Refresh signals</button>
+      </div>
+      <div class="ot-cond-actions">
+        <button type="button" id="btnOptionsCondReset">Reset all conditions</button>
+        <button type="button" id="btnOptionsCondAllOn">All ON</button>
+      </div>
+      <div id="optionsSignalTypes" class="ot-signal-types"></div>
+      <p id="optionsTradingMeta" style="font-size:0.8rem;color:#71717a;margin:0 0 0.75rem;">—</p>
+      <div class="ot-split-grid">
+        <div class="opt-box call">
+          <h3 class="ot-panel-title">ATM CE — Entry Signals</h3>
+          <p id="optionsTradingCeMeta" class="ot-panel-meta">—</p>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Symbol</th>
+                  <th>Strike</th>
+                  <th>Entry</th>
+                  <th>SL</th>
+                  <th>Risk %</th>
+                  <th>EMA13(H)</th>
+                  <th>O/H/L/C</th>
+                </tr>
+              </thead>
+              <tbody id="optionsTradingCeBody"></tbody>
+            </table>
+          </div>
+          <p id="optionsTradingCeEmpty" style="display:none;margin-top:0.5rem;color:#71717a;font-size:0.82rem;">No CE signals.</p>
+        </div>
+        <div class="opt-box put">
+          <h3 class="ot-panel-title">ATM PE — Entry Signals</h3>
+          <p id="optionsTradingPeMeta" class="ot-panel-meta">—</p>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Symbol</th>
+                  <th>Strike</th>
+                  <th>Entry</th>
+                  <th>SL</th>
+                  <th>Risk %</th>
+                  <th>EMA13(H)</th>
+                  <th>O/H/L/C</th>
+                </tr>
+              </thead>
+              <tbody id="optionsTradingPeBody"></tbody>
+            </table>
+          </div>
+          <p id="optionsTradingPeEmpty" style="display:none;margin-top:0.5rem;color:#71717a;font-size:0.82rem;">No PE signals.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="margin-bottom:0.75rem;">
+        <h2 style="margin:0 0 0.25rem;">Bar Analysis</h2>
+        <p style="margin:0;font-size:0.78rem;color:#71717a;">5-min ATM CE &amp; PE · EMA13 on HIGH · rule checks per bar (newest first)</p>
+      </div>
+      <p id="optionsAnalysisMeta" style="font-size:0.78rem;color:#71717a;margin:0 0 0.75rem;">—</p>
+      <div class="ot-bar-analysis-stack">
+        <div class="opt-box call">
+          <h3 class="ot-panel-title">ATM CE — Bar Analysis</h3>
+          <p id="optionsAnalysisCeMeta" class="ot-panel-meta">—</p>
+          <div class="ot-bar-analysis-scroll">
+            <table class="analysis-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>O</th>
+                  <th>H</th>
+                  <th>L</th>
+                  <th>C</th>
+                  <th>EMA13(H)</th>
+                  <th>C&gt;EMA</th>
+                  <th>No top wick</th>
+                  <th>Prior 5</th>
+                  <th>C&gt;4H</th>
+                  <th>Doji</th>
+                  <th>Strong</th>
+                  <th>Prior doji</th>
+                  <th>EMA ok</th>
+                  <th>Cluster</th>
+                  <th>Clear</th>
+                  <th>Vol&gt;EMA20</th>
+                  <th>Sidew.</th>
+                  <th>Brk</th>
+                  <th>S.Clr</th>
+                  <th>Risk %</th>
+                  <th>Signal</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="optionsAnalysisCeBody"></tbody>
+            </table>
+          </div>
+          <p id="optionsAnalysisCeEmpty" style="display:none;margin-top:0.5rem;color:#71717a;font-size:0.82rem;">No CE bars.</p>
+        </div>
+        <div class="opt-box put">
+          <h3 class="ot-panel-title">ATM PE — Bar Analysis</h3>
+          <p id="optionsAnalysisPeMeta" class="ot-panel-meta">—</p>
+          <div class="ot-bar-analysis-scroll">
+            <table class="analysis-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>O</th>
+                  <th>H</th>
+                  <th>L</th>
+                  <th>C</th>
+                  <th>EMA13(H)</th>
+                  <th>C&gt;EMA</th>
+                  <th>No top wick</th>
+                  <th>Prior 5</th>
+                  <th>C&gt;4H</th>
+                  <th>Doji</th>
+                  <th>Strong</th>
+                  <th>Prior doji</th>
+                  <th>EMA ok</th>
+                  <th>Cluster</th>
+                  <th>Clear</th>
+                  <th>Vol&gt;EMA20</th>
+                  <th>Sidew.</th>
+                  <th>Brk</th>
+                  <th>S.Clr</th>
+                  <th>Risk %</th>
+                  <th>Signal</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="optionsAnalysisPeBody"></tbody>
+            </table>
+          </div>
+          <p id="optionsAnalysisPeEmpty" style="display:none;margin-top:0.5rem;color:#71717a;font-size:0.82rem;">No PE bars.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="panel-signals" class="tab-panel">
     <div class="card">
       <h2>Signals (latest 100)</h2>
       <div style="overflow-x: auto;">
@@ -260,6 +487,75 @@
     </div>
     <div id="analysisContent" class="card" style="margin-top: 1rem;"></div>
   </div>
+  <div id="panel-market-overview" class="tab-panel">
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <div>
+        <h2 style="margin:0 0 0.25rem;">Market Overview</h2>
+        <p id="moMeta" style="margin:0;font-size:0.8rem;color:#a1a1aa;">Click Refresh to build the snapshot.</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:0.8rem;color:#a1a1aa;display:flex;align-items:center;gap:0.35rem;">
+          <input type="checkbox" id="moRefreshFiiDii"> re-pull FII/DII from NSE
+        </label>
+        <button class="btn btn-refresh" id="btnRefreshMarketOverview" style="padding:0.4rem 0.85rem;font-size:0.85rem;">Refresh</button>
+      </div>
+    </div>
+
+    <div class="mo-grid">
+      <div class="card mo-card">
+        <h3 class="mo-title">GIFT Nifty</h3>
+        <div id="moGiftNifty"><p class="mo-empty">No data yet.</p></div>
+      </div>
+      <div class="card mo-card">
+        <h3 class="mo-title">India VIX</h3>
+        <div id="moVix"><p class="mo-empty">No data yet.</p></div>
+      </div>
+      <div class="card mo-card" style="grid-column: span 2;">
+        <h3 class="mo-title">NIFTY Plan — Today</h3>
+        <div id="moNiftyPlan"><p class="mo-empty">No data yet.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="mo-title" id="moGlobalIndicesTitle">Global Indices</h3>
+      <div id="moGlobalIndicesSummary" class="mo-grade-summary"></div>
+      <p class="mo-sub" style="margin-bottom:0.6rem;">Grade by daily %: Neutral −0.5% to +0.5% · Bullish/Bearish ±0.5% to ±1.5% · Extreme beyond ±1.5%</p>
+      <div style="overflow-x:auto;">
+        <table class="mo-table">
+          <thead><tr><th>Index</th><th>Last</th><th>High</th><th>Low</th><th>Change</th><th>Chg %</th><th>Grade</th><th>Time</th></tr></thead>
+          <tbody id="moGlobalIndices"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="mo-title" id="moCommoditiesTitle">Commodities</h3>
+      <div id="moCommoditiesSummary" class="mo-grade-summary"></div>
+      <p class="mo-sub" style="margin-bottom:0.6rem;">Grade by daily %: Neutral −0.5% to +0.5% · Bullish/Bearish ±0.5% to ±1.5% · Extreme beyond ±1.5%</p>
+      <div style="overflow-x:auto;">
+        <table class="mo-table">
+          <thead><tr><th>Instrument</th><th>Month</th><th>Last</th><th>High</th><th>Low</th><th>Change</th><th>Chg %</th><th>Grade</th><th>Time</th></tr></thead>
+          <tbody id="moCommodities"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="mo-title">FII / DII Flows (₹ cr, latest sessions)</h3>
+      <div id="moFiiDiiSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem;margin-bottom:0.75rem;"></div>
+      <div style="overflow-x:auto;">
+        <table class="mo-table">
+          <thead><tr><th>Date</th><th>FII Buy</th><th>FII Sell</th><th>FII Net</th><th>DII Buy</th><th>DII Sell</th><th>DII Net</th></tr></thead>
+          <tbody id="moFiiDiiRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="mo-title">Latest Global News (last 24h)</h3>
+      <div id="moNews"><p class="mo-empty">No news yet.</p></div>
+    </div>
+  </div>
   <script>
     const status = document.getElementById('status');
     const tbody = document.getElementById('tbody');
@@ -297,6 +593,7 @@
       }
       tradeDateInput.addEventListener('change', () => {
         loadSignals();
+        loadOptionsTrading();
         loadAnalysis();
       });
     }
@@ -317,6 +614,392 @@
       } catch (e) {
         console.warn('Could not load F&O stocks:', e);
       }
+    }
+
+    const optionsTradingMeta = document.getElementById('optionsTradingMeta');
+    const optionsTradingCeBody = document.getElementById('optionsTradingCeBody');
+    const optionsTradingPeBody = document.getElementById('optionsTradingPeBody');
+    const optionsTradingCeMeta = document.getElementById('optionsTradingCeMeta');
+    const optionsTradingPeMeta = document.getElementById('optionsTradingPeMeta');
+    const optionsTradingCeEmpty = document.getElementById('optionsTradingCeEmpty');
+    const optionsTradingPeEmpty = document.getElementById('optionsTradingPeEmpty');
+    const btnRefreshOptionsTrading = document.getElementById('btnRefreshOptionsTrading');
+    const optionsAnalysisCeBody = document.getElementById('optionsAnalysisCeBody');
+    const optionsAnalysisPeBody = document.getElementById('optionsAnalysisPeBody');
+    const optionsAnalysisMeta = document.getElementById('optionsAnalysisMeta');
+    const optionsAnalysisCeMeta = document.getElementById('optionsAnalysisCeMeta');
+    const optionsAnalysisPeMeta = document.getElementById('optionsAnalysisPeMeta');
+    const optionsAnalysisCeEmpty = document.getElementById('optionsAnalysisCeEmpty');
+    const optionsAnalysisPeEmpty = document.getElementById('optionsAnalysisPeEmpty');
+    const optionsSignalTypes = document.getElementById('optionsSignalTypes');
+    const btnOptionsCondReset = document.getElementById('btnOptionsCondReset');
+    const btnOptionsCondAllOn = document.getElementById('btnOptionsCondAllOn');
+
+    const OT_TOGGLE_KEY = 'optionsConditionToggles';
+    const SIGNAL_TYPE_PRIORITY = ['primary', 'cluster_breakout', 'sideways_breakout', 'doji_strong'];
+    let optionsTradingRawPayload = null;
+    let optionsConditionToggles = {};
+    let optionsSignalTypeDefs = [];
+
+    function normalizeSignalTypeDefs(types) {
+      return (types || []).map(t => ({
+        id: t.id,
+        label: t.label,
+        conditions: (t.conditions || []).map(c => (
+          typeof c === 'string' ? { id: null, label: c } : { id: c.id, label: c.label }
+        )).filter(c => c.id),
+      }));
+    }
+
+    function loadConditionToggles(defs) {
+      let stored = {};
+      try { stored = JSON.parse(localStorage.getItem(OT_TOGGLE_KEY) || '{}'); } catch (_) {}
+      if (stored.cluster_nine_clear && !stored.sideways_breakout) {
+        const old = stored.cluster_nine_clear;
+        stored.sideways_breakout = {
+          sideways_cluster: old.cluster_nine,
+          breakout_expansion: old.breakout_expansion,
+          clears_sideways_cluster: old.clears_cluster_nine,
+          entry_above_sl: old.entry_above_sl,
+          risk_ok: old.risk_ok,
+        };
+      }
+      const out = {};
+      for (const t of defs) {
+        out[t.id] = {};
+        for (const c of t.conditions) {
+          out[t.id][c.id] = stored[t.id]?.[c.id] !== false;
+        }
+      }
+      return out;
+    }
+
+    function saveConditionToggles() {
+      localStorage.setItem(OT_TOGGLE_KEY, JSON.stringify(optionsConditionToggles));
+    }
+
+    function isCondEnabled(typeId, condId) {
+      return optionsConditionToggles[typeId]?.[condId] !== false;
+    }
+
+    function typeMatchesRow(row, typeId) {
+      const checks = row.condition_checks?.[typeId];
+      if (!checks) return false;
+      for (const [condId, passed] of Object.entries(checks)) {
+        if (isCondEnabled(typeId, condId) && !passed) return false;
+      }
+      const defs = optionsSignalTypeDefs.find(t => t.id === typeId);
+      const enabledAny = defs?.conditions.some(c => isCondEnabled(typeId, c.id));
+      return !!enabledAny;
+    }
+
+    function matchedTypesForRow(row) {
+      return SIGNAL_TYPE_PRIORITY.filter(t => typeMatchesRow(row, t));
+    }
+
+    function enrichRowWithToggles(row) {
+      const matched = matchedTypesForRow(row);
+      const top = matched[0] || null;
+      return {
+        ...row,
+        signal: matched.length > 0,
+        signal_type: top,
+        primary_signal: matched.includes('primary'),
+        doji_strong_signal: matched.includes('doji_strong'),
+        cluster_breakout_signal: matched.includes('cluster_breakout'),
+        sideways_breakout_signal: matched.includes('sideways_breakout'),
+        matched_types: matched,
+      };
+    }
+
+    function buildSignalFromRow(row, typeId, payload) {
+      return {
+        underlying: payload.underlying,
+        option_type: row.option_type,
+        signal_type: typeId,
+        side: 'BUY',
+        tradingsymbol: row.tradingsymbol,
+        strike: row.strike,
+        spot_price: row.spot_price || 0,
+        timestamp: row.timestamp,
+        entry: row.close,
+        stop_loss: row.stop_loss,
+        risk_pct: row.risk_pct,
+        ema13_high: row.ema13_high,
+        cluster_high: row.cluster_high || row.sideways_cluster_high,
+        volume: row.volume,
+        candle: { open: row.open, high: row.high, low: row.low, close: row.close },
+      };
+    }
+
+    function buildFilteredOptionsView(payload) {
+      const analysis = payload.analysis || {};
+      const ceRows = (analysis.CE || []).map(enrichRowWithToggles);
+      const peRows = (analysis.PE || []).map(enrichRowWithToggles);
+      const signals = [];
+      for (const row of [...ceRows, ...peRows]) {
+        for (const typeId of row.matched_types || []) {
+          signals.push(buildSignalFromRow(row, typeId, payload));
+        }
+      }
+      signals.sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+      return { ceRows, peRows, signals };
+    }
+
+    function setAllConditionToggles(on) {
+      for (const t of optionsSignalTypeDefs) {
+        optionsConditionToggles[t.id] = optionsConditionToggles[t.id] || {};
+        for (const c of t.conditions) {
+          optionsConditionToggles[t.id][c.id] = on;
+        }
+      }
+      saveConditionToggles();
+      renderOptionsSignalTypes(optionsSignalTypeDefs);
+      if (optionsTradingRawPayload) renderOptionsTradingPayload(optionsTradingRawPayload);
+    }
+
+    function renderOptionsSignalTypes(types) {
+      if (!optionsSignalTypes) return;
+      const list = normalizeSignalTypeDefs(types && types.length ? types : optionsSignalTypeDefs);
+      if (list.length) optionsSignalTypeDefs = list;
+      if (!Object.keys(optionsConditionToggles).length && list.length) {
+        optionsConditionToggles = loadConditionToggles(list);
+      }
+      optionsSignalTypes.innerHTML = list.map(t => `
+        <div class="ot-signal-type-card" data-signal-type="${t.id}">
+          <h4>${fmt(t.label)}</h4>
+          <ul class="ot-cond-list">
+            ${(t.conditions || []).map(c => {
+              const on = isCondEnabled(t.id, c.id);
+              return `<li class="ot-cond-row">
+                <span>${fmt(c.label)}</span>
+                <button type="button" class="ot-toggle-btn ${on ? 'on' : 'off'}"
+                  data-type="${t.id}" data-cond="${c.id}" aria-pressed="${on}">${on ? 'ON' : 'OFF'}</button>
+              </li>`;
+            }).join('')}
+          </ul>
+        </div>
+      `).join('');
+
+      optionsSignalTypes.querySelectorAll('.ot-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const typeId = btn.dataset.type;
+          const condId = btn.dataset.cond;
+          const next = !isCondEnabled(typeId, condId);
+          optionsConditionToggles[typeId] = optionsConditionToggles[typeId] || {};
+          optionsConditionToggles[typeId][condId] = next;
+          saveConditionToggles();
+          btn.classList.toggle('on', next);
+          btn.classList.toggle('off', !next);
+          btn.textContent = next ? 'ON' : 'OFF';
+          btn.setAttribute('aria-pressed', String(next));
+          if (optionsTradingRawPayload) renderOptionsTradingPayload(optionsTradingRawPayload);
+        });
+      });
+    }
+
+    if (btnOptionsCondReset) {
+      btnOptionsCondReset.addEventListener('click', () => {
+        localStorage.removeItem(OT_TOGGLE_KEY);
+        optionsConditionToggles = loadConditionToggles(optionsSignalTypeDefs);
+        renderOptionsSignalTypes(optionsSignalTypeDefs);
+        if (optionsTradingRawPayload) renderOptionsTradingPayload(optionsTradingRawPayload);
+      });
+    }
+    if (btnOptionsCondAllOn) {
+      btnOptionsCondAllOn.addEventListener('click', () => setAllConditionToggles(true));
+    }
+
+    function yn(v) {
+      if (v === true) return '<span class="ind-yes">Y</span>';
+      if (v === false) return '<span class="ind-no">N</span>';
+      return '—';
+    }
+
+    function signalTypeLabel(t) {
+      if (t === 'primary') return 'Primary';
+      if (t === 'doji_strong') return 'Doji→Strong';
+      if (t === 'cluster_breakout') return 'Cluster+Vol';
+      if (t === 'sideways_breakout') return 'Sideways Brk';
+      return '—';
+    }
+
+    function renderOptionsSignalTable(body, emptyEl, metaEl, signals, label) {
+      if (!body) return;
+      if (!signals.length) {
+        body.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = 'block';
+        if (metaEl) metaEl.textContent = `0 ${label} signal(s)`;
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = 'none';
+      const primaryN = signals.filter(s => s.signal_type === 'primary').length;
+      const altN = signals.filter(s => s.signal_type === 'doji_strong').length;
+      const clusterN = signals.filter(s => s.signal_type === 'cluster_breakout').length;
+      const sidewaysN = signals.filter(s => s.signal_type === 'sideways_breakout').length;
+      const parts = [`${signals.length} ${label} signal(s)`];
+      if (primaryN) parts.push(`${primaryN} primary`);
+      if (altN) parts.push(`${altN} doji→strong`);
+      if (clusterN) parts.push(`${clusterN} cluster+vol`);
+      if (sidewaysN) parts.push(`${sidewaysN} sideways brk`);
+      if (metaEl) metaEl.textContent = parts.join(' · ');
+      body.innerHTML = signals.map(s => {
+        const c = s.candle || {};
+        const ohlc = `${fmt(c.open)}/${fmt(c.high)}/${fmt(c.low)}/${fmt(c.close)}`;
+        const typeCls = s.signal_type === 'doji_strong' ? 'sig-buy' : 'sig-buy';
+        return `<tr class="ot-signal-row">
+          <td class="ts">${shortTs(s.timestamp)}</td>
+          <td class="${typeCls}" style="font-size:0.78rem;white-space:nowrap;">${signalTypeLabel(s.signal_type)}</td>
+          <td>${fmt(s.tradingsymbol)}</td>
+          <td>${fmt(s.strike)}</td>
+          <td>${fmt(s.entry)}</td>
+          <td>${fmt(s.stop_loss)}</td>
+          <td>${fmt(s.risk_pct)}%</td>
+          <td>${s.ema13_high != null ? fmt(s.ema13_high) : '—'}</td>
+          <td>${ohlc}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderOptionsAnalysisTable(body, emptyEl, metaEl, rows, label) {
+      if (!body) return;
+      if (!rows.length) {
+        body.innerHTML = '';
+        if (emptyEl) {
+          emptyEl.style.display = 'block';
+          emptyEl.textContent = rows === null ? 'No data yet. Click Refresh signals.' : `No ${label} bars.`;
+        }
+        if (metaEl) metaEl.textContent = `0 bar(s) · 0 signal(s)`;
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = 'none';
+      const signalCount = rows.filter(r => r.signal).length;
+      const primaryCount = rows.filter(r => r.primary_signal || r.signal_type === 'primary').length;
+      const altCount = rows.filter(r => r.doji_strong_signal || r.signal_type === 'doji_strong').length;
+      const clusterCount = rows.filter(r => r.cluster_breakout_signal || r.signal_type === 'cluster_breakout').length;
+      const sidewaysCount = rows.filter(r => r.sideways_breakout_signal || r.signal_type === 'sideways_breakout').length;
+      if (metaEl) {
+        let txt = `${rows.length} bar(s) · ${signalCount} signal(s)`;
+        const bits = [];
+        if (primaryCount) bits.push(`${primaryCount} primary`);
+        if (altCount) bits.push(`${altCount} doji→strong`);
+        if (clusterCount) bits.push(`${clusterCount} cluster+vol`);
+        if (sidewaysCount) bits.push(`${sidewaysCount} sideways brk`);
+        if (bits.length) txt += ` (${bits.join(', ')})`;
+        metaEl.textContent = txt;
+      }
+      body.innerHTML = rows.map(r => {
+        const sigCls = r.signal ? 'ot-signal-row' : '';
+        const statusCls = r.signal ? 'sig-buy' : 'sig-no';
+        let sigLabel = 'N';
+        if (r.signal) {
+          if (r.signal_type === 'doji_strong') sigLabel = 'Doji';
+          else if (r.signal_type === 'cluster_breakout') sigLabel = 'Cluster';
+          else if (r.signal_type === 'sideways_breakout') sigLabel = 'Sideways';
+          else if (r.signal_type === 'primary') sigLabel = 'Primary';
+          else sigLabel = 'Y';
+        }
+        return `<tr class="${sigCls}">
+          <td class="ts">${shortTs(r.timestamp)}</td>
+          <td class="num">${fmt(r.open)}</td>
+          <td class="num">${fmt(r.high)}</td>
+          <td class="num">${fmt(r.low)}</td>
+          <td class="num">${fmt(r.close)}</td>
+          <td class="num">${fmt(r.ema13_high)}</td>
+          <td>${yn(r.close_above_ema)}</td>
+          <td>${yn(r.no_top_wick != null ? r.no_top_wick : r.marubozu)}</td>
+          <td>${yn(r.prior_consolidation)}</td>
+          <td title="${r.prior4_high != null ? 'Prior 4 high: ' + fmt(r.prior4_high) : ''}">${yn(r.close_above_prior4)}</td>
+          <td>${yn(r.is_doji)}</td>
+          <td>${yn(r.is_strong)}</td>
+          <td>${yn(r.prior_doji)}</td>
+          <td>${yn(r.ema_not_extended)}</td>
+          <td title="${r.cluster_high != null ? 'Cluster high: ' + fmt(r.cluster_high) : ''}">${yn(r.range_cluster)}</td>
+          <td>${yn(r.clears_cluster)}</td>
+          <td>${yn(r.volume_above_ema20)}</td>
+          <td title="${r.sideways_cluster_high != null ? 'Sideways high: ' + fmt(r.sideways_cluster_high) + (r.sideways_cluster_bars != null ? ' (' + r.sideways_cluster_bars + ' bars)' : '') : ''}">${yn(r.sideways_cluster)}</td>
+          <td>${yn(r.breakout_expansion)}</td>
+          <td>${yn(r.clears_sideways_cluster)}</td>
+          <td class="num">${r.risk_pct != null ? fmt(r.risk_pct) + '%' : '—'}</td>
+          <td>${sigLabel !== 'N' ? `<span class="sig-buy">${sigLabel}</span>` : yn(false)}</td>
+          <td class="${statusCls}" style="max-width:200px;font-size:0.76rem;">${fmt(r.status)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderOptionsTradingPayload(d) {
+      optionsTradingRawPayload = d;
+      const defs = d.signal_types || optionsSignalTypeDefs;
+      if (defs?.length) {
+        optionsSignalTypeDefs = normalizeSignalTypeDefs(defs);
+        if (!Object.keys(optionsConditionToggles).length) {
+          optionsConditionToggles = loadConditionToggles(optionsSignalTypeDefs);
+        }
+      }
+      renderOptionsSignalTypes(optionsSignalTypeDefs);
+
+      const hasChecks = (d.analysis?.CE?.[0]?.condition_checks) || (d.analysis?.PE?.[0]?.condition_checks);
+      const filtered = hasChecks ? buildFilteredOptionsView(d) : {
+        signals: d.signals || [],
+        ceRows: (d.analysis?.CE || []).map(r => ({ ...r })),
+        peRows: (d.analysis?.PE || []).map(r => ({ ...r })),
+      };
+
+      const ceSignals = filtered.signals.filter(s => s.option_type === 'CE');
+      const peSignals = filtered.signals.filter(s => s.option_type === 'PE');
+      const snaps = d.bars != null ? d.bars : (d.snapshots != null ? d.snapshots : '—');
+      const sources = d.ohlc_sources || {};
+      const srcTxt = Object.keys(sources).length
+        ? ` · OHLC: CE=${fmt(sources.CE)}, PE=${fmt(sources.PE)}`
+        : '';
+      const msg = d.message ? ` · ${d.message}` : '';
+      const toggleNote = hasChecks ? ' · conditions filtered live' : ' · refresh to enable condition toggles';
+      optionsTradingMeta.textContent = `Trade date ${fmt(d.trade_date)} · ${snaps} analysis bar(s)${srcTxt}${toggleNote}${msg}`;
+
+      renderOptionsSignalTable(optionsTradingCeBody, optionsTradingCeEmpty, optionsTradingCeMeta, ceSignals, 'CE');
+      renderOptionsSignalTable(optionsTradingPeBody, optionsTradingPeEmpty, optionsTradingPeMeta, peSignals, 'PE');
+
+      const ceRows = filtered.ceRows;
+      const peRows = filtered.peRows;
+      const totalSignals = ceRows.filter(r => r.signal).length + peRows.filter(r => r.signal).length;
+      if (optionsAnalysisMeta) {
+        optionsAnalysisMeta.textContent = `${ceRows.length + peRows.length} bar(s) total · ${totalSignals} signal bar(s)`;
+      }
+      renderOptionsAnalysisTable(optionsAnalysisCeBody, optionsAnalysisCeEmpty, optionsAnalysisCeMeta, ceRows, 'CE');
+      renderOptionsAnalysisTable(optionsAnalysisPeBody, optionsAnalysisPeEmpty, optionsAnalysisPeMeta, peRows, 'PE');
+    }
+
+    async function loadOptionsTrading() {
+      if (!optionsTradingCeBody && !optionsTradingPeBody) return;
+      try {
+        const r = await fetch(apiUrl('/api/options-trading/signals'));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'Failed to load options signals');
+        renderOptionsTradingPayload(d);
+      } catch (e) {
+        optionsTradingMeta.textContent = 'Error: ' + e.message;
+        renderOptionsSignalTable(optionsTradingCeBody, optionsTradingCeEmpty, optionsTradingCeMeta, [], 'CE');
+        renderOptionsSignalTable(optionsTradingPeBody, optionsTradingPeEmpty, optionsTradingPeMeta, [], 'PE');
+        renderOptionsAnalysisTable(optionsAnalysisCeBody, optionsAnalysisCeEmpty, optionsAnalysisCeMeta, null, 'CE');
+        renderOptionsAnalysisTable(optionsAnalysisPeBody, optionsAnalysisPeEmpty, optionsAnalysisPeMeta, null, 'PE');
+      }
+    }
+
+    if (btnRefreshOptionsTrading) {
+      btnRefreshOptionsTrading.addEventListener('click', async () => {
+        btnRefreshOptionsTrading.disabled = true;
+        try {
+          const r = await fetch(apiUrl('/api/options-trading/refresh'), { method: 'POST' });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.detail || 'Refresh failed');
+          renderOptionsTradingPayload(d.signals || d);
+          setStatus('Options trading signals refreshed.', true);
+        } catch (e) {
+          setStatus('Error: ' + e.message, false);
+        } finally {
+          btnRefreshOptionsTrading.disabled = false;
+        }
+      });
     }
 
     function sigClass(s) {
@@ -426,17 +1109,21 @@
 
     btnRefresh.addEventListener('click', async () => {
       btnRefresh.disabled = true;
-      setStatus('Refreshing...', null);
+      const td = getTradeDate();
+      const today = new Date().toISOString().slice(0, 10);
+      const forPast = td && td !== today;
+      setStatus(forPast ? `Refreshing for ${td}…` : 'Refreshing...', null);
       try {
         const r = await fetch('/api/refresh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ underlying: getUnderlying() }),
+          body: JSON.stringify({ underlying: getUnderlying(), trade_date: td }),
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.detail || 'Refresh failed');
-        setStatus('Refresh complete.', true);
+        setStatus(data.message || 'Refresh complete.', true);
         await loadSignals();
+        await loadOptionsTrading();
         if (data.huge_move) renderHugeMove(data.huge_move);
       } catch (e) {
         setStatus('Error: ' + e.message, false);
@@ -491,6 +1178,8 @@
         document.getElementById(id).classList.add('active');
         if (t.dataset.tab === 'trade-summary') loadTradeSummary();
         if (t.dataset.tab === 'analysis') { loadAnalysis(); loadHugeMove(); }
+        if (t.dataset.tab === 'market-overview') loadMarketOverview();
+        if (t.dataset.tab === 'options-trading') loadOptionsTrading();
       });
     });
     document.getElementById('btnRefreshSummary').addEventListener('click', loadTradeSummary);
@@ -498,6 +1187,7 @@
     if (underlyingSelect) {
       underlyingSelect.addEventListener('change', () => {
         loadSignals();
+        loadOptionsTrading();
         const activeTab = document.querySelector('.tab.active');
         if (activeTab?.dataset.tab === 'trade-summary') loadTradeSummary();
         if (activeTab?.dataset.tab === 'analysis') loadAnalysis();
@@ -952,8 +1642,341 @@
       });
     }
 
+    // -------------------- Market Overview --------------------
+
+    const btnRefreshMarketOverview = document.getElementById('btnRefreshMarketOverview');
+    const moRefreshFiiDii = document.getElementById('moRefreshFiiDii');
+
+    function moNum(v, opts = {}) {
+      if (v == null || v === '' || (typeof v === 'number' && Number.isNaN(v))) return '—';
+      const n = typeof v === 'number' ? v : parseFloat(v);
+      if (!Number.isFinite(n)) return String(v);
+      const decimals = opts.decimals != null ? opts.decimals : 2;
+      const sign = opts.sign && n > 0 ? '+' : '';
+      return sign + n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    function moDir(n) {
+      if (n == null || Number.isNaN(n)) return 'flat';
+      if (n > 0) return 'up';
+      if (n < 0) return 'down';
+      return 'flat';
+    }
+
+    function moChgCls(n) {
+      const d = moDir(n);
+      if (d === 'up') return 'pnl-positive';
+      if (d === 'down') return 'pnl-negative';
+      return '';
+    }
+
+    function moRenderPriceBlock(node, title) {
+      if (!node || node.error || node.last == null) {
+        return `<p class="mo-empty">${node && node.error ? 'Source error: ' + node.error : 'No data.'}</p>`;
+      }
+      const chgCls = moChgCls(node.change);
+      const chgPctCls = moChgCls(node.change_pct);
+      const sub = [];
+      if (node.prev_close != null) sub.push('Prev close ' + moNum(node.prev_close));
+      if (node.open != null) sub.push('Open ' + moNum(node.open));
+      if (node.high != null) sub.push('High ' + moNum(node.high));
+      if (node.low != null) sub.push('Low ' + moNum(node.low));
+      if (node.market_state) sub.push(node.market_state);
+      if (node.as_of) sub.push(String(node.as_of).replace('T', ' ').slice(0, 16) + ' UTC');
+      return `
+        <div class="mo-big-row">
+          <span class="price">${moNum(node.last)}</span>
+          <span class="chg ${chgCls}">${moNum(node.change, { sign: true })}</span>
+          <span class="chg ${chgPctCls}">${moNum(node.change_pct, { sign: true })}%</span>
+        </div>
+        <div class="mo-sub">${sub.filter(Boolean).join(' · ') || '&nbsp;'}</div>
+      `;
+    }
+
+    function moGradeFromPct(pct) {
+      if (pct == null || pct === '' || Number.isNaN(parseFloat(pct))) {
+        return { grade_key: 'unknown', grade_label: '—' };
+      }
+      const p = parseFloat(pct);
+      if (p < -1.5) return { grade_key: 'extremely_bearish', grade_label: 'Extremely Bearish' };
+      if (p < -0.5) return { grade_key: 'bearish', grade_label: 'Bearish' };
+      if (p <= 0.5) return { grade_key: 'neutral', grade_label: 'Neutral' };
+      if (p <= 1.5) return { grade_key: 'bullish', grade_label: 'Bullish' };
+      return { grade_key: 'extremely_bullish', grade_label: 'Extremely Bullish' };
+    }
+
+    function moGradeBadge(row) {
+      const key = row.grade_key || moGradeFromPct(row.change_pct).grade_key;
+      const label = row.grade_label || moGradeFromPct(row.change_pct).grade_label;
+      if (key === 'unknown') return '<span class="mo-grade unknown">—</span>';
+      return `<span class="mo-grade ${key}">${label}</span>`;
+    }
+
+    function moRenderGradeSummary(summaryElId, summary) {
+      const el = document.getElementById(summaryElId);
+      if (!el) return;
+      const s = summary || {};
+      const items = [
+        ['extremely_bearish', 'Extremely Bearish'],
+        ['bearish', 'Bearish'],
+        ['neutral', 'Neutral'],
+        ['bullish', 'Bullish'],
+        ['extremely_bullish', 'Extremely Bullish'],
+      ];
+      const chips = items
+        .filter(([k]) => (s[k] || 0) > 0)
+        .map(([k, lbl]) => `<span class="mo-grade ${k}">${lbl}: ${s[k]}</span>`)
+        .join('');
+      el.innerHTML = chips || '<span class="mo-sub">No graded rows.</span>';
+    }
+
+    function moRenderQuoteTable(rows, opts = {}) {
+      const withMonth = !!opts.withMonth;
+      const colCount = withMonth ? 9 : 8;
+      if (!rows || !rows.length) return `<tr><td colspan="${colCount}" class="mo-empty">No data.</td></tr>`;
+      const sorted = [...rows].sort((a, b) => {
+        const ap = a.change_pct != null ? parseFloat(a.change_pct) : -Infinity;
+        const bp = b.change_pct != null ? parseFloat(b.change_pct) : -Infinity;
+        return bp - ap;
+      });
+      return sorted.map(r => {
+        const chg = r.change;
+        const chgPct = r.change_pct;
+        const chgCls = moChgCls(chg);
+        const chgPctCls = moChgCls(chgPct);
+        const tagCls = chgPct == null ? '' : chgPct > 0 ? 'up' : chgPct < 0 ? 'down' : '';
+        const grade = moGradeFromPct(chgPct);
+        const gradeKey = r.grade_key || grade.grade_key;
+        const ts = r.as_of ? String(r.as_of).replace('T', ' ').slice(0, 19) : '—';
+        const name = r.name || r.symbol || '—';
+        const nameCell = r.url
+          ? `<a href="${(r.url.startsWith('http') ? '' : 'https://in.investing.com') + r.url}" target="_blank" rel="noopener">${name}</a>`
+          : name;
+        const monthCell = withMonth ? `<td>${r.month || '—'}</td>` : '';
+        return `<tr class="mo-row-${gradeKey}">
+          <td>${nameCell}</td>
+          ${monthCell}
+          <td>${moNum(r.last)}</td>
+          <td>${moNum(r.high)}</td>
+          <td>${moNum(r.low)}</td>
+          <td class="${chgCls}">${moNum(chg, { sign: true })}</td>
+          <td class="${chgPctCls}"><span class="mo-tag ${tagCls}">${moNum(chgPct, { sign: true })}%</span></td>
+          <td>${moGradeBadge(r)}</td>
+          <td>${ts}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function moApplyQuoteBlock(titleId, bodyId, block, opts = {}) {
+      const title = document.getElementById(titleId);
+      const body = document.getElementById(bodyId);
+      const baseTitle = opts.title || title.textContent.split(' · ')[0];
+      const url = block && block.source_url;
+      const rows = (block && block.rows) || [];
+      const src = url ? ` · <a href="${url}" target="_blank" rel="noopener" style="font-size:0.75rem;color:#93c5fd;text-decoration:none;">source ↗</a>` : '';
+      const staleTag = block && block.stale ? ' · <span class="mo-tag down" title="Latest fetch failed; showing last-good rows">stale</span>' : '';
+      title.innerHTML = baseTitle + src + staleTag;
+      if (opts.summaryId) moRenderGradeSummary(opts.summaryId, block && block.grade_summary);
+      const colCount = opts.withMonth ? 9 : 8;
+      if (!rows.length) {
+        const reason = block && block.error
+          ? `Investing.com fetch failed (${block.error}). Click Refresh to retry — Cloudflare sometimes throttles the first call.`
+          : 'No data yet. Click Refresh.';
+        body.innerHTML = `<tr><td colspan="${colCount}" class="mo-empty">${reason}</td></tr>`;
+        return;
+      }
+      body.innerHTML = moRenderQuoteTable(rows, opts);
+    }
+
+    function moRenderFiiDii(block) {
+      const summaryEl = document.getElementById('moFiiDiiSummary');
+      const rowsEl = document.getElementById('moFiiDiiRows');
+      if (!block || block.error) {
+        summaryEl.innerHTML = '';
+        rowsEl.innerHTML = `<tr><td colspan="7" class="mo-empty">${block && block.error ? 'No FII/DII cache. Tick the box and Refresh to pull from NSE.' : 'No data.'}</td></tr>`;
+        return;
+      }
+      const sum = block.summary || {};
+      const cards = [
+        { label: 'FII Net (5d)', val: sum.fii_net_5d },
+        { label: 'FII Net (10d)', val: sum.fii_net_10d },
+        { label: 'FII Net (30d)', val: sum.fii_net_30d },
+        { label: 'DII Net (5d)', val: sum.dii_net_5d },
+        { label: 'DII Net (10d)', val: sum.dii_net_10d },
+        { label: 'DII Net (30d)', val: sum.dii_net_30d },
+      ];
+      summaryEl.innerHTML = cards.map(c => {
+        const cls = moChgCls(c.val);
+        return `<div class="mo-flow-card"><div class="label">${c.label}</div><div class="val ${cls}">${c.val != null ? moNum(c.val, { sign: true, decimals: 0 }) : '—'}</div></div>`;
+      }).join('');
+      const rows = block.recent_rows || [];
+      if (!rows.length) {
+        rowsEl.innerHTML = '<tr><td colspan="7" class="mo-empty">No daily rows.</td></tr>';
+        return;
+      }
+      rowsEl.innerHTML = rows.map(r => {
+        const fNet = r.fii_net;
+        const dNet = r.dii_net;
+        return `<tr>
+          <td>${r.date || '—'}</td>
+          <td>${moNum(r.fii_buy, { decimals: 0 })}</td>
+          <td>${moNum(r.fii_sell, { decimals: 0 })}</td>
+          <td class="${moChgCls(fNet)}">${moNum(fNet, { sign: true, decimals: 0 })}</td>
+          <td>${moNum(r.dii_buy, { decimals: 0 })}</td>
+          <td>${moNum(r.dii_sell, { decimals: 0 })}</td>
+          <td class="${moChgCls(dNet)}">${moNum(dNet, { sign: true, decimals: 0 })}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function moSentClass(label) {
+      const u = String(label || '').toUpperCase();
+      if (u === 'POSITIVE') return 'pos';
+      if (u === 'NEGATIVE') return 'neg';
+      return 'neu';
+    }
+
+    function moSentBadge(label, score) {
+      const cls = moSentClass(label);
+      const lbl = String(label || 'NEUTRAL').toUpperCase();
+      const scoreTxt = score != null && !Number.isNaN(parseFloat(score))
+        ? ' ' + (parseFloat(score) > 0 ? '+' : '') + parseFloat(score).toFixed(2)
+        : '';
+      return `<span class="mo-sent ${cls}" title="Sentiment ${lbl}${scoreTxt}">${lbl}${scoreTxt}</span>`;
+    }
+
+    function moRenderNews(news) {
+      const el = document.getElementById('moNews');
+      // Backwards-compat: accept either {groups, overall} or a bare array.
+      const groups = Array.isArray(news) ? news : (news && news.groups) || [];
+      const overall = (news && !Array.isArray(news) && news.overall) || null;
+      if (!groups.length) { el.innerHTML = '<p class="mo-empty">No news.</p>'; return; }
+      const overallBanner = overall ? `
+        <div class="mo-sent-banner">
+          <span class="label">Stock-market sentiment</span>
+          ${moSentBadge(overall.label, overall.score)}
+          <span class="counts">${overall.positive || 0} positive · ${overall.negative || 0} negative · ${overall.neutral || 0} neutral · ${overall.articles || 0} headlines</span>
+        </div>
+      ` : '';
+      const groupsHtml = groups.map(g => {
+        const items = (g.items || []).map(it => {
+          const when = it.published ? String(it.published).replace('T', ' ').slice(0, 16) + ' UTC' : '';
+          return `<li>${moSentBadge(it.sentiment, it.sentiment_score)} <a href="${it.url}" target="_blank" rel="noopener">${it.title}</a>${it.source ? `<span class="src">— ${it.source}</span>` : ''}${when ? `<span class="src">· ${when}</span>` : ''}</li>`;
+        }).join('') || '<li class="mo-empty">No headlines in window.</li>';
+        const groupSent = g.sentiment;
+        const groupBadge = groupSent ? `${moSentBadge(groupSent.label, groupSent.score)} <span class="src">(${groupSent.positive || 0}↑ / ${groupSent.negative || 0}↓ / ${groupSent.neutral || 0}·)</span>` : '';
+        return `<div class="mo-news-group"><h4>${g.topic} ${groupBadge}</h4><ul>${items}</ul></div>`;
+      }).join('');
+      el.innerHTML = overallBanner + groupsHtml;
+    }
+
+    function moRenderNiftyPlan(plan) {
+      const el = document.getElementById('moNiftyPlan');
+      if (!plan) { el.innerHTML = '<p class="mo-empty">No plan data.</p>'; return; }
+      const lvl = plan.levels || {};
+      const sig = plan.latest_signal;
+      const sc = plan.signal_counts || {};
+      const bias = plan.dominant_bias;
+      const sigBlock = sig ? `
+        <div style="margin-top:0.5rem;font-size:0.85rem;">
+          <span class="badge ${sig.signal === 'BUY' ? 'badge-bull' : sig.signal === 'SELL' ? 'badge-bear' : 'badge-neutral'}">${sig.signal || '—'}</span>
+          <span style="color:#a1a1aa;margin-left:0.3rem;">@ ${String(sig.timestamp || '').replace('T', ' ').slice(0, 16) || '—'}</span>
+          <div style="margin-top:0.4rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.5rem;">
+            <div class="mo-flow-card"><div class="label">Entry</div><div class="val">${moNum(sig.entry)}</div></div>
+            <div class="mo-flow-card"><div class="label">Target</div><div class="val pnl-positive">${moNum(sig.target)}</div></div>
+            <div class="mo-flow-card"><div class="label">Stop</div><div class="val pnl-negative">${moNum(sig.stop_loss)}</div></div>
+            <div class="mo-flow-card"><div class="label">R:R</div><div class="val">${moNum(sig.rr)}</div></div>
+            <div class="mo-flow-card"><div class="label">Conf</div><div class="val">${moNum(sig.confidence)}</div></div>
+            <div class="mo-flow-card"><div class="label">Bias</div><div class="val">${sig.bias || '—'}</div></div>
+            <div class="mo-flow-card"><div class="label">Strike</div><div class="val">${sig.strike_price || '—'} ${sig.option_type || ''}</div></div>
+            <div class="mo-flow-card"><div class="label">Option entry / SL / Tgt</div><div class="val" style="font-size:0.85rem;">${moNum(sig.option_entry)} / ${moNum(sig.option_sl)} / ${moNum(sig.option_target)}</div></div>
+          </div>
+        </div>
+      ` : '<p class="mo-empty" style="margin-top:0.5rem;">No actionable BUY/SELL signal stored yet. Use Refresh on the Signals tab to fetch today\'s candles.</p>';
+      el.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.5rem;">
+          <div class="mo-flow-card"><div class="label">Spot</div><div class="val">${moNum(lvl.spot)}</div></div>
+          <div class="mo-flow-card"><div class="label">Open</div><div class="val">${moNum(lvl.open)}</div></div>
+          <div class="mo-flow-card"><div class="label">Session High</div><div class="val">${moNum(lvl.session_high)}</div></div>
+          <div class="mo-flow-card"><div class="label">Session Low</div><div class="val">${moNum(lvl.session_low)}</div></div>
+          <div class="mo-flow-card"><div class="label">Support</div><div class="val">${moNum(lvl.support)}</div></div>
+          <div class="mo-flow-card"><div class="label">Resistance</div><div class="val">${moNum(lvl.resistance)}</div></div>
+          <div class="mo-flow-card"><div class="label">VWAP</div><div class="val">${moNum(lvl.vwap)}</div></div>
+          <div class="mo-flow-card"><div class="label">Dominant Bias</div><div class="val">${bias || '—'}</div></div>
+          <div class="mo-flow-card"><div class="label">BUY / SELL / NO</div><div class="val" style="font-size:0.95rem;">${sc.BUY || 0} / ${sc.SELL || 0} / ${sc.NO_TRADE || 0}</div></div>
+        </div>
+        ${sigBlock}
+        ${plan.error ? `<p class="mo-empty" style="margin-top:0.5rem;color:#f87171;">${plan.error}</p>` : ''}
+      `;
+    }
+
+    function moRenderAll(data) {
+      const meta = document.getElementById('moMeta');
+      if (!data || data.empty) {
+        meta.textContent = data?.message || 'No data yet.';
+      } else {
+        const parts = [];
+        if (data.trade_date) parts.push('Date ' + data.trade_date);
+        if (data.generated_at) parts.push('Built ' + String(data.generated_at).replace('T', ' '));
+        meta.textContent = parts.join(' · ');
+      }
+      document.getElementById('moGiftNifty').innerHTML = moRenderPriceBlock(data?.gift_nifty);
+      document.getElementById('moVix').innerHTML = moRenderPriceBlock(data?.india_vix);
+      moRenderNiftyPlan(data?.nifty_plan);
+      moApplyQuoteBlock('moGlobalIndicesTitle', 'moGlobalIndices', data?.global_indices, {
+        title: 'Global Indices',
+        summaryId: 'moGlobalIndicesSummary',
+      });
+      moApplyQuoteBlock('moCommoditiesTitle', 'moCommodities', data?.commodities_macro, {
+        title: 'Commodities',
+        withMonth: true,
+        summaryId: 'moCommoditiesSummary',
+      });
+      moRenderFiiDii(data?.fii_dii);
+      moRenderNews(data?.news);
+    }
+
+    async function loadMarketOverview() {
+      try {
+        const r = await fetch(apiUrl('/api/market-overview'));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'Failed to load');
+        moRenderAll(d);
+      } catch (e) {
+        document.getElementById('moMeta').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    if (btnRefreshMarketOverview) {
+      btnRefreshMarketOverview.addEventListener('click', async () => {
+        btnRefreshMarketOverview.disabled = true;
+        const meta = document.getElementById('moMeta');
+        meta.textContent = 'Refreshing… global indices + news can take ~20s.';
+        try {
+          const td = getTradeDate();
+          const params = new URLSearchParams({
+            trade_date: td,
+            refresh_fii_dii: moRefreshFiiDii && moRefreshFiiDii.checked ? 'true' : 'false',
+          });
+          const r = await fetch('/api/market-overview/refresh?' + params.toString(), { method: 'POST' });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.detail || 'Refresh failed');
+          moRenderAll(d);
+          setStatus('Market overview refreshed.', true);
+        } catch (e) {
+          meta.textContent = 'Error: ' + e.message;
+          setStatus('Error: ' + e.message, false);
+        } finally {
+          btnRefreshMarketOverview.disabled = false;
+        }
+      });
+    }
+
     initDatePicker();
-    loadUnderlyings().then(() => loadSignals());
+    loadUnderlyings().then(() => {
+      loadOptionsTrading();
+      loadSignals();
+    });
   </script>
 </body>
 </html>
