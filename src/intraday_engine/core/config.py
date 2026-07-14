@@ -98,7 +98,7 @@ class Settings:
             min_day_range_pct=_ef("MIN_DAY_RANGE_PCT", "min_day_range_pct", 0.40),
             data_dir=data_dir,
             log_level=_es_log("LOG_LEVEL", "log_level", "INFO"),
-            daily_sl_rupees=_ef("DAILY_SL_RUPEES", "daily_sl_rupees", 4000.0),
+            daily_sl_rupees=_ef("DAILY_SL_RUPEES", "daily_sl_rupees", 1500.0),
             default_sl_points=_ef("DEFAULT_SL_POINTS", "default_sl_points", 10.0),
         )
 

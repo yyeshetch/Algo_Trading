@@ -203,7 +203,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "max_stop_pct_short": _L(0.65, "float", "Max stop distance (% of spot) for shorts.", "MAX_STOP_PCT_SHORT"),
         "option_stop_ratio": _L(0.35, "float", "Option premium stop as fraction of entry.", "OPTION_STOP_RATIO"),
         "min_day_range_pct": _L(0.40, "float", "Min session range (% of spot) to avoid sideways chop filter.", "MIN_DAY_RANGE_PCT"),
-        "daily_sl_rupees": _L(4000, "float", "Daily loss cap (rupees) for dashboard / risk.", "DAILY_SL_RUPEES"),
+        "daily_sl_rupees": _L(1500, "float", "Daily loss cap (rupees) for dashboard / risk.", "DAILY_SL_RUPEES"),
         "default_sl_points": _L(10, "float", "Default SL distance in points when not specified.", "DEFAULT_SL_POINTS"),
         "log_level": _L("INFO", "str", "Logging level (DEBUG, INFO, …). Overridden by env LOG_LEVEL if set.", "LOG_LEVEL"),
     },

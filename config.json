@@ -60,13 +60,13 @@
       "env": "MIN_DAY_RANGE_PCT"
     },
     "daily_sl_rupees": {
-      "value": 4000,
+      "value": 1500.0,
       "type": "float",
       "help": "Daily loss cap (rupees) for dashboard / risk.",
       "env": "DAILY_SL_RUPEES"
     },
     "default_sl_points": {
-      "value": 10,
+      "value": 10.0,
       "type": "float",
       "help": "Default SL distance in points when not specified.",
       "env": "DEFAULT_SL_POINTS"

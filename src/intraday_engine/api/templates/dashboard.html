@@ -287,12 +287,17 @@
         </div>
         <div style="display:flex;flex-direction:column;gap:0.45rem;justify-content:center;">
           <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;cursor:pointer;">
-            <input type="checkbox" id="autoTradeEnabled" style="width:1rem;height:1rem;">
+            <input type="checkbox" id="autoTradeEnabled" checked style="width:1rem;height:1rem;">
             <span><strong>Auto Entry</strong> — place orders on new signals (1 lot default)</span>
           </label>
           <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;cursor:pointer;">
-            <input type="checkbox" id="rrTrailEnabled" style="width:1rem;height:1rem;">
+            <input type="checkbox" id="rrTrailEnabled" checked style="width:1rem;height:1rem;">
             <span><strong>1:3 RR Trail</strong> — lock SL at 1R, then trail on 5-min swing low</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;">
+            <span><strong>Max loss / day</strong></span>
+            <span>₹</span>
+            <input type="number" id="dailyMaxLoss" min="100" max="100000" step="100" value="1500" style="width:5.5rem;padding:0.2rem 0.35rem;background:#1a1a22;border:1px solid #3f3f46;border-radius:4px;color:#e4e4e7;">
           </label>
         </div>
         <div style="font-size:0.72rem;color:#a1a1aa;display:flex;flex-direction:column;justify-content:center;gap:0.2rem;">
@@ -530,7 +535,7 @@
       <div>
         <h2 style="margin: 0 0 0.5rem;">Day Points</h2>
         <p id="dayPnl" style="font-size: 1.5rem; margin: 0.5rem 0;">—</p>
-        <p id="slStatus" style="font-size: 0.875rem; color: #a1a1aa; margin: 0;">Daily SL: ₹4,000</p>
+        <p id="slStatus" style="font-size: 0.875rem; color: #a1a1aa; margin: 0;">Max loss: ₹1,500 / day</p>
       </div>
       <button class="btn btn-refresh" id="btnRefreshSummary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Refresh</button>
     </div>
@@ -1485,8 +1490,10 @@
     async function loadAutoTradeConfig() {
       const autoCb = document.getElementById('autoTradeEnabled');
       const rrCb = document.getElementById('rrTrailEnabled');
+      const maxLossInput = document.getElementById('dailyMaxLoss');
       const statusEl = document.getElementById('autoTradeStatus');
       const lastEl = document.getElementById('autoTradeLastRun');
+      const slEl = document.getElementById('slStatus');
       if (!autoCb || !rrCb) return;
       try {
         const r = await fetch(apiUrl('/api/auto-trade/config'));
@@ -1495,9 +1502,18 @@
         autoCb.checked = !!d.auto_trade_enabled;
         rrCb.checked = !!d.rr_trail_enabled;
         if (lotsInput && d.lots != null) lotsInput.value = d.lots;
+        if (maxLossInput && d.daily_max_loss != null) maxLossInput.value = d.daily_max_loss;
         const entryOn = d.auto_trade_enabled ? 'ON' : 'OFF';
         const trailOn = d.rr_trail_enabled ? 'ON' : 'OFF';
-        statusEl.innerHTML = `Auto Entry: <span style="color:${d.auto_trade_enabled ? '#22c55e' : '#71717a'}">${entryOn}</span> · RR Trail: <span style="color:${d.rr_trail_enabled ? '#22c55e' : '#71717a'}">${trailOn}</span>`;
+        const maxLoss = d.daily_max_loss != null ? d.daily_max_loss : 1500;
+        statusEl.innerHTML = `Auto Entry: <span style="color:${d.auto_trade_enabled ? '#22c55e' : '#71717a'}">${entryOn}</span> · RR Trail: <span style="color:${d.rr_trail_enabled ? '#22c55e' : '#71717a'}">${trailOn}</span> · Max loss: <span style="color:#fca5a5;">₹${Number(maxLoss).toLocaleString()}</span>${d.sl_reached ? ' <span style="color:#ef4444;">(HIT)</span>' : ''}`;
+        if (slEl) {
+          const pnlTxt = d.day_pnl != null ? ` · P&L ₹${Number(d.day_pnl).toLocaleString()}` : '';
+          slEl.textContent = `Max loss: ₹${Number(maxLoss).toLocaleString()} / day${pnlTxt}${d.sl_reached ? ' — REACHED, no further auto trades' : ''}`;
+          if (d.sl_reached) slEl.style.color = '#ef4444';
+          else if (d.day_pnl != null && d.day_pnl < 0) slEl.style.color = '#fca5a5';
+          else slEl.style.color = '#a1a1aa';
+        }
         const lr = d.last_run_status;
         const execN = (lr && lr.executed) ? lr.executed.length : 0;
         const errN = (lr && lr.errors) ? lr.errors.length : 0;
@@ -1551,6 +1567,16 @@
         const n = Math.max(1, Math.min(100, parseInt(lotsInput.value, 10) || 1));
         lotsInput.value = n;
         saveAutoTradeConfig({ lots: n }).catch(() => {});
+      });
+    }
+    const dailyMaxLossInput = document.getElementById('dailyMaxLoss');
+    if (dailyMaxLossInput) {
+      dailyMaxLossInput.addEventListener('change', () => {
+        const n = Math.max(100, Math.min(100000, parseInt(dailyMaxLossInput.value, 10) || 1500));
+        dailyMaxLossInput.value = n;
+        saveAutoTradeConfig({ daily_max_loss: n })
+          .then(() => setStatus(`Max daily loss set to ₹${n.toLocaleString()}.`, true))
+          .catch(() => {});
       });
     }
 
@@ -1796,7 +1822,11 @@
         if (d.day_pnl != null) {
           pnlEl.classList.add(d.day_pnl >= 0 ? 'pnl-positive' : 'pnl-negative');
         }
-        slEl.textContent = `Daily SL: ₹${(d.daily_sl || 4000).toLocaleString()}${d.sl_reached ? ' (REACHED — no further trades)' : ''}`;
+        slEl.textContent = `Max loss: ₹${(d.daily_sl || 1500).toLocaleString()} / day${d.day_pnl != null ? ' · P&L ₹' + Number(d.day_pnl).toLocaleString() : ''}${d.sl_reached ? ' — REACHED, no further trades' : ''}`;
+        if (d.sl_reached) slEl.style.color = '#ef4444';
+        else slEl.style.color = '#a1a1aa';
+        const maxLossInput = document.getElementById('dailyMaxLoss');
+        if (maxLossInput && d.daily_sl != null) maxLossInput.value = d.daily_sl;
         const orders = d.orders || [];
         document.getElementById('ordersBody').innerHTML = orders.map(o => {
           const t = o.order_timestamp || o.exchange_timestamp || o.created_at || '—';

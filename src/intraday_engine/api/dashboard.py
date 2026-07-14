@@ -24,6 +24,7 @@ from intraday_engine.core.tunables import (
     apply_value_updates,
     default_config,
     ensure_config_file,
+    invalidate_cache,
     load_config,
     save_config,
     validate_no_unknown_keys,
@@ -280,6 +281,27 @@ def _get_settings(underlying: str | None = None) -> Settings:
 
 def _get_store(underlying: str | None = None) -> DataStore:
     return _get_engine(underlying).store
+
+
+def _invalidate_settings_cache(underlying: str | None = None) -> None:
+    key = _underlying_key(underlying)
+    _settings_cache.pop(key, None)
+
+
+def _set_daily_max_loss(amount: float, underlying: str | None = None) -> float:
+    """Persist daily loss cap to config.json and refresh cached settings."""
+    val = max(100.0, min(100_000.0, float(amount)))
+    cfg = load_config()
+    sec = cfg.get("settings", {})
+    node = sec.get("daily_sl_rupees")
+    if isinstance(node, dict) and "value" in node:
+        node["value"] = val
+    else:
+        sec["daily_sl_rupees"] = {"value": val, "type": "float"}
+    save_config(cfg)
+    invalidate_cache()
+    _invalidate_settings_cache(underlying)
+    return val
 
 
 def _templates_dir() -> Path:
@@ -1431,13 +1453,25 @@ class AutoTradeConfigRequest(BaseModel):
     auto_trade_enabled: bool | None = None
     rr_trail_enabled: bool | None = None
     lots: int | None = None
+    daily_max_loss: float | None = None
     underlying: str | None = None
 
 
 @app.get("/api/auto-trade/config")
 async def api_auto_trade_config_get(underlying: str | None = None):
     store = _get_store(underlying)
+    settings = _get_settings(underlying)
     cfg = get_auto_trade_config(store.data_dir)
+    cfg["daily_max_loss"] = settings.daily_sl_rupees
+    day_pnl = None
+    sl_reached = False
+    try:
+        day_pnl = _get_client(underlying).get_day_pnl()
+        sl_reached = day_pnl is not None and day_pnl <= -settings.daily_sl_rupees
+    except Exception:
+        pass
+    cfg["day_pnl"] = day_pnl
+    cfg["sl_reached"] = sl_reached
     return _sanitize_for_json(cfg)
 
 
@@ -1447,10 +1481,15 @@ async def api_auto_trade_config_post(req: AutoTradeConfigRequest):
     updates = {k: v for k, v in req.model_dump().items() if v is not None and k != "underlying"}
     if "lots" in updates:
         updates["lots"] = max(1, min(100, int(updates["lots"])))
+    if "daily_max_loss" in updates:
+        updates["daily_max_loss"] = _set_daily_max_loss(updates["daily_max_loss"], req.underlying)
     # Allow toggling config anytime; live orders only fire during NSE session.
     if updates.get("auto_trade_enabled") is True and not is_nse_session_active():
         logger.info("Auto entry enabled outside session — orders will wait until %s.", session_label())
-    cfg = update_auto_trade_config(store.data_dir, **updates)
+    auto_updates = {k: v for k, v in updates.items() if k != "daily_max_loss"}
+    cfg = update_auto_trade_config(store.data_dir, **auto_updates) if auto_updates else get_auto_trade_config(store.data_dir)
+    settings = _get_settings(req.underlying)
+    cfg["daily_max_loss"] = settings.daily_sl_rupees
     return _sanitize_for_json({"status": "ok", **cfg})
 
 
