@@ -7,6 +7,7 @@ Primary rules (ATM CE / PE separately):
 - Prior 5 bars: red OPEN / green CLOSE within signal candle [low, close]
 - Close above the high of the prior 4 candles
 - SL at 75% of candle range below close; skip if risk > 20% of premium
+- When swing-low SL (below recent pivot low before entry) is ≤ 12 pts from entry, use that instead
 
 Alternative — doji → strong candle:
 - Prior bar is a doji (body <= 15% of range)
@@ -54,7 +55,10 @@ DOJI_MAX_BODY_PCT_OF_RANGE = 15.0
 STRONG_MIN_BODY_PCT_OF_RANGE = 60.0
 STRONG_MAX_UPPER_WICK_PCT_OF_HIGH = 5.0
 SL_RANGE_FRACTION = 0.75
-MAX_EMA_DISTANCE_PCT_OF_CLOSE = 5.0
+SWING_SL_MAX_POINTS = 12.0
+SWING_SL_LOOKBACK = 30
+SWING_SL_BUFFER = 0.05
+MAX_EMA_DISTANCE_PCT_OF_CLOSE = 7.0
 CLUSTER_RANGE_BARS = 5
 CLUSTER_MAX_WIDTH_PCT = 10.0
 CLUSTER_BAR_MAX_RANGE_PCT = 25.0
@@ -92,7 +96,7 @@ def options_signal_definitions() -> list[dict[str, Any]]:
                     "label": f"Prior {PRIOR_CONSOLIDATION_BARS} bars in close–low band",
                 },
                 {"id": "close_above_prior4", "label": f"Close above prior {PRIOR_HIGH_BARS} highs"},
-                {"id": "entry_above_sl", "label": f"Entry above SL ({SL_RANGE_FRACTION:.0%} of range below close)"},
+                {"id": "entry_above_sl", "label": f"Entry above SL (swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range)"},
                 {"id": "risk_ok", "label": f"Risk ≤ {MAX_RISK_PCT:g}% of premium"},
             ],
         },
@@ -106,7 +110,7 @@ def options_signal_definitions() -> list[dict[str, Any]]:
                     "label": f"Strong bullish (body ≥ {STRONG_MIN_BODY_PCT_OF_RANGE:g}% of range)",
                 },
                 {"id": "ema_not_extended", "label": f"Close not > {MAX_EMA_DISTANCE_PCT_OF_CLOSE:g}% above EMA13(H)"},
-                {"id": "entry_above_sl", "label": f"Entry above SL ({SL_RANGE_FRACTION:.0%} of range below close)"},
+                {"id": "entry_above_sl", "label": f"Entry above SL (swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range)"},
                 {"id": "risk_ok", "label": f"Risk ≤ {MAX_RISK_PCT:g}% of premium"},
             ],
         },
@@ -120,7 +124,7 @@ def options_signal_definitions() -> list[dict[str, Any]]:
                 },
                 {"id": "clears_cluster", "label": "Bullish close above cluster high"},
                 {"id": "volume_above_ema20", "label": f"Volume > EMA{VOLUME_EMA_PERIOD}(volume)"},
-                {"id": "entry_above_sl", "label": f"Entry above SL ({SL_RANGE_FRACTION:.0%} of range below close)"},
+                {"id": "entry_above_sl", "label": f"Entry above SL (swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range)"},
                 {"id": "risk_ok", "label": f"Risk ≤ {MAX_RISK_PCT:g}% of premium"},
             ],
         },
@@ -140,7 +144,7 @@ def options_signal_definitions() -> list[dict[str, Any]]:
                     "label": f"Expansion breakout bar (body ≥ {BREAKOUT_MIN_BODY_PCT:g}% of range)",
                 },
                 {"id": "clears_sideways_cluster", "label": "Bullish close above sideways cluster high"},
-                {"id": "entry_above_sl", "label": f"Entry above SL ({SL_RANGE_FRACTION:.0%} of range below close)"},
+                {"id": "entry_above_sl", "label": f"Entry above SL (swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range)"},
                 {"id": "risk_ok", "label": f"Risk ≤ {MAX_RISK_PCT:g}% of premium"},
             ],
         },
@@ -448,11 +452,54 @@ def _is_range_candle(row: pd.Series) -> bool:
     return body_pct is not None and body_pct <= 35.0
 
 
-def _stop_loss_and_risk(h: float, l: float, c: float) -> tuple[float, float | None]:
+def _is_pivot_swing_low(df: pd.DataFrame, j: int, entry_idx: int) -> bool:
+    """True when bar j is a local low among bars before entry_idx."""
+    if j < 0 or j >= entry_idx:
+        return False
+    low = float(df.iloc[j]["low"])
+    prev_low = float(df.iloc[j - 1]["low"]) if j >= 1 else low
+    if j + 1 < entry_idx:
+        next_low = float(df.iloc[j + 1]["low"])
+        return low <= prev_low and low <= next_low
+    return low <= prev_low
+
+
+def _recent_swing_low_before(df: pd.DataFrame, idx: int) -> float | None:
+    """Most recent pivot swing low strictly before the entry bar."""
+    if idx < 1:
+        return None
+    start = max(1, idx - SWING_SL_LOOKBACK)
+    for j in range(idx - 1, start - 1, -1):
+        if _is_pivot_swing_low(df, j, idx):
+            return float(df.iloc[j]["low"])
+    window = df.iloc[max(0, idx - SWING_SL_LOOKBACK) : idx]
+    if window.empty:
+        return None
+    return float(window["low"].min())
+
+
+def _stop_loss_and_risk(
+    h: float,
+    l: float,
+    c: float,
+    *,
+    df: pd.DataFrame | None = None,
+    idx: int | None = None,
+) -> tuple[float, float | None]:
+    """SL below recent swing low when risk ≤ SWING_SL_MAX_POINTS, else 75% of bar range below close."""
     rng = h - l
     if rng <= 0 or c <= 0:
         return c, None
+
     sl = c - SL_RANGE_FRACTION * rng
+
+    if df is not None and idx is not None:
+        swing_low = _recent_swing_low_before(df, idx)
+        if swing_low is not None:
+            sl_swing = swing_low - SWING_SL_BUFFER
+            if sl_swing < c and (c - sl_swing) <= SWING_SL_MAX_POINTS:
+                sl = sl_swing
+
     risk_pct = (c - sl) / c * 100.0 if c > sl else None
     return sl, risk_pct
 
@@ -556,7 +603,7 @@ def _evaluate_primary_entry(df: pd.DataFrame, idx: int) -> dict[str, Any]:
     no_top_wick = _no_top_wick_bullish(row)
     prior_consolidation = _prior_bars_in_signal_close_low_band(df, idx)
     close_above_prior4, prior4_high = _close_above_prior_highs(df, idx)
-    sl, risk_pct = _stop_loss_and_risk(h, l, c)
+    sl, risk_pct = _stop_loss_and_risk(h, l, c, df=df, idx=idx)
 
     skip: list[str] = []
     if idx < EMA_PERIOD:
@@ -632,7 +679,7 @@ def _evaluate_doji_strong_entry(df: pd.DataFrame, idx: int) -> dict[str, Any]:
     prior_doji = idx >= 1 and _is_doji(df.iloc[idx - 1])
     strong = _is_strong_bullish(row)
     ema_ok, ema_dist_pct = _close_not_extended_above_ema13_high(c, ema) if pd.notna(ema) else (True, None)
-    sl, risk_pct = _stop_loss_and_risk(h, l, c)
+    sl, risk_pct = _stop_loss_and_risk(h, l, c, df=df, idx=idx)
 
     skip: list[str] = []
     if idx < 1:
@@ -693,7 +740,7 @@ def _evaluate_cluster_breakout_entry(df: pd.DataFrame, idx: int) -> dict[str, An
     clears_cluster = has_cluster and cluster_high is not None and c > cluster_high
     bullish = c > o
     vol_ok, vol, ema_vol = _volume_above_ema20(row)
-    sl, risk_pct = _stop_loss_and_risk(h, l, c)
+    sl, risk_pct = _stop_loss_and_risk(h, l, c, df=df, idx=idx)
 
     skip: list[str] = []
     if idx < CLUSTER_RANGE_BARS:
@@ -760,7 +807,7 @@ def _evaluate_sideways_breakout_entry(df: pd.DataFrame, idx: int) -> dict[str, A
     has_cluster, cluster_high, cluster_low, cluster_bars = _sideways_cluster_before(df, idx)
     breakout = _is_breakout_expansion_bar(row)
     clears_cluster = has_cluster and cluster_high is not None and c > cluster_high and c > o
-    sl, risk_pct = _stop_loss_and_risk(h, l, c)
+    sl, risk_pct = _stop_loss_and_risk(h, l, c, df=df, idx=idx)
 
     skip: list[str] = []
     if idx < MIN_SIDEWAYS_CLUSTER_BARS:
@@ -958,7 +1005,7 @@ def _scan_candles(candles: pd.DataFrame, option_type: str, underlying: str) -> l
                 f"{option_type} 5m close above EMA{EMA_PERIOD}(high) within "
                 f"{MAX_EMA_DISTANCE_PCT_OF_CLOSE:g}% of close, top wick < {TOP_WICK_MAX_PCT_OF_HIGH:g}%, "
                 f"prior {PRIOR_CONSOLIDATION_BARS} in close–low band, close above prior {PRIOR_HIGH_BARS} highs, "
-                f"SL at {SL_RANGE_FRACTION:.0%} of range below close"
+                f"SL swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range below close"
             ),
             EMA_PERIOD,
         ),
@@ -968,7 +1015,7 @@ def _scan_candles(candles: pd.DataFrame, option_type: str, underlying: str) -> l
             (
                 f"{option_type} 5m doji then strong bullish candle; "
                 f"skip if close > {MAX_EMA_DISTANCE_PCT_OF_CLOSE:g}% above EMA{EMA_PERIOD}(high); "
-                f"SL at {SL_RANGE_FRACTION:.0%} of range below close"
+                f"SL swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range below close"
             ),
             1,
         ),
@@ -978,7 +1025,7 @@ def _scan_candles(candles: pd.DataFrame, option_type: str, underlying: str) -> l
             (
                 f"{option_type} 5m clears {CLUSTER_RANGE_BARS}-bar range cluster "
                 f"(width ≤ {CLUSTER_MAX_WIDTH_PCT:g}%) on volume > EMA{VOLUME_EMA_PERIOD}, "
-                f"SL at {SL_RANGE_FRACTION:.0%} of range below close"
+                f"SL swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range below close"
             ),
             VOLUME_EMA_PERIOD,
         ),
@@ -988,7 +1035,7 @@ def _scan_candles(candles: pd.DataFrame, option_type: str, underlying: str) -> l
             (
                 f"{option_type} 5m first expansion candle after ≥{MIN_SIDEWAYS_CLUSTER_BARS} "
                 f"sideways/barcode bars, clears cluster high, "
-                f"SL at {SL_RANGE_FRACTION:.0%} of range below close"
+                f"SL swing low ≤ {SWING_SL_MAX_POINTS:g} pts else {SL_RANGE_FRACTION:.0%} of range below close"
             ),
             MIN_SIDEWAYS_CLUSTER_BARS,
         ),

@@ -36,6 +36,12 @@ from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.storage import DataStore, load_signal_rows
 from intraday_engine.storage.data_store import _flatten_for_csv
 from intraday_engine.analysis.summary_builder import build_analysis_summaries
+from intraday_engine.analysis.hourly_levels import fetch_hourly_spot_levels, hourly_levels_from_snapshots
+from intraday_engine.analysis.option_confluence import attach_confluence_to_summaries
+from intraday_engine.analysis.buyers_day import compute_buyers_day, compute_buyers_day_series
+from intraday_engine.analysis.expiry_gamma_radar import compute_expiry_gamma_radar, expiry_window_tape
+from intraday_engine.analysis.trend_ignition import compute_trend_ignition, trend_ignition_tape
+from intraday_engine.gamma.expiry_utils import is_expiry_day
 from intraday_engine.eod.eod_fetcher import run_eod_scan
 from intraday_engine.engine.stock_signal_engine import run_stock_analysis_30min
 from intraday_engine.research.tomorrow_watchlist_scanner import (
@@ -57,6 +63,10 @@ from intraday_engine.research.relative_strength_scanner import (
 from intraday_engine.research.intraday_relative_strength_scanner import (
     load_stored_intraday_relative_strength,
     run_intraday_relative_strength_scan,
+)
+from intraday_engine.research.sector_relative_strength_scanner import (
+    load_stored_sector_relative_strength,
+    run_sector_relative_strength_scan,
 )
 from intraday_engine.research.institutional_volume_scanner import (
     api_institutional_volume_payload,
@@ -92,12 +102,14 @@ from intraday_engine.research.options_trading_signals import (
 )
 from intraday_engine.storage.position_sl_store import get_auto_trail_positions, get_sl as get_sl_record, set_sl as store_sl, update_sl_trigger as store_update_sl, set_auto_trail as store_auto_trail
 from intraday_engine.storage.signal_invalidation_store import invalidate as store_invalidate_signal, load_invalidated_keys, reinstate as store_reinstate_signal
+from intraday_engine.execution.auto_trade_store import get_config as get_auto_trade_config, update_config as update_auto_trade_config
+from intraday_engine.execution.options_auto_executor import run_auto_trade_cycle, run_rr_swing_trail_cycle
 from intraday_engine.utils.logging_setup import setup_logging
-
-logger = logging.getLogger(__name__)
+from intraday_engine.utils.nse_session import is_nse_session_active, seconds_until_next_session_start, session_label
 
 _auto_trail_task: asyncio.Task | None = None
 _jobs_loop_task: asyncio.Task | None = None
+_auto_trade_task: asyncio.Task | None = None
 
 
 def _auto_trail_underlyings() -> list[str]:
@@ -118,7 +130,9 @@ def _auto_trail_underlyings() -> list[str]:
 
 
 async def _run_auto_trail_cycle():
-    """Trail SL to prev 1min candle low for positions with auto_trail."""
+    """Trail SL to prev 1min candle low for positions with auto_trail (NSE session only)."""
+    if not is_nse_session_active():
+        return
     try:
         now = datetime.now()
         to_dt = now.replace(second=0, microsecond=0)
@@ -168,13 +182,46 @@ async def _run_auto_trail_cycle():
 
 async def _auto_trail_loop():
     while True:
-        await asyncio.sleep(60)
-        await _run_auto_trail_cycle()
+        if is_nse_session_active():
+            await _run_auto_trail_cycle()
+            await asyncio.sleep(60)
+        else:
+            await asyncio.sleep(min(seconds_until_next_session_start(), 3600))
+
+
+async def _auto_trade_loop():
+    """Every 5 min during NSE session only: refresh, scan entry signals, RR swing trail."""
+    from intraday_engine.utils.nse_session import seconds_to_next_interval_within_session
+
+    logger.info("Auto-trade loop started (%s).", session_label())
+    loop = asyncio.get_event_loop()
+    while True:
+        if not is_nse_session_active():
+            sleep_s = seconds_until_next_session_start()
+            logger.debug("Auto-trade: outside session; sleeping %.0f min.", sleep_s / 60)
+            await asyncio.sleep(min(sleep_s, 3600))
+            continue
+        try:
+            for u in list_index_underlyings():
+                try:
+                    settings = _get_settings(u)
+                    client = _get_client(u)
+                    store = _get_store(u)
+                    engine = _get_engine(u)
+                    await loop.run_in_executor(None, engine.run_cycle)
+                    await loop.run_in_executor(None, lambda s=settings, c=client, st=store: run_auto_trade_cycle(s, c, st))
+                    await loop.run_in_executor(None, lambda s=settings, c=client, st=store: run_rr_swing_trail_cycle(s, c, st))
+                except Exception as e:
+                    logger.debug("Auto-trade cycle %s: %s", u, e)
+        except Exception as e:
+            logger.debug("Auto-trade loop: %s", e)
+        sleep_s = seconds_to_next_interval_within_session(5)
+        await asyncio.sleep(sleep_s)
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    global _auto_trail_task, _jobs_loop_task
+    global _auto_trail_task, _jobs_loop_task, _auto_trade_task
     try:
         ensure_config_file()
     except Exception as e:
@@ -182,8 +229,9 @@ async def _lifespan(app: FastAPI):
     data_dir = Settings.from_env().data_dir
     _auto_trail_task = asyncio.create_task(_auto_trail_loop())
     _jobs_loop_task = asyncio.create_task(run_configured_jobs_loop(data_dir))
+    _auto_trade_task = asyncio.create_task(_auto_trade_loop())
     yield
-    for task in (_auto_trail_task, _jobs_loop_task):
+    for task in (_auto_trail_task, _jobs_loop_task, _auto_trade_task):
         if task:
             task.cancel()
             try:
@@ -636,6 +684,41 @@ async def api_intraday_rs_refresh(
         return _sanitize_for_json(payload)
     except Exception as e:
         logger.exception("Intraday RS refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/sector-rs")
+async def api_sector_rs_get(trade_date: str | None = None):
+    """Load last stored sector RS scan (sectors ranked vs NIFTY 50, with runners/laggards)."""
+    try:
+        td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
+        data = load_stored_sector_relative_strength(settings.data_dir, td)
+        if not data:
+            return {
+                "trade_date": td.isoformat(),
+                "sectors": [],
+                "nifty": None,
+                "message": "No saved sector RS yet. Click Refresh to compute from 15-min cache.",
+            }
+        return _sanitize_for_json(data)
+    except Exception as e:
+        logger.exception("Sector RS load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/sector-rs/refresh")
+async def api_sector_rs_refresh(trade_date: str | None = None):
+    try:
+        td = _parse_trade_date(trade_date)
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_sector_relative_strength_scan(trade_date=td),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("Sector RS refresh failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1212,23 +1295,180 @@ async def get_analysis_summary(timestamp: str | None = None, underlying: str | N
     snap_df = store.load_snapshots()
     sig_df = store.load_signals()
     if snap_df.empty:
-        return {"summaries": [], "selected": None}
+        return {"summaries": [], "selected": None, "hourly_levels": None}
     date_str = trade_date or date.today().isoformat()
     if "timestamp" in snap_df.columns:
         snap_df = snap_df[snap_df["timestamp"].astype(str).str.startswith(date_str)]
     if snap_df.empty:
-        return {"summaries": [], "selected": None}
+        return {"summaries": [], "selected": None, "hourly_levels": None}
     if not sig_df.empty and "timestamp" in sig_df.columns:
         sig_df = sig_df[sig_df["timestamp"].astype(str).str.startswith(date_str)]
     summaries = build_analysis_summaries(snap_df, sig_df, lookback=settings.lookback_bars)
     summaries = [s for s in summaries if s]
+
+    trade_d = date.fromisoformat(date_str) if date_str else date.today()
+    hourly_levels = None
+    try:
+        client = _get_client(underlying)
+        hourly_levels = fetch_hourly_spot_levels(client, settings, trade_d)
+    except Exception as e:
+        logger.debug("Hourly levels via Kite skipped: %s", e)
+    if not hourly_levels or hourly_levels.get("support") is None:
+        hourly_levels = hourly_levels_from_snapshots(snap_df)
+    snap_records = snap_df.to_dict(orient="records") if not snap_df.empty else None
+    summaries = attach_confluence_to_summaries(summaries, hourly_levels, snap_records)
+
+    buyers_day = _sanitize_for_json(compute_buyers_day(summaries))
+    buyers_day["series"] = _sanitize_for_json(compute_buyers_day_series(summaries))
+    try:
+        expiry_gamma = _sanitize_for_json(
+            compute_expiry_gamma_radar(summaries, trade_date=trade_d, underlying=settings.underlying)
+        )
+    except Exception as e:
+        logger.debug("Expiry gamma radar skipped: %s", e)
+        expiry_gamma = None
+
     for s in summaries:
         for k, v in s.items():
             s[k] = _sanitize_for_json(v)
     if timestamp:
         selected = next((x for x in summaries if str(x.get("timestamp", "")) == timestamp), None)
-        return {"summaries": summaries, "selected": selected}
-    return {"summaries": summaries, "selected": summaries[-1] if summaries else None}
+        return {
+            "summaries": summaries,
+            "selected": selected,
+            "hourly_levels": _sanitize_for_json(hourly_levels),
+            "buyers_day": buyers_day,
+            "expiry_gamma": expiry_gamma,
+        }
+    return {
+        "summaries": summaries,
+        "selected": summaries[-1] if summaries else None,
+        "hourly_levels": _sanitize_for_json(hourly_levels),
+        "buyers_day": buyers_day,
+        "expiry_gamma": expiry_gamma,
+    }
+
+
+@app.get("/api/expiry-gamma")
+async def get_expiry_gamma(
+    trade_date: str | None = None,
+    underlying: str | None = None,
+    window_from: str = "14:30",
+    window_to: str = "15:30",
+):
+    """
+    Expiry Gamma Radar + the 2:30-3:30 PM expiry-window candle tape.
+    Only meaningful on the underlying's weekly expiry day (NIFTY = Tuesday).
+    """
+    store = _get_store(underlying)
+    settings = _get_settings(underlying)
+    date_str = trade_date or date.today().isoformat()
+    try:
+        trade_d = date.fromisoformat(date_str)
+    except ValueError:
+        trade_d = date.today()
+    expiry = is_expiry_day(trade_d, settings.underlying)
+
+    snap_df = store.load_snapshots()
+    sig_df = store.load_signals()
+    if snap_df.empty or "timestamp" not in snap_df.columns:
+        return {
+            "trade_date": date_str,
+            "is_expiry_day": expiry,
+            "radar": {"active": False, "is_expiry_day": expiry, "state": "OFF",
+                      "headline": "No snapshot data." if expiry else "Not an expiry day — gamma radar is off."},
+            "window": {"from": window_from, "to": window_to, "rows": []},
+        }
+    snap_df = snap_df[snap_df["timestamp"].astype(str).str.startswith(date_str)]
+    if not sig_df.empty and "timestamp" in sig_df.columns:
+        sig_df = sig_df[sig_df["timestamp"].astype(str).str.startswith(date_str)]
+    summaries = [s for s in build_analysis_summaries(snap_df, sig_df, lookback=settings.lookback_bars) if s]
+
+    radar = compute_expiry_gamma_radar(summaries, trade_date=trade_d, underlying=settings.underlying)
+    tape = expiry_window_tape(summaries, from_hhmm=window_from, to_hhmm=window_to)
+    return _sanitize_for_json({
+        "trade_date": date_str,
+        "is_expiry_day": expiry,
+        "radar": radar,
+        "window": {"from": window_from, "to": window_to, "rows": tape},
+    })
+
+
+@app.get("/api/trend-ignition")
+async def get_trend_ignition(trade_date: str | None = None, underlying: str | None = None):
+    """
+    Trend Ignition Radar — directional breakout/breakdown detector for any day
+    (identifies moves like the 08-Jul-2026 afternoon breakdown), plus the
+    per-candle tape for the analysis table.
+    """
+    store = _get_store(underlying)
+    settings = _get_settings(underlying)
+    date_str = trade_date or date.today().isoformat()
+
+    snap_df = store.load_snapshots()
+    sig_df = store.load_signals()
+    if snap_df.empty or "timestamp" not in snap_df.columns:
+        return {
+            "trade_date": date_str,
+            "radar": {"active": False, "state": "IDLE", "headline": "No snapshot data yet."},
+            "tape": [],
+        }
+    snap_df = snap_df[snap_df["timestamp"].astype(str).str.startswith(date_str)]
+    if not sig_df.empty and "timestamp" in sig_df.columns:
+        sig_df = sig_df[sig_df["timestamp"].astype(str).str.startswith(date_str)]
+    summaries = [s for s in build_analysis_summaries(snap_df, sig_df, lookback=settings.lookback_bars) if s]
+
+    radar = compute_trend_ignition(summaries)
+    tape = trend_ignition_tape(summaries)
+    return _sanitize_for_json({
+        "trade_date": date_str,
+        "radar": radar,
+        "tape": tape,
+    })
+
+
+class AutoTradeConfigRequest(BaseModel):
+    auto_trade_enabled: bool | None = None
+    rr_trail_enabled: bool | None = None
+    lots: int | None = None
+    underlying: str | None = None
+
+
+@app.get("/api/auto-trade/config")
+async def api_auto_trade_config_get(underlying: str | None = None):
+    store = _get_store(underlying)
+    cfg = get_auto_trade_config(store.data_dir)
+    return _sanitize_for_json(cfg)
+
+
+@app.post("/api/auto-trade/config")
+async def api_auto_trade_config_post(req: AutoTradeConfigRequest):
+    store = _get_store(req.underlying)
+    updates = {k: v for k, v in req.model_dump().items() if v is not None and k != "underlying"}
+    if "lots" in updates:
+        updates["lots"] = max(1, min(100, int(updates["lots"])))
+    # Allow toggling config anytime; live orders only fire during NSE session.
+    if updates.get("auto_trade_enabled") is True and not is_nse_session_active():
+        logger.info("Auto entry enabled outside session — orders will wait until %s.", session_label())
+    cfg = update_auto_trade_config(store.data_dir, **updates)
+    return _sanitize_for_json({"status": "ok", **cfg})
+
+
+@app.post("/api/auto-trade/run-once")
+async def api_auto_trade_run_once(underlying: str | None = None):
+    """Manual trigger: scan + execute (if enabled) + RR trail check. NSE session only."""
+    if not is_nse_session_active():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Outside NSE trading hours ({session_label()}). Auto-trade runs only during the session.",
+        )
+    settings = _get_settings(underlying)
+    client = _get_client(underlying)
+    store = _get_store(underlying)
+    loop = asyncio.get_event_loop()
+    trade_status = await loop.run_in_executor(None, lambda: run_auto_trade_cycle(settings, client, store))
+    trail_status = await loop.run_in_executor(None, lambda: run_rr_swing_trail_cycle(settings, client, store))
+    return _sanitize_for_json({"trade": trade_status, "trail": trail_status})
 
 
 @app.get("/api/trade-summary")
@@ -1259,6 +1499,9 @@ async def get_trade_summary(underlying: str | None = None):
             p["sl_trigger"] = rec.get("sl_trigger") if rec else None
             p["sl_order_id"] = rec.get("sl_order_id") if rec else None
             p["auto_trail"] = rec.get("auto_trail", False) if rec else False
+            p["entry_price"] = rec.get("entry_price") if rec else None
+            p["rr_locked"] = rec.get("rr_locked", False) if rec else False
+            p["rr_trail"] = rec.get("rr_trail", False) if rec else False
     day_pnl = data.get("day_pnl", 0.0)
     sl_reached = day_pnl is not None and day_pnl <= -settings.daily_sl_rupees
     day_points = 0.0

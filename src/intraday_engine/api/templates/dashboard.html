@@ -129,6 +129,47 @@
     .day-range-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #ef4444, #22c55e); border-radius: 8px; opacity: 0.4; }
     .day-range-bar .marker { position: absolute; width: 6px; height: 22px; top: -3px; background: #e4e4e7; border-radius: 3px; transform: translateX(-50%); box-shadow: 0 0 0 2px #0f0f12; }
     .day-range-bar .marker.open { background: #a1a1aa; }
+    .analysis-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 900px) { .analysis-charts-grid { grid-template-columns: 1fr; } }
+    .chart-panel { background: #141417; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; }
+    .chart-panel-wide { grid-column: 1 / -1; }
+    .chart-panel h4 { margin: 0 0 0.35rem; font-size: 0.82rem; font-weight: 600; color: #e4e4e7; }
+    .chart-panel .chart-sub { margin: 0 0 0.5rem; font-size: 0.72rem; color: #71717a; }
+    .chart-wrap { position: relative; height: 200px; }
+    .chart-panel-wide .chart-wrap { height: 240px; }
+    .confluence-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .confluence-scores { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .confluence-score-pill { padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600; border: 1px solid #27272a; background: #141417; }
+    .confluence-score-pill.ce { border-color: #7f1d1d; color: #fca5a5; }
+    .confluence-score-pill.pe { border-color: #14532d; color: #86efac; }
+    .confluence-score-pill.dir-ce { background: #7f1d1d; color: #fff; border-color: #ef4444; }
+    .confluence-score-pill.dir-pe { background: #14532d; color: #fff; border-color: #22c55e; }
+    .confluence-score-pill.dir-neutral { background: #3f3f46; color: #d4d4d8; }
+    .confluence-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .confluence-table th, .confluence-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #27272a; text-align: left; }
+    .confluence-table th { color: #a1a1aa; font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .confluence-table td.num { text-align: center; width: 56px; }
+    .confluence-pass { color: #86efac; font-weight: 700; }
+    .confluence-fail { color: #52525b; }
+    .confluence-value { color: #d4d4d8; font-variant-numeric: tabular-nums; }
+    .confluence-timeline { display: flex; gap: 2px; flex-wrap: nowrap; overflow-x: auto; padding: 0.25rem 0; margin-top: 0.5rem; }
+    .confluence-timeline .cf-block { flex: 1 0 8px; min-width: 8px; height: 28px; border-radius: 3px; cursor: pointer; opacity: 0.85; }
+    .confluence-timeline .cf-block:hover { opacity: 1; outline: 1px solid #e4e4e7; }
+    .confluence-timeline .cf-block.selected { outline: 2px solid #e4e4e7; opacity: 1; }
+    .confluence-timeline .cf-block.ce { background: #ef4444; }
+    .confluence-timeline .cf-block.pe { background: #22c55e; }
+    .confluence-timeline .cf-block.neutral { background: #3f3f46; }
+    .confluence-meta { font-size: 0.72rem; color: #71717a; margin: 0 0 0.5rem; }
+    .visual-legend { margin-top: 0.5rem; padding: 0.45rem 0.55rem; border-radius: 6px; background: #0f0f12; border: 1px solid #27272a; font-size: 0.68rem; line-height: 1.5; display: grid; gap: 0.2rem; }
+    .visual-legend .ce-hint { color: #fca5a5; }
+    .visual-legend .pe-hint { color: #86efac; }
+    .visual-legend strong { font-weight: 600; color: inherit; }
+    .chart-reading { margin-top: 0.4rem; font-size: 0.74rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
+    .chart-reading .pill { padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+    .chart-reading .pill.ce { background: #7f1d1d; color: #fff; }
+    .chart-reading .pill.pe { background: #14532d; color: #fff; }
+    .chart-reading .pill.neutral { background: #3f3f46; color: #d4d4d8; }
+    .chart-reading .detail { color: #a1a1aa; font-weight: 500; }
     .signal-counts { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
     .signal-counts span { padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; }
     .signal-counts .buy { background: #14532d; color: #86efac; }
@@ -209,7 +250,7 @@
     <button class="btn btn-secondary" type="button" id="btnRefreshMonitor" title="Reload signals and trade summary from disk/API (no full cycle)">Refresh monitor</button>
     <div class="lots-row">
       <label for="lots">Lots:</label>
-      <input type="number" id="lots" min="1" max="100" value="2">
+      <input type="number" id="lots" min="1" max="100" value="1">
     </div>
     <button class="btn btn-execute" id="btnExecute">Execute</button>
   </div>
@@ -238,6 +279,62 @@
       </div>
       <div id="optionsSignalTypes" class="ot-signal-types"></div>
       <p id="optionsTradingMeta" style="font-size:0.8rem;color:#71717a;margin:0 0 0.75rem;">—</p>
+
+      <div id="autoTradePanel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.65rem;margin:0 0 1rem;padding:0.75rem 0.9rem;border:1px solid #26262e;border-radius:10px;background:#12121a;">
+        <div>
+          <h3 style="margin:0 0 0.35rem;font-size:0.9rem;">Auto Trading</h3>
+          <p style="margin:0;font-size:0.72rem;color:#71717a;line-height:1.4;">Every 5 min: rescan ATM CE/PE entry signals (+ radar ignitions) and place MARKET MIS orders with signal SL. <strong>Active Mon–Fri 09:15–15:30 IST only.</strong></p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.45rem;justify-content:center;">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;cursor:pointer;">
+            <input type="checkbox" id="autoTradeEnabled" style="width:1rem;height:1rem;">
+            <span><strong>Auto Entry</strong> — place orders on new signals (1 lot default)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;cursor:pointer;">
+            <input type="checkbox" id="rrTrailEnabled" style="width:1rem;height:1rem;">
+            <span><strong>1:3 RR Trail</strong> — lock SL at 1R, then trail on 5-min swing low</span>
+          </label>
+        </div>
+        <div style="font-size:0.72rem;color:#a1a1aa;display:flex;flex-direction:column;justify-content:center;gap:0.2rem;">
+          <div id="autoTradeStatus">Loading auto-trade status…</div>
+          <div id="autoTradeLastRun" style="color:#71717a;">—</div>
+        </div>
+      </div>
+
+      <div id="expiryGammaCard" style="display:none;border:1px solid #26262e;border-radius:12px;padding:1rem 1.2rem;margin:0 0 1rem;background:linear-gradient(135deg,#12100a,#0e141d);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div>
+            <h3 style="margin:0 0 0.2rem;font-size:0.98rem;">⚡ Expiry Gamma Radar</h3>
+            <p id="expiryGammaHeadline" style="margin:0;font-size:0.82rem;color:#a1a1aa;">—</p>
+          </div>
+          <div id="expiryGammaState" class="badge">—</div>
+        </div>
+        <div id="expiryGammaBody" style="margin-top:0.7rem;"></div>
+        <div class="visual-legend" style="margin-top:0.75rem;">
+          <div class="ce-hint"><strong>CE explosion:</strong> spot pinned just under a heavy strike, above VWAP, then breaks up with CE premium surging + CE OI unwinding.</div>
+          <div class="pe-hint"><strong>PE explosion:</strong> spot pinned just over a strike, below VWAP, then breaks down with PE premium surging + PE OI unwinding.</div>
+        </div>
+        <p style="margin:0.6rem 0 0;font-size:0.72rem;color:#71717a;">Defined-risk lottery only — most armed setups pin and expire worthless. Risk just the premium; exit fast.</p>
+      </div>
+
+      <div id="expiryTapeCard" style="display:none;border:1px solid #26262e;border-radius:12px;padding:1rem 1.2rem;margin:0 0 1rem;background:#0e141d;">
+        <h3 style="margin:0 0 0.15rem;font-size:0.95rem;">Expiry window tape — <span id="expiryTapeWindow">2:30–3:30 PM</span></h3>
+        <p id="expiryTapeMeta" style="margin:0 0 0.6rem;font-size:0.75rem;color:#71717a;">Every 5-min candle in the final-hour gamma window (ATM strike). Amber = armed, <span style="color:#fb923c;">orange = 🎯 ignition (tight-SL entry)</span>, red = break confirmation.</p>
+        <div style="overflow-x:auto;">
+          <table style="font-size:0.82rem;min-width:820px;">
+            <thead>
+              <tr>
+                <th>Time</th><th class="num">Spot</th><th class="num">VWAP</th><th class="num">Fut</th><th class="num">ATM</th>
+                <th class="num">CE ₹</th><th class="num">CE Δ</th><th class="num">CE OI Δ</th>
+                <th class="num">PE ₹</th><th class="num">PE Δ</th><th class="num">PE OI Δ</th><th>Radar</th>
+              </tr>
+            </thead>
+            <tbody id="expiryTapeBody"></tbody>
+          </table>
+        </div>
+        <p id="expiryTapeEmpty" style="display:none;margin-top:0.5rem;color:#71717a;font-size:0.82rem;">No candles in the 2:30–3:30 window yet.</p>
+      </div>
+
       <div class="ot-split-grid">
         <div class="opt-box call">
           <h3 class="ot-panel-title">ATM CE — Entry Signals</h3>
@@ -286,6 +383,35 @@
           <p id="optionsTradingPeEmpty" style="display:none;margin-top:0.5rem;color:#71717a;font-size:0.82rem;">No PE signals.</p>
         </div>
       </div>
+    </div>
+    <div class="card" id="trendIgnitionCard" style="display:none;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+        <div>
+          <h2 style="margin:0 0 0.25rem;">🚀 Trend Ignition Radar</h2>
+          <p id="trendIgnitionHeadline" style="margin:0;font-size:0.82rem;color:#a1a1aa;max-width:760px;line-height:1.45;">—</p>
+        </div>
+        <div id="trendIgnitionState" class="badge">—</div>
+      </div>
+      <div id="trendIgnitionMetrics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.5rem;margin-bottom:0.75rem;"></div>
+      <div class="visual-legend" style="margin-bottom:0.75rem;">
+        <div class="ce-hint"><strong>CE (up-trend) ignites:</strong> price held above a rising VWAP &amp; coiled, then a candle breaks the coil high with range expansion (≥4× recent volatility) + a CE premium surge.</div>
+        <div class="pe-hint"><strong>PE (down-trend) ignites:</strong> price held below a falling VWAP &amp; coiled, then a candle breaks the coil low with range expansion + a PE premium surge.</div>
+      </div>
+      <p style="margin:0 0 0.4rem;font-size:0.78rem;color:#71717a;">Candle tape — <span style="color:#eab308;">yellow = watch</span> · <span style="color:#f97316;">orange = 🚀 ignition</span> · <span style="color:#fca5a5;">red tint = continuation</span>. Move estimate off the day's expected move (ATM straddle ≈ 1-day 1SD) + the coil's measured move.</p>
+      <div style="overflow-x:auto;">
+        <table style="font-size:0.82rem;min-width:900px;">
+          <thead>
+            <tr>
+              <th>Time</th><th class="num">Spot</th><th class="num">VWAP</th><th>vs VWAP</th>
+              <th class="num">Δ%</th><th class="num">Exp×</th><th class="num">Coil Lo/Hi</th>
+              <th class="num">CE Δ</th><th class="num">PE Δ</th>
+              <th>State</th><th>Move</th><th class="num">Est pts</th><th class="num">Target</th>
+            </tr>
+          </thead>
+          <tbody id="trendIgnitionTapeBody"></tbody>
+        </table>
+      </div>
+      <p id="trendIgnitionTapeEmpty" style="display:none;margin-top:0.5rem;color:#71717a;font-size:0.82rem;">No candles yet.</p>
     </div>
     <div class="card">
       <div style="margin-bottom:0.75rem;">
@@ -454,14 +580,153 @@
     <div id="hugeMoveCard" class="card" style="margin-bottom: 1rem; border-left: 4px solid #7c3aed;">
       <h3 style="margin: 0 0 0.5rem; font-size: 0.95rem;">Huge Move (100+ pts)</h3>
       <div id="hugeMoveContent"><p style="color:#71717a;font-size:0.85rem;">Run Refresh to load option chain analysis.</p></div>
+      <div id="hugeMoveLegend" class="visual-legend" style="display:none;margin-top:0.75rem;">
+        <div class="ce-hint"><strong>Buy CE:</strong> Direction BULLISH · P(Huge Up) highest · PCR(OI) low / call-heavy · spot below max pain (upside magnet).</div>
+        <div class="pe-hint"><strong>Buy PE:</strong> Direction BEARISH · P(Huge Down) highest · PCR(OI) high / put-heavy · spot above max pain (downside magnet).</div>
+      </div>
     </div>
     <div id="dayOverview" class="card" style="margin-bottom: 1rem;"></div>
+    <div id="buyersDayCard" class="card" style="margin-bottom: 1rem; display: none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div>
+          <h3 style="margin: 0 0 0.2rem; font-size: 0.95rem;">Buyer's Day Meter</h3>
+          <p id="buyersDayHeadline" style="margin:0;font-size:0.8rem;color:#a1a1aa;">—</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <div id="buyersDayScore" style="font-size:1.6rem;font-weight:700;">—</div>
+          <div id="buyersDayVerdict" class="badge">—</div>
+        </div>
+      </div>
+      <div style="margin:0.6rem 0 0.75rem;height:10px;border-radius:5px;background:#2a2a31;overflow:hidden;">
+        <div id="buyersDayBar" style="height:100%;width:0%;background:#eab308;transition:width .3s;"></div>
+      </div>
+      <div id="buyersDayTrend" style="margin:0 0 0.75rem;">
+        <p style="margin:0 0 0.35rem;font-size:0.75rem;color:#a1a1aa;">Score trend (every 5 min) — <span style="color:#22c55e;">green ≥60 buy</span> · <span style="color:#eab308;">yellow 40-59 mixed</span> · <span style="color:#ef4444;">red &lt;40 avoid</span></p>
+        <div style="position:relative;height:170px;"><canvas id="chartBuyersDay"></canvas></div>
+      </div>
+      <div id="buyersDayFactors" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.5rem;"></div>
+      <div class="visual-legend" style="margin-top:0.75rem;">
+        <div class="ce-hint"><strong>Buy (either side) when green:</strong> range wide, trend efficiency &amp; ADX high, few VWAP crosses, long straddle holding/expanding — movement beats theta.</div>
+        <div class="pe-hint"><strong>Stand aside when red:</strong> tight range, choppy ER, many VWAP crosses, low ADX, straddle bleeding — theta day, buyers lose.</div>
+      </div>
+    </div>
+    <div id="confluenceCard" class="card" style="margin-bottom: 1rem; display: none;">
+      <div class="confluence-header">
+        <div>
+          <h3 style="margin: 0 0 0.2rem; font-size: 0.95rem;">Option Long Confluence</h3>
+          <p id="confluenceMeta" class="confluence-meta">10 checks · 7+ = CE or PE direction · click timeline to select bar</p>
+        </div>
+        <div id="confluenceScores" class="confluence-scores"></div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="confluence-table" id="confluenceTable">
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Current value</th>
+              <th style="text-align:center;color:#fca5a5">CE</th>
+              <th style="text-align:center;color:#86efac">PE</th>
+            </tr>
+          </thead>
+          <tbody id="confluenceBody"></tbody>
+        </table>
+      </div>
+      <div class="visual-legend">
+        <div class="ce-hint"><strong>Buy CE:</strong> 7+ CE ✓ checks and spot above open &amp; VWAP · direction must show CE (spot trend gate).</div>
+        <div class="pe-hint"><strong>Buy PE:</strong> 7+ PE ✓ checks and spot below open &amp; VWAP · direction must show PE.</div>
+      </div>
+      <p style="margin: 0.75rem 0 0.35rem; font-size: 0.75rem; color: #a1a1aa;">Direction timeline</p>
+      <div class="visual-legend" style="margin-top:0;margin-bottom:0.35rem;">
+        <div class="ce-hint"><strong>Buy CE:</strong> Red block — CE confluence ≥7 at that time (click block to inspect checks).</div>
+        <div class="pe-hint"><strong>Buy PE:</strong> Green block — PE confluence ≥7 at that time.</div>
+      </div>
+      <div id="confluenceTimeline" class="confluence-timeline"></div>
+    </div>
+    <div id="analysisChartsCard" class="card" style="margin-bottom: 1rem; display: none;">
+      <h3 style="margin: 0 0 0.25rem; font-size: 0.95rem;">Option Buying Visuals</h3>
+      <p id="analysisChartsMeta" style="margin: 0 0 0.75rem; font-size: 0.75rem; color: #71717a;">ATM CE &amp; PE · % vs session open (09:15) · click a point to drill down</p>
+      <div class="analysis-charts-grid">
+        <div class="chart-panel chart-panel-wide">
+          <h4>Directional Flow — CE vs PE</h4>
+          <p class="chart-sub">Session premium % + OI only when paired with premium (put writing counts toward CE)</p>
+          <div class="chart-wrap"><canvas id="chartOiPct"></canvas></div>
+          <div class="visual-legend">
+            <div class="ce-hint"><strong>Buy CE:</strong> Red line (CE) above green and rising — CE flow positive (call prem ↑ and/or put writing).</div>
+            <div class="pe-hint"><strong>Buy PE:</strong> Green line (PE) above red and rising — PE flow positive (put prem ↑ and/or call writing).</div>
+          </div>
+          <div class="chart-reading" id="readingFlow"></div>
+        </div>
+        <div class="chart-panel chart-panel-wide">
+          <h4>OI % Change — CE vs PE</h4>
+          <p class="chart-sub">Raw open-interest % vs session open · CE red · PE green</p>
+          <div class="chart-wrap"><canvas id="chartOiPctRaw"></canvas></div>
+        </div>
+        <div class="chart-panel">
+          <h4>ATM Premium % Change (session)</h4>
+          <p class="chart-sub">LTP % vs session open (09:15) · CE red · PE green</p>
+          <div class="chart-wrap"><canvas id="chartPremiumPct"></canvas></div>
+          <div class="visual-legend">
+            <div class="ce-hint"><strong>Buy CE:</strong> Red (CE) line above green and rising — call premium expanding, put decaying.</div>
+            <div class="pe-hint"><strong>Buy PE:</strong> Green (PE) line above red and rising — put premium expanding, call decaying.</div>
+          </div>
+          <div class="chart-reading" id="readingPrem"></div>
+        </div>
+        <div class="chart-panel">
+          <h4>ATM Premium % Change</h4>
+          <p class="chart-sub">LTP % vs prior bar · CE red · PE green</p>
+          <div class="chart-wrap"><canvas id="chartPremiumRaw"></canvas></div>
+        </div>
+        <div class="chart-panel">
+          <h4>Flow Skew (CE − PE index)</h4>
+          <p class="chart-sub">Premium-adjusted · above 0 = CE (red) · below 0 = PE (green)</p>
+          <div class="chart-wrap"><canvas id="chartOiSkew"></canvas></div>
+          <div class="visual-legend">
+            <div class="ce-hint"><strong>Buy CE:</strong> Line above zero and rising — CE flow outpacing PE (not raw OI skew).</div>
+            <div class="pe-hint"><strong>Buy PE:</strong> Line below zero and falling — PE flow outpacing CE.</div>
+          </div>
+          <div class="chart-reading" id="readingSkew"></div>
+        </div>
+        <div class="chart-panel">
+          <h4>OI Skew (CE% − PE%)</h4>
+          <p class="chart-sub">Raw session OI % difference · above 0 = CE OI building faster</p>
+          <div class="chart-wrap"><canvas id="chartOiSkewRaw"></canvas></div>
+        </div>
+        <div class="chart-panel">
+          <h4>Put / Call Ratio</h4>
+          <p class="chart-sub">PE LTP ÷ CE LTP · falling = CE · rising = PE</p>
+          <div class="chart-wrap"><canvas id="chartPcr"></canvas></div>
+          <div class="visual-legend">
+            <div class="ce-hint"><strong>Buy CE:</strong> Ratio falling vs session start — calls outpacing puts.</div>
+            <div class="pe-hint"><strong>Buy PE:</strong> Ratio rising vs session start — puts outpacing calls.</div>
+          </div>
+          <div class="chart-reading" id="readingPcr"></div>
+        </div>
+        <div class="chart-panel chart-panel-wide">
+          <h4>Confluence Score &amp; Futures Premium</h4>
+          <p class="chart-sub">Net confluence (CE − PE checks) as bars + fut vs spot % line · red = CE · green = PE</p>
+          <div class="chart-wrap"><canvas id="chartScoreFut"></canvas></div>
+          <div class="visual-legend">
+            <div class="ce-hint"><strong>Buy CE:</strong> Red bars above zero (CE checks &gt; PE) + purple fut line above 0.</div>
+            <div class="pe-hint"><strong>Buy PE:</strong> Green bars below zero (PE checks &gt; CE) + purple line below 0.</div>
+          </div>
+          <div class="chart-reading" id="readingScore"></div>
+        </div>
+      </div>
+    </div>
     <div class="card" style="margin-bottom: 1rem;">
       <h3 style="margin: 0 0 0.5rem; font-size: 0.95rem;">Signal timeline — click a block to drill down</h3>
+      <div class="visual-legend" style="margin-bottom:0.5rem;">
+        <div class="ce-hint"><strong>Buy CE context:</strong> Green BUY blocks — underlying long signal; pair with CE confluence ≥7 before entering calls.</div>
+        <div class="pe-hint"><strong>Buy PE context:</strong> Red SELL blocks — underlying short signal; pair with PE confluence ≥7 before entering puts.</div>
+      </div>
       <div id="dayTimeline" class="day-timeline"></div>
     </div>
     <div class="card">
-      <h3 style="margin: 0 0 0.75rem; font-size: 0.95rem;">Candle-by-candle (click row for detail)</h3>
+      <h3 style="margin: 0 0 0.5rem; font-size: 0.95rem;">Candle-by-candle (click row for detail)</h3>
+      <div class="visual-legend" style="margin-bottom:0.65rem;">
+        <div class="ce-hint"><strong>Buy CE:</strong> Dir = CE and CE column ≥7 — full check list in confluence table above.</div>
+        <div class="pe-hint"><strong>Buy PE:</strong> Dir = PE and PE column ≥7 — wait for green timeline block or PE score column to hit 7+.</div>
+      </div>
       <div style="overflow-x: auto;">
         <table class="summary-table" id="analysisOverviewTable">
           <thead>
@@ -477,6 +742,9 @@
               <th>Put%</th>
               <th>P/C</th>
               <th>Score</th>
+              <th>Dir</th>
+              <th>CE</th>
+              <th>PE</th>
               <th>Bias</th>
               <th>Mom</th>
             </tr>
@@ -556,6 +824,7 @@
       <div id="moNews"><p class="mo-empty">No news yet.</p></div>
     </div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     const status = document.getElementById('status');
     const tbody = document.getElementById('tbody');
@@ -821,8 +1090,13 @@
       if (t === 'doji_strong') return 'Doji→Strong';
       if (t === 'cluster_breakout') return 'Cluster+Vol';
       if (t === 'sideways_breakout') return 'Sideways Brk';
+      if (t === 'gamma_ignition') return '🎯 Gamma Ignition';
+      if (t === 'trend_ignition') return '🚀 Trend Ignition';
+      if (t === 'trend_continuation') return '↳ Trend Add';
       return '—';
     }
+
+    const SPECIAL_SIGNALS = ['gamma_ignition', 'trend_ignition', 'trend_continuation'];
 
     function renderOptionsSignalTable(body, emptyEl, metaEl, signals, label) {
       if (!body) return;
@@ -837,7 +1111,11 @@
       const altN = signals.filter(s => s.signal_type === 'doji_strong').length;
       const clusterN = signals.filter(s => s.signal_type === 'cluster_breakout').length;
       const sidewaysN = signals.filter(s => s.signal_type === 'sideways_breakout').length;
+      const ignN = signals.filter(s => s.signal_type === 'gamma_ignition').length;
+      const trendN = signals.filter(s => s.signal_type === 'trend_ignition').length;
       const parts = [`${signals.length} ${label} signal(s)`];
+      if (trendN) parts.push(`${trendN} 🚀 trend ignition`);
+      if (ignN) parts.push(`${ignN} 🎯 gamma ignition`);
       if (primaryN) parts.push(`${primaryN} primary`);
       if (altN) parts.push(`${altN} doji→strong`);
       if (clusterN) parts.push(`${clusterN} cluster+vol`);
@@ -845,15 +1123,34 @@
       if (metaEl) metaEl.textContent = parts.join(' · ');
       body.innerHTML = signals.map(s => {
         const c = s.candle || {};
-        const ohlc = `${fmt(c.open)}/${fmt(c.high)}/${fmt(c.low)}/${fmt(c.close)}`;
-        const typeCls = s.signal_type === 'doji_strong' ? 'sig-buy' : 'sig-buy';
-        return `<tr class="ot-signal-row">
+        const isSpecial = SPECIAL_SIGNALS.includes(s.signal_type);
+        const isTrend = s.signal_type === 'trend_ignition' || s.signal_type === 'trend_continuation';
+        const ohlc = isSpecial ? '—' : `${fmt(c.open)}/${fmt(c.high)}/${fmt(c.low)}/${fmt(c.close)}`;
+        const tint = s.signal_type === 'trend_ignition' ? 'rgba(249,115,22,.16)'
+          : s.signal_type === 'trend_continuation' ? 'rgba(239,68,68,.10)'
+          : s.signal_type === 'gamma_ignition' ? 'rgba(251,146,60,.14)' : null;
+        const typeColor = s.signal_type === 'trend_ignition' ? '#f97316'
+          : s.signal_type === 'trend_continuation' ? '#fca5a5'
+          : s.signal_type === 'gamma_ignition' ? '#fb923c' : null;
+        const rowStyle = tint ? ` style="background:${tint};"` : '';
+        const typeStyle = typeColor ? `color:${typeColor};font-weight:700;` : '';
+        let typeLabel = signalTypeLabel(s.signal_type);
+        if (isTrend && s.move_class) {
+          const mvC = s.move_class === 'HUGE' ? '#ef4444' : (s.move_class === 'MEDIUM' ? '#f97316' : '#eab308');
+          const tgt = s.target_spot != null ? ` → ${fmt(s.target_spot)}` : '';
+          typeLabel += ` <span style="color:${mvC};" title="Est. ${fmt(s.est_move_pts)} pts${tgt}">(${s.move_class})</span>`;
+        }
+        const slTitle = isSpecial && s.stop_spot != null ? ` title="Underlying invalidation: ${fmt(s.stop_spot)}"` : '';
+        const slCell = isSpecial
+          ? `${fmt(s.stop_loss)}<span style="color:#71717a;"${slTitle}> ⓘ</span>`
+          : fmt(s.stop_loss);
+        return `<tr class="ot-signal-row"${rowStyle}>
           <td class="ts">${shortTs(s.timestamp)}</td>
-          <td class="${typeCls}" style="font-size:0.78rem;white-space:nowrap;">${signalTypeLabel(s.signal_type)}</td>
+          <td class="sig-buy" style="font-size:0.78rem;white-space:nowrap;${typeStyle}">${typeLabel}</td>
           <td>${fmt(s.tradingsymbol)}</td>
           <td>${fmt(s.strike)}</td>
           <td>${fmt(s.entry)}</td>
-          <td>${fmt(s.stop_loss)}</td>
+          <td>${slCell}</td>
           <td>${fmt(s.risk_pct)}%</td>
           <td>${s.ema13_high != null ? fmt(s.ema13_high) : '—'}</td>
           <td>${ohlc}</td>
@@ -956,8 +1253,11 @@
       const toggleNote = hasChecks ? ' · conditions filtered live' : ' · refresh to enable condition toggles';
       optionsTradingMeta.textContent = `Trade date ${fmt(d.trade_date)} · ${snaps} analysis bar(s)${srcTxt}${toggleNote}${msg}`;
 
-      renderOptionsSignalTable(optionsTradingCeBody, optionsTradingCeEmpty, optionsTradingCeMeta, ceSignals, 'CE');
-      renderOptionsSignalTable(optionsTradingPeBody, optionsTradingPeEmpty, optionsTradingPeMeta, peSignals, 'PE');
+      const igns = gammaIgnitionSignals(_expiryGammaData).concat(trendIgnitionSignals(_trendIgnitionData));
+      const ceAll = igns.filter(s => s.option_type === 'CE').concat(ceSignals);
+      const peAll = igns.filter(s => s.option_type === 'PE').concat(peSignals);
+      renderOptionsSignalTable(optionsTradingCeBody, optionsTradingCeEmpty, optionsTradingCeMeta, ceAll, 'CE');
+      renderOptionsSignalTable(optionsTradingPeBody, optionsTradingPeEmpty, optionsTradingPeMeta, peAll, 'PE');
 
       const ceRows = filtered.ceRows;
       const peRows = filtered.peRows;
@@ -969,7 +1269,295 @@
       renderOptionsAnalysisTable(optionsAnalysisPeBody, optionsAnalysisPeEmpty, optionsAnalysisPeMeta, peRows, 'PE');
     }
 
+    function renderExpiryTape(win) {
+      const card = document.getElementById('expiryTapeCard');
+      const body = document.getElementById('expiryTapeBody');
+      const empty = document.getElementById('expiryTapeEmpty');
+      if (!card || !body) return;
+      const rows = (win && win.rows) || [];
+      const wl = document.getElementById('expiryTapeWindow');
+      if (wl && win && win.from && win.to) wl.textContent = win.from + '–' + win.to;
+      if (!rows.length) { card.style.display = 'none'; return; }
+      card.style.display = 'block';
+      if (empty) empty.style.display = 'none';
+      const chg = (v) => {
+        const n = Number(v);
+        if (!isFinite(n) || n === 0) return '<span class="num">—</span>';
+        const c = n > 0 ? 'pnl-positive' : 'pnl-negative';
+        return `<span class="num ${c}">${n > 0 ? '+' : ''}${n.toFixed(0)}%</span>`;
+      };
+      const rowBg = (st) => st === 'TRIGGERED' ? 'background:rgba(239,68,68,.14);'
+        : (st === 'IGNITION' ? 'background:rgba(251,146,60,.16);'
+        : (st === 'ARMED' ? 'background:rgba(245,158,11,.10);' : ''));
+      const radarCell = (st, side) => {
+        if (!st) return '<span style="color:#52525b;">—</span>';
+        const c = st === 'TRIGGERED' ? '#ef4444' : (st === 'IGNITION' ? '#fb923c' : '#f59e0b');
+        const label = st === 'IGNITION' ? '🎯 IGNITION' : st;
+        return `<span style="color:${c};font-weight:700;">${label}${side ? ' ' + side : ''}</span>`;
+      };
+      body.innerHTML = rows.map(r => `<tr style="${rowBg(r.state)}">
+        <td>${fmt(r.time)}</td>
+        <td class="num">${fmt(r.spot)}</td>
+        <td class="num">${fmt(r.vwap)}</td>
+        <td class="num">${fmt(r.fut)}</td>
+        <td class="num">${fmt(r.atm_strike)}</td>
+        <td class="num">${fmt(r.call_ltp)}</td>
+        <td>${chg(r.call_change_pct)}</td>
+        <td>${chg(r.call_oi_change_candle_pct)}</td>
+        <td class="num">${fmt(r.put_ltp)}</td>
+        <td>${chg(r.put_change_pct)}</td>
+        <td>${chg(r.put_oi_change_candle_pct)}</td>
+        <td>${radarCell(r.state, r.side)}</td>
+      </tr>`).join('');
+    }
+
+    let _expiryGammaData = null;
+
+    // Convert the radar's IGNITION triggers into option entry-signal rows (schema-compatible
+    // with the ATM CE/PE — Entry Signals tables).
+    function gammaIgnitionSignals(d) {
+      if (!d || !d.is_expiry_day || !d.radar || !Array.isArray(d.radar.triggers)) return [];
+      return d.radar.triggers.filter(t => t.stage === 'IGNITION').map(t => ({
+        timestamp: t.timestamp,
+        signal_type: 'gamma_ignition',
+        option_type: t.side,
+        tradingsymbol: `${t.strike} ${t.side}`,
+        strike: t.strike,
+        entry: t.entry,
+        stop_loss: t.stop_ltp,
+        stop_spot: t.stop_spot,
+        risk_pct: t.risk_pct,
+        ema13_high: null,
+        candle: {},
+      }));
+    }
+
+    async function loadExpiryGamma() {
+      const gcard = document.getElementById('expiryGammaCard');
+      const tcard = document.getElementById('expiryTapeCard');
+      if (!gcard && !tcard) return;
+      try {
+        const r = await fetch(apiUrl('/api/expiry-gamma'));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        _expiryGammaData = d;
+        if (!d.is_expiry_day) {
+          if (gcard) gcard.style.display = 'none';
+          if (tcard) tcard.style.display = 'none';
+        } else {
+          renderExpiryGamma(d.radar);
+          renderExpiryTape(d.window);
+        }
+        // Re-render the entry-signal tables so ignition rows appear once gamma data lands.
+        if (optionsTradingRawPayload) renderOptionsTradingPayload(optionsTradingRawPayload);
+      } catch (e) {
+        _expiryGammaData = null;
+        if (gcard) gcard.style.display = 'none';
+        if (tcard) tcard.style.display = 'none';
+      }
+    }
+
+    let _trendIgnitionData = null;
+
+    // Convert Trend-Ignition triggers into option entry-signal rows (schema-compatible
+    // with the ATM CE/PE — Entry Signals tables). Both IGNITION and CONTINUATION show.
+    function trendIgnitionSignals(d) {
+      if (!d || !d.radar || !Array.isArray(d.radar.triggers)) return [];
+      return d.radar.triggers.map(t => ({
+        timestamp: t.timestamp,
+        signal_type: t.stage === 'IGNITION' ? 'trend_ignition' : 'trend_continuation',
+        move_class: t.move_class,
+        est_move_pts: t.est_move_pts,
+        target_spot: t.target_spot,
+        option_type: t.side,
+        tradingsymbol: `${t.strike} ${t.side}`,
+        strike: t.strike,
+        entry: t.entry,
+        stop_loss: t.stop_ltp,
+        stop_spot: t.stop_spot,
+        risk_pct: t.risk_pct,
+        ema13_high: null,
+        candle: {},
+      }));
+    }
+
+    function renderTrendIgnition(radar, tape) {
+      const card = document.getElementById('trendIgnitionCard');
+      if (!card) return;
+      const rows = tape || [];
+      // Keep visible for the whole session once candles exist — don't hide when setup cools to IDLE.
+      if (!radar && !rows.length) { card.style.display = 'none'; return; }
+      card.style.display = 'block';
+      const st = radar?.state || 'IDLE';
+      const stateColor = st === 'IGNITION' ? '#f97316' : (st === 'RUNNING' ? '#ef4444' : (st === 'WATCH' ? '#eab308' : '#52525b'));
+      const badge = document.getElementById('trendIgnitionState');
+      badge.textContent = st + (radar?.side ? ' ' + radar.side : '');
+      badge.style.background = stateColor;
+      badge.style.color = '#0b0b0f';
+      let headline = radar?.headline || 'Waiting for session data…';
+      if (st === 'IDLE' && rows.some(r => r.state === 'WATCH')) {
+        const lastWatch = [...rows].reverse().find(r => r.state === 'WATCH');
+        const ended = rows.filter(r => r.timestamp > (lastWatch?.timestamp || '')).find(r => !r.state);
+        headline = `Setup cooled${ended ? ' at ' + (ended.time || '') : ''} — last watch ${lastWatch?.time || ''} ${lastWatch?.side || ''}. ${headline}`;
+      }
+      document.getElementById('trendIgnitionHeadline').textContent = headline;
+      const mv = radar?.move_class;
+      const mvColor = mv === 'HUGE' ? '#ef4444' : (mv === 'MEDIUM' ? '#f97316' : (mv === 'SHORT' ? '#eab308' : '#a1a1aa'));
+      const tile = (label, val, color) => `<div style="border:1px solid #26262e;border-left:3px solid ${color || '#3f3f46'};border-radius:6px;padding:0.4rem 0.55rem;background:#17171c;">
+        <div style="font-size:0.66rem;color:#a1a1aa;text-transform:uppercase;letter-spacing:0.03em;">${label}</div>
+        <div style="font-size:1.0rem;font-weight:600;color:${color || '#e4e4e7'};">${val}</div></div>`;
+      const m = document.getElementById('trendIgnitionMetrics');
+      m.innerHTML = [
+        tile('Bias', radar?.side || '—', radar?.side === 'PE' ? '#86efac' : (radar?.side === 'CE' ? '#fca5a5' : null)),
+        tile('Move class', mv || '—', mvColor),
+        tile('Est. move', radar?.est_move_pts != null ? `${fmt(radar.est_move_pts)} pts` : '—', mvColor),
+        tile('Target spot', radar?.target_spot != null ? fmt(radar.target_spot) : '—', mvColor),
+        tile('Entry (opt)', radar?.entry != null ? `₹${fmt(radar.entry)}` : '—', null),
+        tile('SL (opt)', radar?.stop_ltp != null ? `₹${fmt(radar.stop_ltp)}` : '—', null),
+        tile('Coil', (radar?.coil_low != null && radar?.coil_high != null) ? `${fmt(radar.coil_low)}–${fmt(radar.coil_high)}` : '—', null),
+        tile('Exp. move (day)', radar?.expected_move_pts != null ? `${fmt(radar.expected_move_pts)} pts` : '—', null),
+      ].join('');
+    }
+
+    function renderTrendIgnitionTape(tape) {
+      const body = document.getElementById('trendIgnitionTapeBody');
+      const empty = document.getElementById('trendIgnitionTapeEmpty');
+      if (!body) return;
+      const rows = tape || [];
+      if (!rows.length) { if (empty) empty.style.display = 'block'; body.innerHTML = ''; return; }
+      if (empty) empty.style.display = 'none';
+      const chg = (v) => {
+        const n = Number(v);
+        if (!isFinite(n) || n === 0) return '<span class="num">—</span>';
+        const c = n > 0 ? 'pnl-positive' : 'pnl-negative';
+        return `<span class="num ${c}">${n > 0 ? '+' : ''}${n.toFixed(0)}%</span>`;
+      };
+      const rowBg = (st) => st === 'IGNITION' ? 'background:rgba(249,115,22,.18);'
+        : (st === 'CONTINUATION' ? 'background:rgba(239,68,68,.10);'
+        : (st === 'WATCH' ? 'background:rgba(234,179,8,.08);' : ''));
+      const stateCell = (st, side) => {
+        if (!st) return '<span style="color:#52525b;">—</span>';
+        const c = st === 'IGNITION' ? '#f97316' : (st === 'CONTINUATION' ? '#ef4444' : '#eab308');
+        const label = st === 'IGNITION' ? '🚀 IGNITION' : st;
+        return `<span style="color:${c};font-weight:700;white-space:nowrap;">${label}${side ? ' ' + side : ''}</span>`;
+      };
+      const mvCell = (mv) => {
+        if (!mv) return '—';
+        const c = mv === 'HUGE' ? '#ef4444' : (mv === 'MEDIUM' ? '#f97316' : '#eab308');
+        return `<span style="color:${c};font-weight:700;">${mv}</span>`;
+      };
+      const spotVwap = (v) => v === 'below' ? '<span style="color:#86efac;">below</span>'
+        : (v === 'above' ? '<span style="color:#fca5a5;">above</span>' : (v || '—'));
+      body.innerHTML = rows.map(r => `<tr style="${rowBg(r.state)}">
+        <td>${fmt(r.time)}</td>
+        <td class="num">${fmt(r.spot)}</td>
+        <td class="num">${fmt(r.vwap)}</td>
+        <td>${spotVwap(r.spot_vs_vwap)}</td>
+        <td class="num">${r.spot_change_pct != null ? (r.spot_change_pct > 0 ? '+' : '') + fmt(r.spot_change_pct) + '%' : '—'}</td>
+        <td class="num">${r.expansion_x != null ? fmt(r.expansion_x) + '×' : '—'}</td>
+        <td class="num">${(r.coil_low != null && r.coil_high != null) ? fmt(r.coil_low) + '/' + fmt(r.coil_high) : '—'}</td>
+        <td>${chg(r.call_change_pct)}</td>
+        <td>${chg(r.put_change_pct)}</td>
+        <td>${stateCell(r.state, r.side)}</td>
+        <td>${mvCell(r.move_class)}</td>
+        <td class="num">${r.est_move_pts != null ? fmt(r.est_move_pts) : '—'}</td>
+        <td class="num">${r.target_spot != null ? fmt(r.target_spot) : '—'}</td>
+      </tr>`).join('');
+    }
+
+    async function loadTrendIgnition() {
+      const card = document.getElementById('trendIgnitionCard');
+      if (!card) return;
+      try {
+        const r = await fetch(apiUrl('/api/trend-ignition'));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        _trendIgnitionData = d;
+        renderTrendIgnition(d.radar, d.tape);
+        renderTrendIgnitionTape(d.tape);
+        if (optionsTradingRawPayload) renderOptionsTradingPayload(optionsTradingRawPayload);
+      } catch (e) {
+        _trendIgnitionData = null;
+        card.style.display = 'none';
+      }
+    }
+
+    async function loadAutoTradeConfig() {
+      const autoCb = document.getElementById('autoTradeEnabled');
+      const rrCb = document.getElementById('rrTrailEnabled');
+      const statusEl = document.getElementById('autoTradeStatus');
+      const lastEl = document.getElementById('autoTradeLastRun');
+      if (!autoCb || !rrCb) return;
+      try {
+        const r = await fetch(apiUrl('/api/auto-trade/config'));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        autoCb.checked = !!d.auto_trade_enabled;
+        rrCb.checked = !!d.rr_trail_enabled;
+        if (lotsInput && d.lots != null) lotsInput.value = d.lots;
+        const entryOn = d.auto_trade_enabled ? 'ON' : 'OFF';
+        const trailOn = d.rr_trail_enabled ? 'ON' : 'OFF';
+        statusEl.innerHTML = `Auto Entry: <span style="color:${d.auto_trade_enabled ? '#22c55e' : '#71717a'}">${entryOn}</span> · RR Trail: <span style="color:${d.rr_trail_enabled ? '#22c55e' : '#71717a'}">${trailOn}</span>`;
+        const lr = d.last_run_status;
+        const execN = (lr && lr.executed) ? lr.executed.length : 0;
+        const errN = (lr && lr.errors) ? lr.errors.length : 0;
+        lastEl.textContent = d.last_run_at
+          ? `Last scan ${shortTs(d.last_run_at, 19)} · executed ${execN} · errors ${errN}${lr && lr.skipped ? ' · ' + lr.skipped : ''}`
+          : 'No auto-trade scan yet today.';
+      } catch (e) {
+        if (statusEl) statusEl.textContent = 'Auto-trade status unavailable.';
+      }
+    }
+
+    async function saveAutoTradeConfig(patch) {
+      try {
+        const r = await fetch(apiUrl('/api/auto-trade/config'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'save failed');
+        await loadAutoTradeConfig();
+        return d;
+      } catch (e) {
+        setStatus('Auto-trade config error: ' + e.message, false);
+        throw e;
+      }
+    }
+
+    const autoTradeCb = document.getElementById('autoTradeEnabled');
+    const rrTrailCb = document.getElementById('rrTrailEnabled');
+    if (autoTradeCb) {
+      autoTradeCb.addEventListener('change', async () => {
+        autoTradeCb.disabled = true;
+        try {
+          await saveAutoTradeConfig({ auto_trade_enabled: autoTradeCb.checked });
+          setStatus(autoTradeCb.checked ? 'Auto entry ENABLED — orders will fire on new signals.' : 'Auto entry disabled.', true);
+        } finally { autoTradeCb.disabled = false; }
+      });
+    }
+    if (rrTrailCb) {
+      rrTrailCb.addEventListener('change', async () => {
+        rrTrailCb.disabled = true;
+        try {
+          await saveAutoTradeConfig({ rr_trail_enabled: rrTrailCb.checked });
+          setStatus(rrTrailCb.checked ? '1:3 RR swing trail ENABLED.' : 'RR swing trail disabled.', true);
+        } finally { rrTrailCb.disabled = false; }
+      });
+    }
+    if (lotsInput) {
+      lotsInput.addEventListener('change', () => {
+        const n = Math.max(1, Math.min(100, parseInt(lotsInput.value, 10) || 1));
+        lotsInput.value = n;
+        saveAutoTradeConfig({ lots: n }).catch(() => {});
+      });
+    }
+
     async function loadOptionsTrading() {
+      loadExpiryGamma();
+      loadTrendIgnition();
+      loadAutoTradeConfig();
       if (!optionsTradingCeBody && !optionsTradingPeBody) return;
       try {
         const r = await fetch(apiUrl('/api/options-trading/signals'));
@@ -993,6 +1581,8 @@
           const d = await r.json();
           if (!r.ok) throw new Error(d.detail || 'Refresh failed');
           renderOptionsTradingPayload(d.signals || d);
+          loadExpiryGamma();
+          loadTrendIgnition();
           setStatus('Options trading signals refreshed.', true);
         } catch (e) {
           setStatus('Error: ' + e.message, false);
@@ -1149,7 +1739,7 @@
     }
 
     btnExecute.addEventListener('click', async () => {
-      const lots = parseInt(lotsInput.value, 10) || 2;
+      const lots = parseInt(lotsInput.value, 10) || 1;
       btnExecute.disabled = true;
       setStatus('Placing order...', null);
       try {
@@ -1230,7 +1820,10 @@
           const slVal = p.sl_trigger != null ? parseFloat(p.sl_trigger) : null;
           const hasSl = p.sl_order_id != null;
           const autoTrail = p.auto_trail === true;
-          const trailCls = autoTrail ? 'btn-trail on' : 'btn-trail';
+          const rrLocked = p.rr_locked === true;
+          const rrTrail = p.rr_trail === true;
+          const trailLbl = rrTrail ? (rrLocked ? 'RR+Swing' : 'RR wait') : (autoTrail ? '1m trail' : '');
+          const trailCls = (autoTrail || rrTrail) ? 'btn-trail on' : 'btn-trail';
           return `<tr data-sym="${sym}" data-qty="${qty}">
             <td>${sym}</td>
             <td>${fmt(p.quantity)}</td>
@@ -1244,7 +1837,7 @@
             <td>
               <div class="pos-actions">
                 <button class="btn btn-exit exit-btn" data-sym="${sym}" data-qty="${qty}">Exit</button>
-                ${hasSl ? `<button class="btn ${trailCls} trail-btn" data-sym="${sym}" data-qty="${qty}" data-on="${autoTrail}">${autoTrail ? 'Trail ON' : 'Auto Trail'}</button>` : ''}
+                ${hasSl ? `<button class="btn ${trailCls} trail-btn" data-sym="${sym}" data-qty="${qty}" data-on="${autoTrail}">${trailLbl || (autoTrail ? 'Trail ON' : 'Auto Trail')}</button>` : ''}
               </div>
             </td>
           </tr>`;
@@ -1263,6 +1856,7 @@
 
     function renderHugeMove(hm) {
       const el = document.getElementById('hugeMoveContent');
+      const legend = document.getElementById('hugeMoveLegend');
       if (!el || !hm) return;
       const dirCls = hm.direction === 'BULLISH' ? 'badge-bull' : hm.direction === 'BEARISH' ? 'badge-bear' : 'badge-neutral';
       const reasons = (hm.reasons || []).map(r => `<li>${r}</li>`).join('');
@@ -1304,6 +1898,7 @@
         </div>
         ${reasons ? `<p style="margin: 0; font-size: 0.8rem; color: #a1a1aa;"><strong>Reasons:</strong></p><ul style="margin: 0.25rem 0 0; padding-left: 1.25rem; font-size: 0.8rem; color: #a1a1aa;">${reasons}</ul>` : ''}
       `;
+      if (legend) legend.style.display = 'grid';
     }
 
     async function loadHugeMove() {
@@ -1397,6 +1992,10 @@
           <div class="marker" style="left: ${rangePct}%;" title="Spot: ${fmt(spot)}"></div>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #71717a; margin-top: 0.25rem;"><span>${fmt(sessionLow)}</span><span>${fmt(sessionHigh)}</span></div>
+        <div class="visual-legend" style="margin-top:0.65rem;">
+          <div class="ce-hint"><strong>Buy CE:</strong> Marker rising from session low with bullish bias — dip-buy zone, not extended at highs only.</div>
+          <div class="pe-hint"><strong>Buy PE:</strong> Marker rolling from session high with bearish bias — fade rallies, not blindly at highs on an up day.</div>
+        </div>
       `;
     }
 
@@ -1420,6 +2019,234 @@
       });
     }
 
+    let _analysisSummaries = [];
+    let _hourlyLevels = null;
+
+    function confluencePassCell(ok) {
+      return `<td class="num ${ok ? 'confluence-pass' : 'confluence-fail'}">${ok ? '✓' : '—'}</td>`;
+    }
+
+    function renderConfluencePanel(summaries, selectedTs, hourlyLevels) {
+      const card = document.getElementById('confluenceCard');
+      const body = document.getElementById('confluenceBody');
+      const scoresEl = document.getElementById('confluenceScores');
+      const meta = document.getElementById('confluenceMeta');
+      const timeline = document.getElementById('confluenceTimeline');
+      if (!card || !body) return;
+
+      _analysisSummaries = summaries || [];
+      _hourlyLevels = hourlyLevels || null;
+
+      if (!summaries.length || !summaries.some(s => s.confluence)) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'block';
+
+      const selected = summaries.find(s => s.timestamp === selectedTs) || summaries[summaries.length - 1];
+      const cf = selected?.confluence;
+      const ts = selected?.timestamp;
+
+      if (hourlyLevels?.support != null) {
+        const src = hourlyLevels.source || 'hourly';
+        const lb = hourlyLevels.lookback_bars || '—';
+        meta.textContent = `1H S/R (${src}, ${lb} bars) · direction requires spot trend + 7+ checks · OI read with premium`;
+      }
+
+      if (cf && scoresEl) {
+        const dirCls = cf.direction === 'CE' ? 'dir-ce' : cf.direction === 'PE' ? 'dir-pe' : 'dir-neutral';
+        scoresEl.innerHTML = `
+          <span class="confluence-score-pill ce">CE ${cf.ce_score}/${cf.total_checks}</span>
+          <span class="confluence-score-pill pe">PE ${cf.pe_score}/${cf.total_checks}</span>
+          <span class="confluence-score-pill ${dirCls}">→ ${cf.direction}</span>
+        `;
+        body.innerHTML = (cf.checks || []).map(row => `
+          <tr>
+            <td>${row.label}</td>
+            <td class="confluence-value">${row.value || '—'}</td>
+            ${confluencePassCell(row.ce)}
+            ${confluencePassCell(row.pe)}
+          </tr>
+        `).join('');
+      }
+
+      if (timeline) {
+        timeline.innerHTML = summaries.map(s => {
+          const c = s.confluence || {};
+          const dir = (c.direction || 'NEUTRAL').toLowerCase();
+          const cls = dir === 'ce' ? 'ce' : dir === 'pe' ? 'pe' : 'neutral';
+          const time = shortTs(s.timestamp || '', 5);
+          const title = `${time} · CE ${c.ce_score || 0}/10 · PE ${c.pe_score || 0}/10 · ${c.direction || '—'}`;
+          const sel = s.timestamp === ts ? ' selected' : '';
+          return `<div class="cf-block ${cls}${sel}" data-ts="${s.timestamp || ''}" title="${title}"></div>`;
+        }).join('');
+        timeline.querySelectorAll('.cf-block').forEach(block => {
+          block.onclick = () => {
+            const bts = block.dataset.ts;
+            if (!bts) return;
+            renderConfluencePanel(_analysisSummaries, bts, _hourlyLevels);
+            fetch(apiUrl('/api/analysis-summary', { timestamp: bts }))
+              .then(r => r.json())
+              .then(data => renderAnalysis(data.selected));
+          };
+        });
+      }
+    }
+
+    function renderExpiryGamma(eg) {
+      const card = document.getElementById('expiryGammaCard');
+      if (!card) return;
+      if (!eg || eg.state === 'OFF' || eg.is_expiry_day === false) { card.style.display = 'none'; return; }
+      card.style.display = 'block';
+      const stateColors = { TRIGGERED:'#ef4444', IGNITION:'#fb923c', ARMED:'#f59e0b', IDLE:'#64748b', OFF:'#64748b' };
+      const color = stateColors[eg.state] || '#64748b';
+      const badge = document.getElementById('expiryGammaState');
+      badge.textContent = eg.state;
+      badge.style.background = color; badge.style.color = '#0b0b0f';
+      document.getElementById('expiryGammaHeadline').textContent = eg.headline || '';
+      const sideColor = (s) => s === 'CE' ? '#fca5a5' : (s === 'PE' ? '#86efac' : '#e6edf3');
+      let html = '';
+      if (eg.candidate_hint) {
+        html += `<div style="border-left:3px solid ${color};background:#12171f;border-radius:0 8px 8px 0;padding:.55rem .8rem;margin-bottom:.6rem;">
+          <span style="font-weight:700;color:${sideColor(eg.side)};">${fmt(eg.candidate_hint)}</span></div>`;
+      }
+      if (eg.reasons && eg.reasons.length) {
+        html += '<ul style="margin:.2rem 0 .4rem 1.1rem;padding:0;font-size:.85rem;color:#cbd5e1;">' +
+          eg.reasons.map(r => `<li>${fmt(r)}</li>`).join('') + '</ul>';
+      }
+      const trigs = eg.triggers || [];
+      if (trigs.length) {
+        const stageBadge = (st) => {
+          const c = st === 'IGNITION' ? '#fb923c' : '#ef4444';
+          return `<span style="font-weight:700;color:${c};">${st}</span>`;
+        };
+        html += `<div style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#71717a;margin:.6rem 0 .3rem;">Triggers fired today (${trigs.length}) — 🎯 ignition = the tight-SL entry, break = confirmation</div>`;
+        html += `<table style="width:100%;font-size:.83rem;"><thead><tr>
+          <th>Time</th><th>Stage</th><th>Side</th><th class="num">Strike</th><th class="num">Spot</th>
+          <th class="num">Entry ₹</th><th class="num">SL (spot)</th><th class="num">Prem Δ</th><th class="num">OI Δ</th><th class="num">Conf</th></tr></thead><tbody>` +
+          trigs.slice().reverse().map(t => `<tr>
+            <td>${shortTs(fmt(t.timestamp), 5)}</td>
+            <td>${stageBadge(t.stage)}</td>
+            <td style="font-weight:700;color:${sideColor(t.side)};">${t.side}</td>
+            <td class="num">${fmt(t.strike)}</td>
+            <td class="num">${fmt(t.spot)}</td>
+            <td class="num">${fmt(t.entry)}</td>
+            <td class="num">${fmt(t.stop_spot)}</td>
+            <td class="num pnl-positive">+${fmt(t.prem_change_pct)}%</td>
+            <td class="num pnl-negative">${fmt(t.oi_change_pct)}%</td>
+            <td class="num">${(Number(t.confidence)*100).toFixed(0)}%</td>
+          </tr>`).join('') + '</tbody></table>';
+      }
+      document.getElementById('expiryGammaBody').innerHTML = html;
+    }
+
+    let _buyersDayChart = null;
+
+    function buyersDayScoreColor(score) {
+      if (!isFinite(score)) return '#71717a';
+      if (score >= 60) return '#22c55e';   // buyer-friendly
+      if (score >= 40) return '#eab308';   // mixed
+      return '#ef4444';                     // avoid
+    }
+
+    function renderBuyersDayTrend(series) {
+      const ctx = document.getElementById('chartBuyersDay');
+      if (!ctx || typeof Chart === 'undefined') return;
+      if (_buyersDayChart) { _buyersDayChart.destroy(); _buyersDayChart = null; }
+      const pts = (series || []).filter(p => p && isFinite(Number(p.score)));
+      if (!pts.length) return;
+      const labels = pts.map(p => p.time || shortTs(p.timestamp, 5));
+      const data = pts.map(p => Number(p.score));
+      const pointColors = data.map(buyersDayScoreColor);
+      _buyersDayChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: "Buyer's Day score",
+            data,
+            fill: false,
+            tension: 0.25,
+            borderWidth: 2,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+            // colour each segment by the score it ends on (red/yellow/green regime)
+            segment: {
+              borderColor: (c) => buyersDayScoreColor(c.p1.parsed.y),
+            },
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (c) => {
+                  const v = c.parsed.y;
+                  if (v == null || !isFinite(v)) return 'score: —';
+                  const verdict = v >= 60 ? 'buyer-friendly' : (v >= 40 ? 'mixed' : 'avoid');
+                  return `score ${v.toFixed(0)} · ${verdict}`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#71717a', maxTicksLimit: 14, font: { size: 9 }, maxRotation: 0 },
+              grid: { color: '#27272a' },
+            },
+            y: {
+              min: 0, max: 100,
+              ticks: { color: '#71717a', stepSize: 20 },
+              grid: {
+                color: (c) => (c.tick.value === 40 || c.tick.value === 60) ? '#3f3f46' : '#1f1f23',
+              },
+            },
+          },
+        },
+      });
+    }
+
+    function renderBuyersDay(bd) {
+      const card = document.getElementById('buyersDayCard');
+      if (!card) return;
+      if (!bd || bd.candles == null) {
+        card.style.display = 'none';
+        if (_buyersDayChart) { _buyersDayChart.destroy(); _buyersDayChart = null; }
+        return;
+      }
+      card.style.display = 'block';
+      const score = Number(bd.score);
+      const color = bd.verdict === 'BUYER_FRIENDLY' ? '#22c55e' : (bd.verdict === 'AVOID' ? '#ef4444' : '#eab308');
+      document.getElementById('buyersDayScore').textContent = isFinite(score) ? score.toFixed(0) : '—';
+      document.getElementById('buyersDayScore').style.color = color;
+      const verdictEl = document.getElementById('buyersDayVerdict');
+      verdictEl.textContent = (bd.verdict || '—').replace('_', ' ');
+      verdictEl.style.background = color;
+      verdictEl.style.color = '#0b0b0f';
+      document.getElementById('buyersDayHeadline').textContent = bd.headline || '';
+      const bar = document.getElementById('buyersDayBar');
+      bar.style.width = (isFinite(score) ? Math.max(0, Math.min(100, score)) : 0) + '%';
+      bar.style.background = color;
+      const stateColor = (st) => st === 'good' ? '#22c55e' : (st === 'bad' ? '#ef4444' : (st === 'na' ? '#52525b' : '#eab308'));
+      const factors = (bd.factors || []).filter(f => f.state !== 'na');
+      document.getElementById('buyersDayFactors').innerHTML = factors.map(f => {
+        const c = stateColor(f.state);
+        const val = f.value == null ? '—' : f.value;
+        return `<div style="border:1px solid #26262e;border-left:3px solid ${c};border-radius:6px;padding:0.4rem 0.55rem;background:#17171c;">
+          <div style="font-size:0.68rem;color:#a1a1aa;text-transform:uppercase;letter-spacing:0.03em;">${fmt(f.label)}</div>
+          <div style="font-size:1.05rem;font-weight:600;color:${c};">${val}</div>
+          <div style="font-size:0.68rem;color:#8a8a93;line-height:1.2;margin-top:0.15rem;">${fmt(f.hint)}</div>
+        </div>`;
+      }).join('');
+      renderBuyersDayTrend(bd.series);
+    }
+
     async function loadAnalysis() {
       try {
         const r = await fetch(apiUrl('/api/analysis-summary'));
@@ -1427,7 +2254,11 @@
         if (!r.ok) throw new Error(d.detail || 'Failed to load');
         const summaries = d.summaries || [];
         renderDayOverview(summaries);
+        renderBuyersDay(d.buyers_day);
+        renderConfluencePanel(summaries, d.selected?.timestamp, d.hourly_levels);
+        renderAnalysisCharts(summaries);
         renderDayTimeline(summaries, (ts) => {
+          renderConfluencePanel(summaries, ts, d.hourly_levels);
           fetch(apiUrl('/api/analysis-summary', { timestamp: ts })).then(r => r.json()).then(data => renderAnalysis(data.selected));
         });
         const tbody = document.getElementById('analysisOverviewBody');
@@ -1441,6 +2272,11 @@
           const callChg = opt.call_change_pct != null ? opt.call_change_pct : 0;
           const putChg = opt.put_change_pct != null ? opt.put_change_pct : 0;
           const score = s.scores?.final_score != null ? s.scores.final_score : null;
+          const cf = s.confluence || {};
+          const dir = cf.direction || '—';
+          const dirCls = dir === 'CE' ? 'pnl-negative' : dir === 'PE' ? 'pnl-positive' : '';
+          const ceSc = cf.ce_score != null ? cf.ce_score : '—';
+          const peSc = cf.pe_score != null ? cf.pe_score : '—';
           return `<tr class="analysis-row" data-ts="${s.timestamp || ''}" style="cursor:pointer">
             <td>${shortTs(fmt(s.timestamp), 5)}</td>
             <td class="${sigClass(s.signal)}">${fmt(s.signal)?.replace('_','') || '—'}</td>
@@ -1453,25 +2289,486 @@
             <td class="num ${putChg > 0 ? 'pnl-positive' : putChg < 0 ? 'pnl-negative' : ''}">${fmt(opt.put_change_pct)}%</td>
             <td class="num">${fmt(opt.put_call_ratio)}</td>
             <td class="num ${score != null && score > 0 ? 'pnl-positive' : score != null && score < 0 ? 'pnl-negative' : ''}">${score != null ? score.toFixed(2) : '—'}</td>
+            <td class="${dirCls}" style="font-weight:600">${dir}</td>
+            <td class="num">${ceSc}</td>
+            <td class="num">${peSc}</td>
             <td><span class="badge ${biasCls}">${fmt(s.bias)?.replace('_DAY','') || '—'}</span></td>
             <td><span class="badge ${momCls}">${fmt(pa.momentum) || '—'}</span></td>
           </tr>`;
-        }).join('') || '<tr><td colspan="13">No data. Run Refresh first.</td></tr>';
+        }).join('') || '<tr><td colspan="16">No data. Run Refresh first.</td></tr>';
         document.querySelectorAll('.analysis-row').forEach(row => {
           row.onclick = () => {
             const ts = row.dataset.ts;
-            if (ts) fetch(apiUrl('/api/analysis-summary', { timestamp: ts })).then(r => r.json()).then(data => renderAnalysis(data.selected));
+            if (ts) fetch(apiUrl('/api/analysis-summary', { timestamp: ts })).then(r => r.json()).then(data => {
+              renderConfluencePanel(summaries, ts, d.hourly_levels);
+              renderAnalysis(data.selected);
+            });
           };
         });
         renderAnalysis(d.selected);
       } catch (e) {
         document.getElementById('analysisContent').innerHTML = '<p class="status err">Error: ' + e.message + '</p>';
+        renderAnalysisCharts([]);
+        renderConfluencePanel([], null, null);
+        renderBuyersDay(null);
+      }
+    }
+
+    const CE_CHART_COLOR = '#ef4444';
+    const PE_CHART_COLOR = '#22c55e';
+    const _analysisCharts = {};
+
+    function destroyAnalysisCharts() {
+      Object.keys(_analysisCharts).forEach(k => {
+        if (_analysisCharts[k]) {
+          _analysisCharts[k].destroy();
+          _analysisCharts[k] = null;
+        }
+      });
+    }
+
+    function analysisChartBaseOptions(yTitle, summaries, onPointClick) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        onClick: (evt, elements) => {
+          if (!elements.length || !onPointClick) return;
+          const idx = elements[0].index;
+          const s = summaries[idx];
+          if (s?.timestamp) onPointClick(s.timestamp);
+        },
+        plugins: {
+          legend: {
+            labels: { color: '#a1a1aa', boxWidth: 12, font: { size: 11 } },
+            position: 'top',
+            align: 'end',
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.parsed.y;
+                if (v == null || !Number.isFinite(v)) return `${ctx.dataset.label}: —`;
+                return `${ctx.dataset.label}: ${v.toFixed(2)}%`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#71717a', maxTicksLimit: 14, font: { size: 9 }, maxRotation: 0 },
+            grid: { color: '#27272a' },
+          },
+          y: {
+            ticks: { color: '#71717a', callback: (v) => v + '%' },
+            grid: { color: '#27272a' },
+            title: yTitle ? { display: true, text: yTitle, color: '#71717a', font: { size: 10 } } : undefined,
+          },
+        },
+      };
+    }
+
+    function renderAnalysisCharts(summaries) {
+      const card = document.getElementById('analysisChartsCard');
+      const meta = document.getElementById('analysisChartsMeta');
+      destroyAnalysisCharts();
+      if (!card || typeof Chart === 'undefined') return;
+
+      const hasOi = summaries.some(s => s.oi && (s.oi.call_oi || s.oi.put_oi));
+      if (!summaries.length || !hasOi) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'block';
+      if (meta) {
+        meta.textContent = `${summaries.length} bars · OI+premium flow (not raw OI alone) · spot must align for CE/PE direction`;
+      }
+
+      const labels = summaries.map(s => shortTs(s.timestamp, 5));
+      const ceFlow = summaries.map(s => s.flow?.ce_flow_index ?? null);
+      const peFlow = summaries.map(s => s.flow?.pe_flow_index ?? null);
+      const flowSkew = summaries.map(s => s.flow?.flow_skew ?? null);
+      const rawOiSkew = summaries.map(s => s.flow?.raw_oi_skew_pp ?? null);
+      const cePremPct = summaries.map(s => s.options?.call_session_change_pct ?? null);
+      const pePremPct = summaries.map(s => s.options?.put_session_change_pct ?? null);
+      const cePremBar = summaries.map(s => s.options?.call_change_pct ?? null);
+      const pePremBar = summaries.map(s => s.options?.put_change_pct ?? null);
+      const ceOiPctRaw = summaries.map(s => s.oi?.call_oi_change_pct ?? null);
+      const peOiPctRaw = summaries.map(s => s.oi?.put_oi_change_pct ?? null);
+      const pcr = summaries.map(s => s.options?.put_call_ratio ?? null);
+      const netConfluence = summaries.map(s => {
+        const cf = s.confluence;
+        if (!cf) return null;
+        return (cf.ce_score ?? 0) - (cf.pe_score ?? 0);
+      });
+      const futPrem = summaries.map(s => s.futures?.vs_spot_pct ?? null);
+
+      // Live readings keep each legend in sync with its chart + overall direction.
+      const lastIdx = summaries.length - 1;
+      const setReading = (id, dir, detail) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const cls = dir === 'CE' ? 'ce' : dir === 'PE' ? 'pe' : 'neutral';
+        el.innerHTML = `Now: <span class="pill ${cls}">${dir}</span><span class="detail">${detail}</span>`;
+      };
+      const firstNonNull = (arr) => arr.find(v => v != null) ?? 0;
+
+      const onPointClick = (ts) => {
+        fetch(apiUrl('/api/analysis-summary', { timestamp: ts }))
+          .then(r => r.json())
+          .then(data => renderAnalysis(data.selected));
+      };
+
+      const flowChartOptions = (yTitle, summaries, onPointClick, afterBodyFn) => {
+        const base = analysisChartBaseOptions(yTitle, summaries, onPointClick);
+        return {
+          ...base,
+          plugins: {
+            ...base.plugins,
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const v = ctx.parsed.y;
+                  if (v == null || !Number.isFinite(v)) return `${ctx.dataset.label}: —`;
+                  return `${ctx.dataset.label}: ${v.toFixed(2)}`;
+                },
+                afterBody: afterBodyFn ? (items) => afterBodyFn(items) : undefined,
+              },
+            },
+          },
+          scales: {
+            ...base.scales,
+            y: {
+              ...base.scales.y,
+              ticks: {
+                color: '#71717a',
+                callback: (v) => v,
+              },
+            },
+          },
+        };
+      };
+
+      const ctxOi = document.getElementById('chartOiPct');
+      if (ctxOi) {
+        _analysisCharts.oi = new Chart(ctxOi, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'CE flow index',
+                data: ceFlow,
+                borderColor: CE_CHART_COLOR,
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                fill: false,
+                tension: 0.25,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+              },
+              {
+                label: 'PE flow index',
+                data: peFlow,
+                borderColor: PE_CHART_COLOR,
+                backgroundColor: 'rgba(34, 197, 94, 0.08)',
+                fill: false,
+                tension: 0.25,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: flowChartOptions('flow pts', summaries, onPointClick, (items) => {
+            const i = items[0]?.dataIndex;
+            if (i == null) return [];
+            const raw = rawOiSkew[i];
+            return raw != null ? [`Raw OI skew (misleading alone): ${raw.toFixed(2)} pp`] : [];
+          }),
+        });
+        const ce = ceFlow[lastIdx], pe = peFlow[lastIdx];
+        if (ce != null && pe != null) {
+          const dir = ce > pe ? 'CE' : pe > ce ? 'PE' : 'NEUTRAL';
+          setReading('readingFlow', dir, `CE flow ${ce.toFixed(1)} vs PE flow ${pe.toFixed(1)}`);
+        }
+      }
+
+      const ctxOiRaw = document.getElementById('chartOiPctRaw');
+      if (ctxOiRaw) {
+        _analysisCharts.oiRaw = new Chart(ctxOiRaw, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'CE OI %',
+                data: ceOiPctRaw,
+                borderColor: CE_CHART_COLOR,
+                tension: 0.25,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+              },
+              {
+                label: 'PE OI %',
+                data: peOiPctRaw,
+                borderColor: PE_CHART_COLOR,
+                tension: 0.25,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: analysisChartBaseOptions('% vs session open', summaries, onPointClick),
+        });
+      }
+
+      const ctxPrem = document.getElementById('chartPremiumPct');
+      if (ctxPrem) {
+        _analysisCharts.premium = new Chart(ctxPrem, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'CE premium % (session)',
+                data: cePremPct,
+                borderColor: CE_CHART_COLOR,
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+              {
+                label: 'PE premium % (session)',
+                data: pePremPct,
+                borderColor: PE_CHART_COLOR,
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: analysisChartBaseOptions('% vs session open', summaries, onPointClick),
+        });
+        const ce = cePremPct[lastIdx], pe = pePremPct[lastIdx];
+        if (ce != null && pe != null) {
+          const dir = ce > pe ? 'CE' : pe > ce ? 'PE' : 'NEUTRAL';
+          setReading('readingPrem', dir, `CE ${ce.toFixed(1)}% vs PE ${pe.toFixed(1)}%`);
+        }
+      }
+
+      const ctxPremRaw = document.getElementById('chartPremiumRaw');
+      if (ctxPremRaw) {
+        _analysisCharts.premiumRaw = new Chart(ctxPremRaw, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'CE premium %',
+                data: cePremBar,
+                borderColor: CE_CHART_COLOR,
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+              {
+                label: 'PE premium %',
+                data: pePremBar,
+                borderColor: PE_CHART_COLOR,
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: analysisChartBaseOptions('% vs prior bar', summaries, onPointClick),
+        });
+      }
+
+      const ctxPcr = document.getElementById('chartPcr');
+      if (ctxPcr) {
+        _analysisCharts.pcr = new Chart(ctxPcr, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'P/C ratio',
+              data: pcr,
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              fill: true,
+              tension: 0.25,
+              pointRadius: 0,
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            ...analysisChartBaseOptions('', summaries, onPointClick),
+            plugins: {
+              ...analysisChartBaseOptions('', summaries, onPointClick).plugins,
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `P/C: ${ctx.parsed.y?.toFixed(2) ?? '—'}`,
+                },
+              },
+            },
+            scales: {
+              ...analysisChartBaseOptions('', summaries, onPointClick).scales,
+              y: {
+                ticks: { color: '#71717a' },
+                grid: { color: '#27272a' },
+              },
+            },
+          },
+        });
+        const firstPcr = firstNonNull(pcr);
+        const lastPcr = pcr[lastIdx];
+        if (lastPcr != null) {
+          const dir = lastPcr < firstPcr ? 'CE' : lastPcr > firstPcr ? 'PE' : 'NEUTRAL';
+          setReading('readingPcr', dir, `P/C ${lastPcr.toFixed(2)} (start ${firstPcr.toFixed(2)})`);
+        }
+      }
+
+      const ctxSkew = document.getElementById('chartOiSkew');
+      if (ctxSkew) {
+        _analysisCharts.skew = new Chart(ctxSkew, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Flow skew (CE − PE)',
+              data: flowSkew,
+              borderColor: '#60a5fa',
+              backgroundColor: (ctx) => {
+                const chart = ctx.chart;
+                const { ctx: c, chartArea } = chart;
+                if (!chartArea) return 'rgba(96, 165, 250, 0.1)';
+                const grad = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                grad.addColorStop(0, 'rgba(239, 68, 68, 0.22)');
+                grad.addColorStop(0.5, 'rgba(96, 165, 250, 0.04)');
+                grad.addColorStop(1, 'rgba(34, 197, 94, 0.22)');
+                return grad;
+              },
+              fill: true,
+              tension: 0.25,
+              pointRadius: 0,
+              borderWidth: 2,
+            }],
+          },
+          options: flowChartOptions('flow pts', summaries, onPointClick, (items) => {
+              const i = items[0]?.dataIndex;
+              if (i == null) return [];
+              const lines = [];
+              const s = summaries[i];
+              if (s?.flow?.premium_skew_pp != null) {
+                lines.push(`Premium skew: ${s.flow.premium_skew_pp.toFixed(2)} pp`);
+              }
+              if (rawOiSkew[i] != null) {
+                lines.push(`Raw OI skew: ${rawOiSkew[i].toFixed(2)} pp`);
+              }
+              return lines;
+            }),
+        });
+        const sk = flowSkew[lastIdx];
+        if (sk != null) {
+          const dir = sk > 0 ? 'CE' : sk < 0 ? 'PE' : 'NEUTRAL';
+          setReading('readingSkew', dir, `Flow skew ${sk.toFixed(1)}`);
+        }
+      }
+
+      const ctxSkewRaw = document.getElementById('chartOiSkewRaw');
+      if (ctxSkewRaw) {
+        _analysisCharts.skewRaw = new Chart(ctxSkewRaw, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'CE% − PE%',
+              data: rawOiSkew,
+              borderColor: '#60a5fa',
+              backgroundColor: 'rgba(96, 165, 250, 0.08)',
+              fill: true,
+              tension: 0.25,
+              pointRadius: 0,
+              borderWidth: 2,
+            }],
+          },
+          options: flowChartOptions('pp', summaries, onPointClick),
+        });
+      }
+
+      const ctxScore = document.getElementById('chartScoreFut');
+      if (ctxScore) {
+        _analysisCharts.score = new Chart(ctxScore, {
+          data: {
+            labels,
+            datasets: [
+              {
+                type: 'bar',
+                label: 'Net confluence (CE − PE)',
+                data: netConfluence,
+                backgroundColor: netConfluence.map(v => (v != null && v >= 0 ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 197, 94, 0.6)')),
+                yAxisID: 'y',
+                order: 2,
+              },
+              {
+                type: 'line',
+                label: 'Fut vs spot %',
+                data: futPrem,
+                borderColor: '#a78bfa',
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 2,
+                yAxisID: 'y1',
+                order: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            onClick: (evt, elements) => {
+              if (!elements.length) return;
+              const idx = elements[0].index;
+              const s = summaries[idx];
+              if (s?.timestamp) onPointClick(s.timestamp);
+            },
+            plugins: {
+              legend: { labels: { color: '#a1a1aa', boxWidth: 12, font: { size: 11 } }, position: 'top', align: 'end' },
+            },
+            scales: {
+              x: { ticks: { color: '#71717a', maxTicksLimit: 14, font: { size: 9 } }, grid: { color: '#27272a' } },
+              y: {
+                position: 'left',
+                ticks: { color: '#71717a' },
+                grid: { color: '#27272a' },
+                title: { display: true, text: 'CE − PE checks', color: '#71717a', font: { size: 10 } },
+              },
+              y1: {
+                position: 'right',
+                ticks: { color: '#a78bfa', callback: (v) => v + '%' },
+                grid: { display: false },
+                title: { display: true, text: 'Fut premium %', color: '#a78bfa', font: { size: 10 } },
+              },
+            },
+          },
+        });
+        const net = netConfluence[lastIdx];
+        if (net != null) {
+          const dir = net > 0 ? 'CE' : net < 0 ? 'PE' : 'NEUTRAL';
+          setReading('readingScore', dir, `Net ${net > 0 ? '+' : ''}${net} · fut ${(futPrem[lastIdx] ?? 0).toFixed(2)}%`);
+        }
       }
     }
 
     function setSelectedTimestamp(ts) {
       document.querySelectorAll('.day-timeline .candle-block').forEach(b => b.classList.toggle('selected', b.dataset.ts === ts));
       document.querySelectorAll('.analysis-row').forEach(r => r.classList.toggle('selected', r.dataset.ts === ts));
+      document.querySelectorAll('.confluence-timeline .cf-block').forEach(b => b.classList.toggle('selected', b.dataset.ts === ts));
     }
 
     function renderAnalysis(s) {

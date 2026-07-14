@@ -246,6 +246,7 @@
       <button class="tab" data-tab="fiidii">FII/DII &amp; OI Trends</button>
       <button class="tab" data-tab="rs">RS vs NIFTY</button>
       <button class="tab" data-tab="intraday-rs">Intraday RS</button>
+      <button class="tab" data-tab="sector-rs">Sector RS</button>
       <button class="tab" data-tab="instvol">Institutional Volume</button>
       <button class="tab" data-tab="combined">Combined Signals</button>
     </div>
@@ -699,6 +700,44 @@
       </div>
     </div>
 
+    <div id="panel-sector-rs" class="tab-panel">
+      <div class="toolbar">
+        <button type="button" class="btn btn-primary" id="btnSectorRsRefresh">Refresh</button>
+        <span class="status" id="sectorRsStatus">Groups NIFTY 500 by sector (Industry) and ranks each sector vs NIFTY 50.</span>
+        <span class="status" id="sectorRsMeta" style="color: var(--text-muted);">—</span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
+        Sectors ranked by average member out/under-performance vs NIFTY 50 today (open → latest 15-min close).
+        <strong style="color:#10b981;">Avg excess &gt; 0</strong> = sector leading the index; <strong style="color:#ef4444;">&lt; 0</strong> = lagging.
+        <em>Breadth</em> = share of the sector's stocks beating NIFTY. Click a sector to see its
+        <strong style="color:#10b981;">runners</strong> (ride these) and <strong style="color:#ef4444;">laggards</strong> (avoid / short candidates).
+      </p>
+      <div id="sectorRsLoading" class="loading" style="display:none;">Loading sector RS…</div>
+      <div id="sectorRsEmpty" class="empty" style="display:none;">No saved sector RS yet. Click Refresh.</div>
+      <div id="sectorRsContent" style="display:none;">
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head">Sector strength vs NIFTY 50 (strongest first)</div>
+          <div class="panel-body" style="overflow:auto;">
+            <table id="sectorRsTable" style="font-size: 0.84rem;">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Sector</th>
+                  <th class="num">Avg excess</th>
+                  <th class="num">Median</th>
+                  <th>Breadth</th>
+                  <th class="num">Adv/Dec</th>
+                  <th>Sector RS</th>
+                  <th>Top runners</th>
+                </tr>
+              </thead>
+              <tbody id="sectorRsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="panel-instvol" class="tab-panel">
       <div class="toolbar">
         <button type="button" class="btn btn-primary" id="btnInstVolRefresh">Refresh (1y daily for NIFTY 500)</button>
@@ -979,6 +1018,7 @@
         if (t.dataset.tab === 'fiidii') loadFiiDiiTrends();
         if (t.dataset.tab === 'rs') loadRelativeStrength();
         if (t.dataset.tab === 'intraday-rs') loadIntradayRs();
+        if (t.dataset.tab === 'sector-rs') loadSectorRs();
         if (t.dataset.tab === 'instvol') loadInstitutionalVolume();
         if (t.dataset.tab === 'combined') loadCombinedSignals();
       });
@@ -2694,8 +2734,165 @@
     });
 
 
+    // ---------- Sector Relative Strength (15-min, vs NIFTY 50) ----------
+    const btnSectorRsRefresh = document.getElementById('btnSectorRsRefresh');
+    const sectorRsStatus = document.getElementById('sectorRsStatus');
+    const sectorRsMeta = document.getElementById('sectorRsMeta');
+    const sectorRsLoading = document.getElementById('sectorRsLoading');
+    const sectorRsEmpty = document.getElementById('sectorRsEmpty');
+    const sectorRsContent = document.getElementById('sectorRsContent');
+    const sectorRsTbody = document.getElementById('sectorRsTbody');
+    let _sectorRsCache = [];
+    let _sectorRsExpanded = null;
+
+    function sectorPct(v) {
+      const n = Number(v);
+      if (!isFinite(n)) return '—';
+      return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+    }
+
+    function breadthBar(pct) {
+      const p = Math.max(0, Math.min(100, Number(pct) || 0));
+      const color = p >= 60 ? '#10b981' : (p >= 40 ? '#eab308' : '#ef4444');
+      return `<div style="display:flex;align-items:center;gap:0.4rem;min-width:120px;">
+        <div style="flex:1;height:8px;background:#2a2a31;border-radius:4px;overflow:hidden;">
+          <div style="width:${p}%;height:100%;background:${color};"></div>
+        </div>
+        <span style="font-size:0.78rem;color:var(--text-muted);width:34px;text-align:right;">${p.toFixed(0)}%</span>
+      </div>`;
+    }
+
+    function sectorChips(members, positive) {
+      if (!members || !members.length) return '<span style="color:var(--text-muted);">—</span>';
+      const color = positive ? '#10b981' : '#ef4444';
+      const bg = positive ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
+      return members.map(m =>
+        `<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:4px;background:${bg};color:${color};font-size:0.76rem;white-space:nowrap;">`
+        + `${fmt(m.stock)} <span style="opacity:0.85;">${sectorPct(m.excess_pct)}</span></span>`
+      ).join('');
+    }
+
+    function sectorDetailRow(s) {
+      const memberRows = (which) => {
+        const list = which === 'runners' ? (s.runners || []) : (s.laggards || []);
+        if (!list.length) return '<div class="empty">—</div>';
+        return `<table style="font-size:0.8rem;width:100%;">
+          <thead><tr><th>Stock</th><th class="num">Stock %</th><th class="num">Excess</th><th class="num">Price</th><th>RS</th></tr></thead>
+          <tbody>${list.map(m => `<tr>
+            <td class="stock"><strong>${fmt(m.stock)}</strong></td>
+            <td class="num ${deltaCls(m.pct_today)}">${sectorPct(m.pct_today)}</td>
+            <td class="num ${deltaCls(m.excess_pct)}"><strong>${sectorPct(m.excess_pct)}</strong></td>
+            <td class="num">${fmtNum(m.last_price)}</td>
+            <td>${intradayRsSparkline(m.rs_line || [], 90, 24)}</td>
+          </tr>`).join('')}</tbody></table>`;
+      };
+      return `<tr class="sector-detail"><td colspan="8" style="background:rgba(255,255,255,0.02);padding:0.6rem 1rem;">
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:1rem;">
+          <div><div class="panel-head" style="color:#10b981;">▲ Runners (ride these)</div>${memberRows('runners')}</div>
+          <div><div class="panel-head" style="color:#ef4444;">▼ Laggards (weak)</div>${memberRows('laggards')}</div>
+        </div></td></tr>`;
+    }
+
+    function renderSectorRsTable() {
+      sectorRsTbody.innerHTML = _sectorRsCache.map((s, i) => {
+        const cls = deltaCls(s.avg_excess_pct);
+        const row = `<tr class="sector-row" data-sector="${fmt(s.sector)}" style="cursor:pointer;">
+          <td class="num">${i + 1}</td>
+          <td><strong>${fmt(s.sector)}</strong> <span style="color:var(--text-muted);font-size:0.75rem;">(${s.members_with_data})</span></td>
+          <td class="num ${cls}"><strong>${sectorPct(s.avg_excess_pct)}</strong></td>
+          <td class="num ${deltaCls(s.median_excess_pct)}">${sectorPct(s.median_excess_pct)}</td>
+          <td>${breadthBar(s.breadth_pct)}</td>
+          <td class="num"><span style="color:#10b981;">${s.advancers}</span>/<span style="color:#ef4444;">${s.decliners}</span></td>
+          <td>${intradayRsSparkline(s.rs_line || [])}</td>
+          <td>${sectorChips((s.runners || []).slice(0, 3), true)}</td>
+        </tr>`;
+        return row + (_sectorRsExpanded === s.sector ? sectorDetailRow(s) : '');
+      }).join('');
+      sectorRsTbody.querySelectorAll('tr.sector-row').forEach(tr => {
+        tr.addEventListener('click', () => {
+          const sec = tr.dataset.sector;
+          _sectorRsExpanded = (_sectorRsExpanded === sec) ? null : sec;
+          renderSectorRsTable();
+        });
+      });
+    }
+
+    function renderSectorRsPayload(d) {
+      sectorRsLoading.style.display = 'none';
+      const sectors = d.sectors || [];
+      const nifty = d.nifty || null;
+      const sessionDay = d.session_day || d.trade_date || '—';
+      if (!sectors.length) {
+        sectorRsEmpty.style.display = 'block';
+        sectorRsEmpty.textContent = d.message || 'No sector RS data.';
+        sectorRsContent.style.display = 'none';
+        sectorRsMeta.textContent = '—';
+        return;
+      }
+      sectorRsEmpty.style.display = 'none';
+      sectorRsContent.style.display = 'block';
+      if (nifty) {
+        const np = Number(nifty.pct_today || 0);
+        const npCls = np >= 0 ? 'pnl-positive' : 'pnl-negative';
+        const note = d.session_note
+          ? `<div style="margin-top:0.35rem; color:#eab308; font-size:0.8rem;">${d.session_note}</div>`
+          : '';
+        sectorRsMeta.innerHTML =
+          `<strong>Session:</strong> ${fmt(sessionDay)} &nbsp;|&nbsp; ` +
+          `<strong>NIFTY 50:</strong> <span class="${npCls}">${(np >= 0 ? '+' : '') + np.toFixed(2)}%</span> ` +
+          `(${fmt(nifty.bars)} bars, last ${fmt(nifty.last_bar_ts)}) &nbsp;|&nbsp; ` +
+          `<strong>Sectors:</strong> ${sectors.length}` + note;
+      } else {
+        sectorRsMeta.textContent = d.message || d.session_note || '—';
+      }
+      _sectorRsCache = sectors;
+      _sectorRsExpanded = null;
+      renderSectorRsTable();
+      sectorRsStatus.textContent =
+        `${sectors.length} sectors, ${fmt(d.passed || 0)} of ${fmt(d.scanned || 0)} stocks${refreshStamp(d)}.`;
+      sectorRsStatus.className = 'status ok';
+    }
+
+    async function loadSectorRs() {
+      sectorRsLoading.style.display = 'block';
+      sectorRsEmpty.style.display = 'none';
+      sectorRsContent.style.display = 'none';
+      try {
+        const r = await fetch('/api/stocks/sector-rs');
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'load failed');
+        renderSectorRsPayload(d);
+      } catch (e) {
+        sectorRsLoading.style.display = 'none';
+        sectorRsEmpty.style.display = 'block';
+        sectorRsEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    btnSectorRsRefresh?.addEventListener('click', async () => {
+      btnSectorRsRefresh.disabled = true;
+      sectorRsStatus.textContent = 'Computing sector RS from 15-min cache…';
+      sectorRsStatus.className = 'status';
+      sectorRsLoading.style.display = 'block';
+      sectorRsEmpty.style.display = 'none';
+      sectorRsContent.style.display = 'none';
+      try {
+        const d = await postRefreshJson('/api/stocks/sector-rs/refresh', 'Sector RS');
+        renderSectorRsPayload(d);
+      } catch (e) {
+        sectorRsLoading.style.display = 'none';
+        sectorRsEmpty.style.display = 'block';
+        sectorRsEmpty.textContent = 'Refresh error: ' + e.message;
+        sectorRsStatus.textContent = 'Error: ' + e.message;
+        sectorRsStatus.className = 'status err';
+      } finally {
+        btnSectorRsRefresh.disabled = false;
+      }
+    });
+
+
     // Allow opening new tabs by hash
-    if (['#silent', '#fiidii', '#rs', '#intraday-rs', '#instvol'].includes(window.location.hash)) {
+    if (['#silent', '#fiidii', '#rs', '#intraday-rs', '#sector-rs', '#instvol'].includes(window.location.hash)) {
       const tab = window.location.hash.replace('#', '');
       document.querySelector(`.tab[data-tab="${tab}"]`)?.click();
     }

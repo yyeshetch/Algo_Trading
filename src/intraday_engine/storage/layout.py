@@ -138,6 +138,16 @@ def intraday_relative_strength_path(data_dir: Path, trade_date: date) -> Path:
     return intraday_relative_strength_dir(data_dir) / f"intraday_rs_{trade_date.isoformat()}.json"
 
 
+def sector_relative_strength_dir(data_dir: Path) -> Path:
+    p = data_dir / "analysis" / "sector_relative_strength"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def sector_relative_strength_path(data_dir: Path, trade_date: date) -> Path:
+    return sector_relative_strength_dir(data_dir) / f"sector_rs_{trade_date.isoformat()}.json"
+
+
 def institutional_volume_dir(data_dir: Path) -> Path:
     p = data_dir / "analysis" / "institutional_volume"
     p.mkdir(parents=True, exist_ok=True)

@@ -134,6 +134,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         for _, row in signals_df.iterrows():
             ts = str(row.get("timestamp", ""))
             signals_by_ts[ts] = row.to_dict()
+    first_row = snapshots_df.iloc[0]
     for idx in range(len(snapshots_df)):
         row = snapshots_df.iloc[idx]
         ts = str(row.get("timestamp", ""))
@@ -147,6 +148,8 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         prev_spot = float(prev.get("spot_ltp", 0) or 0)
         prev_call = float(prev.get("call_ltp", 0) or 0)
         prev_put = float(prev.get("put_ltp", 0) or 0)
+        first_call = float(first_row.get("call_ltp", 0) or 0)
+        first_put = float(first_row.get("put_ltp", 0) or 0)
         support = float(row.get("support", 0) or 0)
         resistance = float(row.get("resistance", 0) or 0)
         sig = signals_by_ts.get(ts, {})
@@ -167,6 +170,8 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         fut_strength = _pct_change(fut_ltp, spot_ltp) if spot_ltp else 0
         call_change = _pct_change(call_ltp, prev_call) if prev_call else 0
         put_change = _pct_change(put_ltp, prev_put) if prev_put else 0
+        call_session_change = _pct_change(call_ltp, first_call) if first_call else 0
+        put_session_change = _pct_change(put_ltp, first_put) if first_put else 0
         frame = snapshots_df.iloc[: idx + 1]
         momentum = _momentum(frame, "spot_ltp", 4)
         momentum_3 = _momentum(frame, "spot_ltp", 3)
@@ -190,7 +195,6 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         range_pct = _pct_change(range_size, spot_ltp) if spot_ltp else 0
         put_call_ratio = round(put_ltp / call_ltp, 2) if call_ltp else 0
         spot_in_range = ((spot_ltp - support) / (resistance - support) * 100) if (resistance and support and resistance > support) else 50
-        first_row = snapshots_df.iloc[0]
         fut_oi = float(row.get("future_oi", 0) or 0)
         call_oi = float(row.get("call_oi", 0) or 0)
         put_oi = float(row.get("put_oi", 0) or 0)
@@ -201,7 +205,11 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         call_oi_chg = _pct_change(call_oi, call_oi_first) if call_oi_first else 0
         put_oi_chg = _pct_change(put_oi, put_oi_first) if put_oi_first else 0
         prev_fut_oi = float(prev.get("future_oi", 0) or 0)
+        prev_call_oi = float(prev.get("call_oi", 0) or 0)
+        prev_put_oi = float(prev.get("put_oi", 0) or 0)
         fut_oi_chg_candle = _pct_change(fut_oi, prev_fut_oi) if prev_fut_oi and idx > 0 else 0
+        call_oi_chg_candle = _pct_change(call_oi, prev_call_oi) if prev_call_oi and idx > 0 else 0
+        put_oi_chg_candle = _pct_change(put_oi, prev_put_oi) if prev_put_oi and idx > 0 else 0
         volume_bias = _latest_volume_bias(frame)
         summaries.append({
             "timestamp": ts,
@@ -250,9 +258,15 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
             "options": {
                 "call_ltp": round(call_ltp, 2),
                 "put_ltp": round(put_ltp, 2),
+                "call_low": round(float(row.get("call_low", 0) or 0), 2),
+                "put_low": round(float(row.get("put_low", 0) or 0), 2),
+                "call_high": round(float(row.get("call_high", 0) or 0), 2),
+                "put_high": round(float(row.get("put_high", 0) or 0), 2),
                 "atm_strike": int(row.get("atm_strike", 0) or 0),
                 "call_change_pct": call_change,
                 "put_change_pct": put_change,
+                "call_session_change_pct": call_session_change,
+                "put_session_change_pct": put_session_change,
                 "call_expanding": call_change > 0,
                 "put_decaying": put_change < 0,
                 "put_expanding": put_change > 0,
@@ -268,6 +282,8 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
                 "call_oi_change_pct": call_oi_chg,
                 "put_oi_change_pct": put_oi_chg,
                 "fut_oi_change_candle_pct": fut_oi_chg_candle,
+                "call_oi_change_candle_pct": call_oi_chg_candle,
+                "put_oi_change_candle_pct": put_oi_chg_candle,
             },
             "volume_bias": volume_bias,
             "scores": {
