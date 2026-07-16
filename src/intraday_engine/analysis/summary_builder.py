@@ -135,6 +135,10 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
             ts = str(row.get("timestamp", ""))
             signals_by_ts[ts] = row.to_dict()
     first_row = snapshots_df.iloc[0]
+    first_spot_open = float(first_row.get("spot_open", 0) or first_row.get("spot_ltp", 0) or 0)
+    first_call = float(first_row.get("call_ltp", 0) or 0)
+    first_put = float(first_row.get("put_ltp", 0) or 0)
+    first_straddle = round(first_call + first_put, 2) if (first_call > 0 and first_put > 0) else 0.0
     for idx in range(len(snapshots_df)):
         row = snapshots_df.iloc[idx]
         ts = str(row.get("timestamp", ""))
@@ -148,8 +152,6 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         prev_spot = float(prev.get("spot_ltp", 0) or 0)
         prev_call = float(prev.get("call_ltp", 0) or 0)
         prev_put = float(prev.get("put_ltp", 0) or 0)
-        first_call = float(first_row.get("call_ltp", 0) or 0)
-        first_put = float(first_row.get("put_ltp", 0) or 0)
         support = float(row.get("support", 0) or 0)
         resistance = float(row.get("resistance", 0) or 0)
         sig = signals_by_ts.get(ts, {})
@@ -211,6 +213,14 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         call_oi_chg_candle = _pct_change(call_oi, prev_call_oi) if prev_call_oi and idx > 0 else 0
         put_oi_chg_candle = _pct_change(put_oi, prev_put_oi) if prev_put_oi and idx > 0 else 0
         volume_bias = _latest_volume_bias(frame)
+        straddle = round(call_ltp + put_ltp, 2)
+        expected_pts = first_straddle if first_straddle > 0 else straddle
+        em_upper = round(first_spot_open + expected_pts, 2) if expected_pts > 0 else None
+        em_lower = round(first_spot_open - expected_pts, 2) if expected_pts > 0 else None
+        move_from_open = round(spot_ltp - first_spot_open, 2) if first_spot_open else 0
+        range_used_pct = round(abs(move_from_open) / expected_pts * 100, 1) if expected_pts > 0 else None
+        session_range_pts = round(session_high - session_low, 2) if (session_high and session_low) else 0
+        range_captured_pct = round(session_range_pts / expected_pts * 100, 1) if expected_pts > 0 else None
         summaries.append({
             "timestamp": ts,
             "signal": _str_safe(sig.get("signal"), "—"),
@@ -273,6 +283,23 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
                 "call_decaying": call_change < 0,
                 "put_call_ratio": put_call_ratio,
                 "skew": "put_heavy" if put_call_ratio > 1.1 else ("call_heavy" if put_call_ratio < 0.9 else "balanced"),
+                "atm_straddle": straddle,
+            },
+            "expected_move": {
+                "straddle_open": first_straddle,
+                "straddle_now": straddle,
+                "expected_pts": expected_pts,
+                "day_open": round(first_spot_open, 2),
+                "upper": em_upper,
+                "lower": em_lower,
+                "move_from_open_pts": move_from_open,
+                "range_used_pct": range_used_pct,
+                "remaining_up_pts": round(em_upper - spot_ltp, 2) if em_upper is not None else None,
+                "remaining_down_pts": round(spot_ltp - em_lower, 2) if em_lower is not None else None,
+                "session_range_pts": session_range_pts,
+                "range_captured_pct": range_captured_pct,
+                "breached_upper": bool(em_upper is not None and spot_ltp > em_upper),
+                "breached_lower": bool(em_lower is not None and spot_ltp < em_lower),
             },
             "oi": {
                 "future_oi": int(fut_oi),

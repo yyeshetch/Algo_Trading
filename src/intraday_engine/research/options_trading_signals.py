@@ -23,13 +23,20 @@ Alternative — sideways cluster breakout:
 - Consecutive sideways / barcode candles (variable length, min 5)
 - First expansion candle closes above cluster high (bullish)
 - Same SL / max-risk filters (no volume filter)
+
+Alternative — alert EMA breakout:
+- 13 EMA on HIGH (prior session bars included for warmup at day start)
+- Alert candle: opens below EMA13(H), closes above EMA13(H)
+- Prior 20 bars open and close below EMA13(H)
+- Entry on first close above alert-candle HIGH after the alert
+- SL below entry-candle low when risk ≤ 12 pts, else fixed 12 pts below entry
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, time
 from pathlib import Path
 from typing import Any
 
@@ -70,8 +77,16 @@ SIDEWAYS_CHOP_MAX_BODY_PCT = 45.0
 SIDEWAYS_CLUSTER_MAX_DIRECTIONAL_BODY_PCT = 52.0
 BREAKOUT_MIN_BODY_PCT = 55.0
 SIDEWAYS_BREAKOUT_RANGE_MULTIPLIER = 1.5
+ALERT_CONSOLIDATION_BARS = 20
+PRIOR_SESSION_EMA_BARS = 40
 
-SIGNAL_TYPE_PRIORITY = ("primary", "cluster_breakout", "sideways_breakout", "doji_strong")
+SIGNAL_TYPE_PRIORITY = (
+    "primary",
+    "alert_breakout",
+    "cluster_breakout",
+    "sideways_breakout",
+    "doji_strong",
+)
 
 
 def _common_risk_checks(close: float, sl: float, risk_pct: float | None) -> dict[str, bool]:
@@ -148,6 +163,30 @@ def options_signal_definitions() -> list[dict[str, Any]]:
                 {"id": "risk_ok", "label": f"Risk ≤ {MAX_RISK_PCT:g}% of premium"},
             ],
         },
+        {
+            "id": "alert_breakout",
+            "label": "Alert Breakout",
+            "conditions": [
+                {
+                    "id": "alert_candle",
+                    "label": "Alert candle: open below EMA13(H), close above EMA13(H)",
+                },
+                {
+                    "id": "prior_below_ema",
+                    "label": f"Prior {ALERT_CONSOLIDATION_BARS} bars open & close below EMA13(H)",
+                },
+                {"id": "close_above_alert_high", "label": "First close above alert-candle HIGH"},
+                {
+                    "id": "ema_not_extended",
+                    "label": f"Close not > {MAX_EMA_DISTANCE_PCT_OF_CLOSE:g}% above EMA13(H)",
+                },
+                {
+                    "id": "entry_above_sl",
+                    "label": f"SL below entry-candle low if risk ≤ {SWING_SL_MAX_POINTS:g} pts else {SWING_SL_MAX_POINTS:g} pts fixed",
+                },
+                {"id": "risk_ok", "label": f"Risk ≤ {MAX_RISK_PCT:g}% of premium"},
+            ],
+        },
     ]
 
 
@@ -209,6 +248,8 @@ def _fetch_option_ohlc_kite(
     underlying: str,
     option_type: str,
     symbol: str,
+    *,
+    include_prior_session: bool = False,
 ) -> pd.DataFrame:
     """Fetch real 5-min option OHLC from Kite for EMA calculation."""
     from intraday_engine.core.config import Settings
@@ -223,6 +264,9 @@ def _fetch_option_ohlc_kite(
     settings = Settings.from_env(underlying=underlying)
     client = ZerodhaClient(settings)
     from_dt, to_dt = _market_window(trade_date)
+    if include_prior_session:
+        prior = _prior_trading_date(trade_date)
+        from_dt = datetime.combine(prior, time(9, 15))
 
     quote = client.quote([symbol])
     token = int(quote[symbol]["instrument_token"])
@@ -244,6 +288,74 @@ def _fetch_option_ohlc_kite(
             "tradingsymbol": tradingsymbol,
         }
     )
+
+
+def _prior_trading_date(d: date) -> date:
+    prev = d - timedelta(days=1)
+    while prev.weekday() >= 5:
+        prev -= timedelta(days=1)
+    return prev
+
+
+def _session_start_ts(trade_date: date) -> pd.Timestamp:
+    return pd.Timestamp(datetime.combine(trade_date, time(9, 15)))
+
+
+def _prepend_prior_session_candles(
+    candles: pd.DataFrame,
+    *,
+    data_dir: Path,
+    trade_date: date,
+    underlying: str,
+    option_type: str,
+) -> pd.DataFrame:
+    """Prepend prior-session 5-min bars so EMA13(H) is warmed up at today's open."""
+    if candles.empty:
+        return candles
+
+    session_start = _session_start_ts(trade_date)
+    today = candles[candles["timestamp"] >= session_start].copy()
+    if today.empty:
+        today = candles.copy()
+
+    symbol = ""
+    if "tradingsymbol" in candles.columns:
+        syms = candles["tradingsymbol"].dropna().astype(str)
+        syms = syms[syms.str.len() > 0]
+        if not syms.empty:
+            symbol = syms.iloc[-1]
+
+    prior: pd.DataFrame | None = None
+    if symbol:
+        try:
+            extended = _fetch_option_ohlc_kite(
+                trade_date, underlying, option_type, symbol, include_prior_session=True,
+            )
+            if not extended.empty:
+                prior = extended[extended["timestamp"] < session_start]
+        except Exception as exc:
+            logger.debug("Prior-session Kite OHLC skipped for %s: %s", underlying, exc)
+
+    if prior is None or prior.empty:
+        prev_df = _load_index_analysis(data_dir, _prior_trading_date(trade_date), underlying)
+        if not prev_df.empty:
+            prior_candles, _ = _option_candles_from_analysis(
+                prev_df,
+                option_type,
+                trade_date=_prior_trading_date(trade_date),
+                underlying=underlying,
+                data_dir=None,
+            )
+            if not prior_candles.empty:
+                prior = prior_candles[prior_candles["timestamp"] < session_start]
+
+    if prior is None or prior.empty:
+        return today.reset_index(drop=True)
+
+    prior_tail = prior.sort_values("timestamp").tail(PRIOR_SESSION_EMA_BARS)
+    combined = pd.concat([prior_tail, today], ignore_index=True)
+    combined = combined.drop_duplicates(subset=["timestamp"], keep="last")
+    return combined.sort_values("timestamp").reset_index(drop=True)
 
 
 def _merge_analysis_metadata(candles: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
@@ -281,6 +393,7 @@ def _option_candles_from_analysis(
     *,
     trade_date: date,
     underlying: str,
+    data_dir: Path | None = None,
 ) -> tuple[pd.DataFrame, str]:
     """Build 5-min OHLC for ATM CE or PE. Returns (candles, source)."""
     if df.empty:
@@ -332,6 +445,25 @@ def _option_candles_from_analysis(
         trade_date.isoformat(),
     )
     return pd.DataFrame(), "none"
+
+
+def _with_prior_session_warmup(
+    candles: pd.DataFrame,
+    *,
+    data_dir: Path | None,
+    trade_date: date,
+    underlying: str,
+    option_type: str,
+) -> pd.DataFrame:
+    if candles.empty or data_dir is None:
+        return candles
+    return _prepend_prior_session_candles(
+        candles,
+        data_dir=data_dir,
+        trade_date=trade_date,
+        underlying=underlying,
+        option_type=option_type,
+    )
 
 
 def _prepare_indicator_df(candles: pd.DataFrame) -> pd.DataFrame:
@@ -502,6 +634,22 @@ def _stop_loss_and_risk(
 
     risk_pct = (c - sl) / c * 100.0 if c > sl else None
     return sl, risk_pct
+
+
+def _alert_breakout_stop_loss(close: float, low: float) -> tuple[float, float | None]:
+    """SL below entry-candle low if risk ≤ 12 pts, else fixed 12 pts below entry."""
+    if close <= 0 or low <= 0:
+        return close, None
+    sl_at_low = low - SWING_SL_BUFFER
+    risk_pts = close - sl_at_low
+    if risk_pts <= SWING_SL_MAX_POINTS:
+        sl = sl_at_low
+    else:
+        sl = close - SWING_SL_MAX_POINTS
+    if sl >= close:
+        return close, None
+    risk_pct = (close - sl) / close * 100.0
+    return round(sl, 2), round(risk_pct, 2)
 
 
 def _ema_distance_pct(close: float, ema: float) -> float | None:
@@ -863,14 +1011,146 @@ def _evaluate_sideways_breakout_entry(df: pd.DataFrame, idx: int) -> dict[str, A
     }
 
 
+def _bar_open_close_below_ema(row: pd.Series) -> bool:
+    ema = float(row.get("ema13_high", float("nan")))
+    if pd.isna(ema):
+        return False
+    o, c = float(row["open"]), float(row["close"])
+    return o < ema and c < ema
+
+
+def _is_alert_candle(row: pd.Series) -> bool:
+    ema = float(row.get("ema13_high", float("nan")))
+    if pd.isna(ema):
+        return False
+    o, c = float(row["open"]), float(row["close"])
+    return o < ema and c > ema
+
+
+def _is_valid_alert_setup(df: pd.DataFrame, alert_idx: int) -> bool:
+    if alert_idx < ALERT_CONSOLIDATION_BARS:
+        return False
+    if not _is_alert_candle(df.iloc[alert_idx]):
+        return False
+    for j in range(alert_idx - ALERT_CONSOLIDATION_BARS, alert_idx):
+        if not _bar_open_close_below_ema(df.iloc[j]):
+            return False
+    return True
+
+
+def _alert_breakout_context(df: pd.DataFrame, idx: int) -> tuple[bool, int | None, float | None]:
+    """
+    Entry on first close above a valid alert-candle HIGH.
+    Uses the most recent alert whose breakout occurs on bar idx.
+    """
+    if idx < ALERT_CONSOLIDATION_BARS + 1:
+        return False, None, None
+    close = float(df.iloc[idx]["close"])
+    for alert_idx in range(idx - 1, ALERT_CONSOLIDATION_BARS - 1, -1):
+        if not _is_valid_alert_setup(df, alert_idx):
+            continue
+        alert_high = float(df.iloc[alert_idx]["high"])
+        if close <= alert_high:
+            continue
+        already_broken = any(
+            float(df.iloc[j]["close"]) > alert_high for j in range(alert_idx + 1, idx)
+        )
+        if already_broken:
+            continue
+        return True, alert_idx, alert_high
+    return False, None, None
+
+
+def _evaluate_alert_breakout_entry(df: pd.DataFrame, idx: int) -> dict[str, Any]:
+    row = df.iloc[idx]
+    o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
+    ema = float(row["ema13_high"]) if "ema13_high" in row.index else float("nan")
+    breakout, alert_idx, alert_high = _alert_breakout_context(df, idx)
+    alert_row = df.iloc[alert_idx] if alert_idx is not None else None
+    alert_valid = alert_idx is not None and _is_valid_alert_setup(df, alert_idx)
+    is_alert = _is_alert_candle(row) if pd.notna(ema) else False
+    prior_below = False
+    if alert_idx is not None and alert_idx >= ALERT_CONSOLIDATION_BARS:
+        prior_below = all(
+            _bar_open_close_below_ema(df.iloc[j])
+            for j in range(alert_idx - ALERT_CONSOLIDATION_BARS, alert_idx)
+        )
+    ema_ok, ema_dist_pct = _close_not_extended_above_ema13_high(c, ema) if pd.notna(ema) else (True, None)
+    sl, risk_pct = _alert_breakout_stop_loss(c, l)
+
+    skip: list[str] = []
+    if idx < ALERT_CONSOLIDATION_BARS + 1:
+        skip.append(f"need {ALERT_CONSOLIDATION_BARS}+ prior bars")
+    elif not breakout:
+        skip.append("no alert breakout")
+    if idx >= EMA_PERIOD and pd.notna(ema) and not ema_ok:
+        skip.append(f"close > {MAX_EMA_DISTANCE_PCT_OF_CLOSE:g}% above EMA")
+    if c <= sl:
+        skip.append("entry ≤ SL")
+    if risk_pct is not None and risk_pct > MAX_RISK_PCT:
+        skip.append(f"risk {risk_pct:.1f}%")
+
+    is_signal = (
+        breakout
+        and alert_idx is not None
+        and alert_high is not None
+        and ema_ok
+        and c > sl
+        and risk_pct is not None
+        and risk_pct <= MAX_RISK_PCT
+    )
+
+    checks = {
+        "alert_candle": alert_valid,
+        "prior_below_ema": prior_below if alert_idx is not None else False,
+        "close_above_alert_high": breakout,
+        "ema_not_extended": ema_ok if idx >= EMA_PERIOD and pd.notna(ema) else None,
+        **_common_risk_checks(c, sl, risk_pct),
+    }
+
+    alert_ts = None
+    if alert_row is not None:
+        ts = alert_row.get("timestamp")
+        alert_ts = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+
+    return {
+        "open": o,
+        "high": h,
+        "low": l,
+        "close": c,
+        "ema13_high": ema if pd.notna(ema) else None,
+        "is_alert_candle": is_alert,
+        "alert_timestamp": alert_ts,
+        "alert_high": round(alert_high, 2) if alert_high is not None else None,
+        "alert_valid": alert_valid,
+        "prior_below_ema": prior_below if alert_idx is not None else None,
+        "close_above_alert_high": breakout,
+        "ema_not_extended": ema_ok if idx >= EMA_PERIOD and pd.notna(ema) else None,
+        "ema_distance_pct": round(ema_dist_pct, 2) if ema_dist_pct is not None else None,
+        "risk_pct": risk_pct,
+        "stop_loss": sl,
+        "checks": checks,
+        "signal": is_signal,
+        "skip": skip,
+        "status": (
+            f"SIGNAL (alert breakout, high {alert_high:.2f})"
+            if is_signal and alert_high is not None
+            else (" · ".join(skip) if skip else "—")
+        ),
+    }
+
+
 def _pick_signal_type(
     primary: dict,
     doji: dict,
     cluster: dict,
     sideways: dict,
+    alert: dict,
 ) -> tuple[bool, str | None, str, dict]:
     if primary["signal"]:
         return True, "primary", primary["status"], primary
+    if alert["signal"]:
+        return True, "alert_breakout", alert["status"], alert
     if cluster["signal"]:
         return True, "cluster_breakout", cluster["status"], cluster
     if sideways["signal"]:
@@ -878,8 +1158,10 @@ def _pick_signal_type(
     if doji["signal"]:
         return True, "doji_strong", doji["status"], doji
     status = primary["status"] if primary["skip"] else (
-        cluster["status"] if cluster["skip"] else (
-            sideways["status"] if sideways["skip"] else doji["status"]
+        alert["status"] if alert["skip"] else (
+            cluster["status"] if cluster["skip"] else (
+                sideways["status"] if sideways["skip"] else doji["status"]
+            )
         )
     )
     return False, None, status, primary
@@ -890,8 +1172,9 @@ def _evaluate_entry_bar(df: pd.DataFrame, idx: int) -> dict[str, Any]:
     doji = _evaluate_doji_strong_entry(df, idx)
     cluster = _evaluate_cluster_breakout_entry(df, idx)
     sideways = _evaluate_sideways_breakout_entry(df, idx)
+    alert = _evaluate_alert_breakout_entry(df, idx)
 
-    is_signal, signal_type, status, active = _pick_signal_type(primary, doji, cluster, sideways)
+    is_signal, signal_type, status, active = _pick_signal_type(primary, doji, cluster, sideways, alert)
 
     return {
         **primary,
@@ -911,17 +1194,23 @@ def _evaluate_entry_bar(df: pd.DataFrame, idx: int) -> dict[str, Any]:
         "sideways_cluster_high": sideways.get("sideways_cluster_high"),
         "breakout_expansion": sideways.get("breakout_expansion"),
         "clears_sideways_cluster": sideways.get("clears_sideways_cluster"),
+        "alert_timestamp": alert.get("alert_timestamp"),
+        "alert_high": alert.get("alert_high"),
+        "is_alert_candle": alert.get("is_alert_candle"),
+        "close_above_alert_high": alert.get("close_above_alert_high"),
         "signal": is_signal,
         "signal_type": signal_type,
         "primary_signal": primary["signal"],
         "doji_strong_signal": doji["signal"],
         "cluster_breakout_signal": cluster["signal"],
         "sideways_breakout_signal": sideways["signal"],
+        "alert_breakout_signal": alert["signal"],
         "condition_checks": {
             "primary": primary.get("checks", {}),
             "doji_strong": doji.get("checks", {}),
             "cluster_breakout": cluster.get("checks", {}),
             "sideways_breakout": sideways.get("checks", {}),
+            "alert_breakout": alert.get("checks", {}),
         },
         "stop_loss": active["stop_loss"],
         "risk_pct": active["risk_pct"],
@@ -929,7 +1218,7 @@ def _evaluate_entry_bar(df: pd.DataFrame, idx: int) -> dict[str, Any]:
     }
 
 
-def _analyze_candles(candles: pd.DataFrame, option_type: str) -> list[dict[str, Any]]:
+def _analyze_candles(candles: pd.DataFrame, option_type: str, trade_date: date | None = None) -> list[dict[str, Any]]:
     if candles.empty:
         return []
 
@@ -939,6 +1228,8 @@ def _analyze_candles(candles: pd.DataFrame, option_type: str) -> list[dict[str, 
     for i in range(len(df)):
         row = df.iloc[i]
         ts = row["timestamp"]
+        if trade_date is not None and pd.Timestamp(ts).date() != trade_date:
+            continue
         ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
         ev = _evaluate_entry_bar(df, i)
 
@@ -973,6 +1264,10 @@ def _analyze_candles(candles: pd.DataFrame, option_type: str) -> list[dict[str, 
                 "breakout_expansion": ev.get("breakout_expansion"),
                 "clears_sideways_cluster": ev.get("clears_sideways_cluster"),
                 "ema_not_extended": ev.get("ema_not_extended"),
+                "alert_timestamp": ev.get("alert_timestamp"),
+                "alert_high": ev.get("alert_high"),
+                "is_alert_candle": ev.get("is_alert_candle"),
+                "close_above_alert_high": ev.get("close_above_alert_high"),
                 "marubozu": ev["no_top_wick"],
                 "risk_pct": round(ev["risk_pct"], 2) if ev["risk_pct"] is not None else None,
                 "signal": ev["signal"],
@@ -981,6 +1276,7 @@ def _analyze_candles(candles: pd.DataFrame, option_type: str) -> list[dict[str, 
                 "doji_strong_signal": ev.get("doji_strong_signal"),
                 "cluster_breakout_signal": ev.get("cluster_breakout_signal"),
                 "sideways_breakout_signal": ev.get("sideways_breakout_signal"),
+                "alert_breakout_signal": ev.get("alert_breakout_signal"),
                 "condition_checks": ev.get("condition_checks", {}),
                 "stop_loss": round(ev["stop_loss"], 2) if ev.get("stop_loss") is not None else None,
                 "status": ev["status"],
@@ -990,7 +1286,12 @@ def _analyze_candles(candles: pd.DataFrame, option_type: str) -> list[dict[str, 
     return list(reversed(rows))
 
 
-def _scan_candles(candles: pd.DataFrame, option_type: str, underlying: str) -> list[dict[str, Any]]:
+def _scan_candles(
+    candles: pd.DataFrame,
+    option_type: str,
+    underlying: str,
+    trade_date: date,
+) -> list[dict[str, Any]]:
     if len(candles) < 2:
         return []
 
@@ -1039,10 +1340,23 @@ def _scan_candles(candles: pd.DataFrame, option_type: str, underlying: str) -> l
             ),
             MIN_SIDEWAYS_CLUSTER_BARS,
         ),
+        (
+            "alert_breakout",
+            _evaluate_alert_breakout_entry,
+            (
+                f"{option_type} 5m alert EMA cross (open<EMA13(H)<close) after "
+                f"{ALERT_CONSOLIDATION_BARS} bars below EMA, entry on first close above alert HIGH; "
+                f"skip if close > {MAX_EMA_DISTANCE_PCT_OF_CLOSE:g}% above EMA13(H); "
+                f"SL below entry low if ≤ {SWING_SL_MAX_POINTS:g} pts else {SWING_SL_MAX_POINTS:g} pts fixed"
+            ),
+            ALERT_CONSOLIDATION_BARS + 1,
+        ),
     ]
 
     for i in range(1, len(df)):
         row = df.iloc[i]
+        if pd.Timestamp(row["timestamp"]).date() != trade_date:
+            continue
         for signal_type, fn, reason, min_idx in evaluators:
             if i < min_idx:
                 continue
@@ -1068,7 +1382,9 @@ def _scan_candles(candles: pd.DataFrame, option_type: str, underlying: str) -> l
                     "stop_loss": round(ev["stop_loss"], 2),
                     "risk_pct": round(ev["risk_pct"], 2),
                     "ema13_high": round(ema_val, 2) if ema_val is not None else None,
-                    "cluster_high": ev.get("cluster_high") or ev.get("sideways_cluster_high"),
+                    "cluster_high": ev.get("cluster_high") or ev.get("sideways_cluster_high") or ev.get("alert_high"),
+                    "alert_high": ev.get("alert_high"),
+                    "alert_timestamp": ev.get("alert_timestamp"),
                     "volume": ev.get("volume"),
                     "ema20_volume": ev.get("ema20_volume"),
                     "candle": {
@@ -1116,10 +1432,18 @@ def scan_options_trading_signals(
             opt_type,
             trade_date=trade_date,
             underlying=u,
+            data_dir=data_dir,
+        )
+        candles = _with_prior_session_warmup(
+            candles,
+            data_dir=data_dir,
+            trade_date=trade_date,
+            underlying=u,
+            option_type=opt_type,
         )
         ohlc_sources[opt_type] = source
-        analysis[opt_type] = _analyze_candles(candles, opt_type)
-        all_signals.extend(_scan_candles(candles, opt_type, u))
+        analysis[opt_type] = _analyze_candles(candles, opt_type, trade_date=trade_date)
+        all_signals.extend(_scan_candles(candles, opt_type, u, trade_date))
 
     all_signals.sort(key=lambda s: s.get("timestamp", ""), reverse=True)
 

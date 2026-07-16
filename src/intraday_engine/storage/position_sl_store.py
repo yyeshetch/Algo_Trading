@@ -37,7 +37,9 @@ def get_position_key(tradingsymbol: str, quantity: int) -> str:
 
 def set_sl(data_dir: Path, tradingsymbol: str, quantity: int, sl_order_id: str, sl_trigger: float, instrument_token: int,
            *, entry_price: float | None = None, initial_sl: float | None = None, risk_pts: float | None = None,
-           rr_locked: bool = False, rr_trail: bool = False, signal_key: str | None = None) -> None:
+           rr_locked: bool = False, rr_trail: bool = False, signal_key: str | None = None,
+           signal_high: float | None = None, signal_timestamp: str | None = None,
+           entry_candle_close: float | None = None, entry_candle_checked: bool = False) -> None:
     data = load(data_dir)
     key = get_position_key(tradingsymbol, quantity)
     prev = data.get(key, {})
@@ -54,6 +56,10 @@ def set_sl(data_dir: Path, tradingsymbol: str, quantity: int, sl_order_id: str, 
         "rr_locked": bool(rr_locked) if rr_locked else prev.get("rr_locked", False),
         "rr_trail": bool(rr_trail) if rr_trail else prev.get("rr_trail", False),
         "signal_key": signal_key or prev.get("signal_key"),
+        "signal_high": float(signal_high) if signal_high is not None else prev.get("signal_high"),
+        "signal_timestamp": signal_timestamp or prev.get("signal_timestamp"),
+        "entry_candle_close": float(entry_candle_close) if entry_candle_close is not None else prev.get("entry_candle_close"),
+        "entry_candle_checked": bool(entry_candle_checked) if entry_candle_checked else prev.get("entry_candle_checked", False),
     }
     save(data_dir, data)
 
@@ -106,9 +112,25 @@ def set_rr_trail(data_dir: Path, tradingsymbol: str, quantity: int, enabled: boo
         save(data_dir, data)
 
 
-def get_rr_trail_positions(data_dir: Path) -> list[dict]:
+def mark_entry_candle_checked(data_dir: Path, tradingsymbol: str, quantity: int) -> None:
     data = load(data_dir)
-    return [v for v in data.values() if v.get("entry_price") is not None]
+    key = get_position_key(tradingsymbol, quantity)
+    if key in data:
+        data[key]["entry_candle_checked"] = True
+        save(data_dir, data)
+
+
+def get_managed_positions(data_dir: Path) -> list[dict]:
+    """Open positions with SL orders — always subject to standard trail logic."""
+    data = load(data_dir)
+    return [
+        v for v in data.values()
+        if v.get("sl_order_id") and int(v.get("quantity") or 0) > 0
+    ]
+
+
+def get_rr_trail_positions(data_dir: Path) -> list[dict]:
+    return get_managed_positions(data_dir)
 
 
 def get_auto_trail_positions(data_dir: Path) -> list[dict]:

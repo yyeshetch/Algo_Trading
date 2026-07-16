@@ -15,7 +15,6 @@ def _path(data_dir: Path) -> Path:
 def _default() -> dict[str, Any]:
     return {
         "auto_trade_enabled": True,
-        "rr_trail_enabled": True,
         "lots": 1,
         "executed_keys": [],
         "last_run_at": None,

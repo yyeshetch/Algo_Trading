@@ -39,6 +39,7 @@ from intraday_engine.storage.data_store import _flatten_for_csv
 from intraday_engine.analysis.summary_builder import build_analysis_summaries
 from intraday_engine.analysis.hourly_levels import fetch_hourly_spot_levels, hourly_levels_from_snapshots
 from intraday_engine.analysis.option_confluence import attach_confluence_to_summaries
+from intraday_engine.analysis.realized_implied_vol import attach_volatility_compare
 from intraday_engine.analysis.buyers_day import compute_buyers_day, compute_buyers_day_series
 from intraday_engine.analysis.expiry_gamma_radar import compute_expiry_gamma_radar, expiry_window_tape
 from intraday_engine.analysis.trend_ignition import compute_trend_ignition, trend_ignition_tape
@@ -101,97 +102,22 @@ from intraday_engine.research.options_trading_signals import (
     load_options_trading_signals,
     run_options_trading_scan,
 )
-from intraday_engine.storage.position_sl_store import get_auto_trail_positions, get_sl as get_sl_record, set_sl as store_sl, update_sl_trigger as store_update_sl, set_auto_trail as store_auto_trail
+from intraday_engine.storage.position_sl_store import get_sl as get_sl_record, set_sl as store_sl, update_sl_trigger as store_update_sl
 from intraday_engine.storage.signal_invalidation_store import invalidate as store_invalidate_signal, load_invalidated_keys, reinstate as store_reinstate_signal
 from intraday_engine.execution.auto_trade_store import get_config as get_auto_trade_config, update_config as update_auto_trade_config
-from intraday_engine.execution.options_auto_executor import run_auto_trade_cycle, run_rr_swing_trail_cycle
+from intraday_engine.execution.options_auto_executor import run_auto_trade_cycle, run_position_trail_cycle
+from intraday_engine.execution.strategy_store import get_enabled_map, list_strategies, update_strategy
 from intraday_engine.utils.logging_setup import setup_logging
 from intraday_engine.utils.nse_session import is_nse_session_active, seconds_until_next_session_start, session_label
 
-_auto_trail_task: asyncio.Task | None = None
+logger = logging.getLogger(__name__)
+
 _jobs_loop_task: asyncio.Task | None = None
 _auto_trade_task: asyncio.Task | None = None
 
 
-def _auto_trail_underlyings() -> list[str]:
-    """Underlyings to check for auto-trail: indices + any with data subdirs."""
-    base = list_index_underlyings()
-    try:
-        settings = _get_settings("NIFTY")
-        data_path = settings.data_dir
-        if data_path.exists():
-            for d in data_path.iterdir():
-                if d.is_dir() and not d.name.startswith("."):
-                    u = d.name.upper()
-                    if u not in base:
-                        base.append(u)
-    except Exception:
-        pass
-    return base
-
-
-async def _run_auto_trail_cycle():
-    """Trail SL to prev 1min candle low for positions with auto_trail (NSE session only)."""
-    if not is_nse_session_active():
-        return
-    try:
-        now = datetime.now()
-        to_dt = now.replace(second=0, microsecond=0)
-        from_dt = to_dt - timedelta(minutes=5)
-        loop = asyncio.get_event_loop()
-        for u in _auto_trail_underlyings():
-            try:
-                store = _get_store(u)
-                client = _get_client(u)
-                positions = get_auto_trail_positions(store.data_dir)
-                if not positions:
-                    continue
-                for rec in positions:
-                    try:
-                        token = rec.get("instrument_token")
-                        if not token:
-                            continue
-                        candles = await loop.run_in_executor(
-                            None,
-                            lambda t=token, f=from_dt, td=to_dt: client.historical_data(int(t), f, td, interval="minute"),
-                        )
-                        if not candles or len(candles) < 2:
-                            continue
-                        prev = candles[-2]
-                        low = float(prev.get("low", 0) or 0)
-                        if low <= 0:
-                            continue
-                        sl_order_id = rec.get("sl_order_id")
-                        current_sl = rec.get("sl_trigger")
-                        qty = rec.get("quantity", 0)
-                        is_long = qty > 0
-                        if is_long and low > (current_sl or 0):
-                            await loop.run_in_executor(None, lambda oid=sl_order_id, l=low: client.modify_sl_order(oid, l))
-                            store_update_sl(store.data_dir, rec["tradingsymbol"], qty, low)
-                            logger.info("Auto-trail: %s SL -> %.2f", rec["tradingsymbol"], low)
-                        elif not is_long and low < (current_sl or float("inf")):
-                            await loop.run_in_executor(None, lambda oid=sl_order_id, l=low: client.modify_sl_order(oid, l))
-                            store_update_sl(store.data_dir, rec["tradingsymbol"], -qty, low)
-                            logger.info("Auto-trail: %s SL -> %.2f", rec["tradingsymbol"], low)
-                    except Exception as e:
-                        logger.debug("Auto-trail skip %s: %s", rec.get("tradingsymbol"), e)
-            except Exception as e:
-                logger.debug("Auto-trail cycle %s: %s", u, e)
-    except Exception as e:
-        logger.debug("Auto-trail cycle: %s", e)
-
-
-async def _auto_trail_loop():
-    while True:
-        if is_nse_session_active():
-            await _run_auto_trail_cycle()
-            await asyncio.sleep(60)
-        else:
-            await asyncio.sleep(min(seconds_until_next_session_start(), 3600))
-
-
 async def _auto_trade_loop():
-    """Every 5 min during NSE session only: refresh, scan entry signals, RR swing trail."""
+    """Every 5 min during NSE session only: refresh, scan entry signals, standard trail."""
     from intraday_engine.utils.nse_session import seconds_to_next_interval_within_session
 
     logger.info("Auto-trade loop started (%s).", session_label())
@@ -211,7 +137,7 @@ async def _auto_trade_loop():
                     engine = _get_engine(u)
                     await loop.run_in_executor(None, engine.run_cycle)
                     await loop.run_in_executor(None, lambda s=settings, c=client, st=store: run_auto_trade_cycle(s, c, st))
-                    await loop.run_in_executor(None, lambda s=settings, c=client, st=store: run_rr_swing_trail_cycle(s, c, st))
+                    await loop.run_in_executor(None, lambda s=settings, c=client, st=store: run_position_trail_cycle(s, c, st))
                 except Exception as e:
                     logger.debug("Auto-trade cycle %s: %s", u, e)
         except Exception as e:
@@ -222,17 +148,16 @@ async def _auto_trade_loop():
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    global _auto_trail_task, _jobs_loop_task, _auto_trade_task
+    global _jobs_loop_task, _auto_trade_task
     try:
         ensure_config_file()
     except Exception as e:
         logger.warning("Could not ensure config.json: %s", e)
     data_dir = Settings.from_env().data_dir
-    _auto_trail_task = asyncio.create_task(_auto_trail_loop())
     _jobs_loop_task = asyncio.create_task(run_configured_jobs_loop(data_dir))
     _auto_trade_task = asyncio.create_task(_auto_trade_loop())
     yield
-    for task in (_auto_trail_task, _jobs_loop_task, _auto_trade_task):
+    for task in (_jobs_loop_task, _auto_trade_task):
         if task:
             task.cancel()
             try:
@@ -1076,14 +1001,17 @@ async def api_options_trading_signals(underlying: str | None = None, trade_date:
     u_key = _underlying_key(underlying)
     td = _parse_trade_date(trade_date)
     settings = _get_settings(underlying)
+    store = _get_store(underlying)
     stored = load_options_trading_signals(settings.data_dir, td, u_key)
     if stored and stored.get("analysis"):
+        stored["strategy_enabled"] = get_enabled_map(store.data_dir)
         return _sanitize_for_json(stored)
     loop = asyncio.get_event_loop()
     payload = await loop.run_in_executor(
         None,
         lambda: run_options_trading_scan(settings.data_dir, td, u_key),
     )
+    payload["strategy_enabled"] = get_enabled_map(store.data_dir)
     return _sanitize_for_json(payload)
 
 
@@ -1099,6 +1027,8 @@ async def api_options_trading_refresh(underlying: str | None = None, trade_date:
             None,
             lambda: run_options_trading_scan(settings.data_dir, td, u_key),
         )
+        store = _get_store(underlying)
+        payload["strategy_enabled"] = get_enabled_map(store.data_dir)
         return {
             "status": "ok",
             "signals": _sanitize_for_json(payload),
@@ -1339,6 +1269,7 @@ async def get_analysis_summary(timestamp: str | None = None, underlying: str | N
         hourly_levels = hourly_levels_from_snapshots(snap_df)
     snap_records = snap_df.to_dict(orient="records") if not snap_df.empty else None
     summaries = attach_confluence_to_summaries(summaries, hourly_levels, snap_records)
+    summaries = attach_volatility_compare(summaries)
 
     buyers_day = _sanitize_for_json(compute_buyers_day(summaries))
     buyers_day["series"] = _sanitize_for_json(compute_buyers_day_series(summaries))
@@ -1451,10 +1382,31 @@ async def get_trend_ignition(trade_date: str | None = None, underlying: str | No
 
 class AutoTradeConfigRequest(BaseModel):
     auto_trade_enabled: bool | None = None
-    rr_trail_enabled: bool | None = None
     lots: int | None = None
     daily_max_loss: float | None = None
     underlying: str | None = None
+
+
+class StrategyToggleRequest(BaseModel):
+    strategy_id: str
+    enabled: bool
+    underlying: str | None = None
+
+
+@app.get("/api/options-trading/strategies")
+async def api_options_trading_strategies_get(underlying: str | None = None):
+    store = _get_store(underlying)
+    return _sanitize_for_json({"strategies": list_strategies(store.data_dir)})
+
+
+@app.post("/api/options-trading/strategies")
+async def api_options_trading_strategies_post(req: StrategyToggleRequest):
+    store = _get_store(req.underlying)
+    try:
+        strategies = update_strategy(store.data_dir, req.strategy_id, req.enabled)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return _sanitize_for_json({"status": "ok", "strategies": strategies})
 
 
 @app.get("/api/auto-trade/config")
@@ -1495,7 +1447,7 @@ async def api_auto_trade_config_post(req: AutoTradeConfigRequest):
 
 @app.post("/api/auto-trade/run-once")
 async def api_auto_trade_run_once(underlying: str | None = None):
-    """Manual trigger: scan + execute (if enabled) + RR trail check. NSE session only."""
+    """Manual trigger: scan + execute (if enabled) + standard trail check. NSE session only."""
     if not is_nse_session_active():
         raise HTTPException(
             status_code=400,
@@ -1506,7 +1458,7 @@ async def api_auto_trade_run_once(underlying: str | None = None):
     store = _get_store(underlying)
     loop = asyncio.get_event_loop()
     trade_status = await loop.run_in_executor(None, lambda: run_auto_trade_cycle(settings, client, store))
-    trail_status = await loop.run_in_executor(None, lambda: run_rr_swing_trail_cycle(settings, client, store))
+    trail_status = await loop.run_in_executor(None, lambda: run_position_trail_cycle(settings, client, store))
     return _sanitize_for_json({"trade": trade_status, "trail": trail_status})
 
 
@@ -1537,10 +1489,8 @@ async def get_trade_summary(underlying: str | None = None):
             rec = get_sl_record(store.data_dir, sym, qty)
             p["sl_trigger"] = rec.get("sl_trigger") if rec else None
             p["sl_order_id"] = rec.get("sl_order_id") if rec else None
-            p["auto_trail"] = rec.get("auto_trail", False) if rec else False
             p["entry_price"] = rec.get("entry_price") if rec else None
-            p["rr_locked"] = rec.get("rr_locked", False) if rec else False
-            p["rr_trail"] = rec.get("rr_trail", False) if rec else False
+            p["trail_managed"] = bool(rec.get("sl_order_id")) if rec else False
     day_pnl = data.get("day_pnl", 0.0)
     sl_reached = day_pnl is not None and day_pnl <= -settings.daily_sl_rupees
     day_points = 0.0
@@ -1871,11 +1821,5 @@ async def update_position_sl(req: UpdateSLRequest):
 
 @app.post("/api/position/auto-trail")
 async def toggle_auto_trail(req: AutoTrailRequest):
-    """Toggle auto-trail for a position."""
-    underlying = req.underlying or _infer_underlying(req.tradingsymbol)
-    store = _get_store(underlying)
-    rec = get_sl_record(store.data_dir, req.tradingsymbol, req.quantity)
-    if not rec:
-        raise HTTPException(status_code=400, detail="No SL record for this position.")
-    store_auto_trail(store.data_dir, req.tradingsymbol, req.quantity, req.enabled)
-    return {"status": "ok", "auto_trail": req.enabled}
+    """Trailing is always on for positions with SL. Kept for API compatibility."""
+    return {"status": "ok", "auto_trail": True, "message": "Standard 5-min trail is always enabled."}

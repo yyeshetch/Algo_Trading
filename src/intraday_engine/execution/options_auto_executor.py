@@ -4,7 +4,10 @@ Automated execution for Options Trading entry signals (ATM CE/PE + radar ignitio
 Runs on each 5-min candle boundary during NSE session:
   1. Rescan options-trading signals (+ gamma/trend ignitions)
   2. Place MARKET MIS entry + SL-M from the signal when auto-trade is enabled
-  3. Optionally monitor open positions for 1:3 RR lock + swing trailing
+  3. Standard position management (always on):
+       - SL at signal level on entry
+       - Exit if entry-candle close < signal-candle high
+       - Else trail SL to previous 5-min candle low
 """
 
 from __future__ import annotations
@@ -23,22 +26,21 @@ from intraday_engine.execution.auto_trade_store import (
     mark_executed,
     record_run,
 )
+from intraday_engine.execution.strategy_store import filter_signals_by_strategy
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.research.options_trading_signals import run_options_trading_scan
 from intraday_engine.storage import DataStore
 from intraday_engine.storage.position_sl_store import (
-    get_rr_trail_positions,
-    set_rr_locked,
+    get_managed_positions,
+    mark_entry_candle_checked,
+    remove as remove_sl_record,
     set_sl as store_sl,
     update_sl_trigger as store_update_sl,
 )
 from intraday_engine.utils.nse_session import is_nse_session_active, now_ist, session_label
 
 logger = logging.getLogger(__name__)
-
-RR_TARGET_MULT = 3.0   # lock 1R after 3R achieved
-RR_LOCK_MULT = 1.0     # SL -> entry + 1R
 
 
 def signal_key(sig: dict[str, Any]) -> str:
@@ -77,7 +79,24 @@ def _normalize_radar_trigger(t: dict[str, Any], *, signal_type: str) -> dict[str
         "entry": entry,
         "stop_loss": sl,
         "risk_pct": t.get("risk_pct"),
+        "candle": {"high": entry, "close": entry},
     }
+
+
+def _signal_candle_fields(signal: dict[str, Any]) -> tuple[float | None, float | None]:
+    """Return (signal_high, entry_candle_close) from signal payload."""
+    candle = signal.get("candle") or {}
+    signal_high = candle.get("high") or signal.get("high")
+    entry_close = candle.get("close") or signal.get("entry")
+    try:
+        sh = float(signal_high) if signal_high is not None else None
+    except (TypeError, ValueError):
+        sh = None
+    try:
+        ec = float(entry_close) if entry_close is not None else None
+    except (TypeError, ValueError):
+        ec = None
+    return sh, ec
 
 
 def collect_entry_signals(
@@ -136,7 +155,7 @@ def collect_entry_signals(
                 store, str(s.get("timestamp", "")), str(s.get("option_type", "CE")), int(s.get("strike") or 0),
             )
 
-    return signals, latest_ts
+    return filter_signals_by_strategy(store.data_dir, signals), latest_ts
 
 
 def _lot_size(client: ZerodhaClient, settings: Settings) -> int:
@@ -160,6 +179,88 @@ def _open_position_count(client: ZerodhaClient) -> int:
     return sum(1 for p in positions if isinstance(p, dict) and int(p.get("quantity", 0)) != 0)
 
 
+def _parse_ts(ts: str) -> datetime:
+    raw = str(ts).replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return now_ist().replace(tzinfo=None)
+
+
+def _option_candle_at_timestamp(client: ZerodhaClient, token: int, ts: str) -> dict | None:
+    """Fetch the 5-min option candle at the signal/entry timestamp."""
+    dt = _parse_ts(ts)
+    if getattr(dt, "tzinfo", None) is not None:
+        dt = dt.replace(tzinfo=None)
+    from_dt = dt - timedelta(minutes=10)
+    to_dt = dt + timedelta(minutes=1)
+    candles = client.historical_data(int(token), from_dt, to_dt, interval="5minute")
+    if not candles:
+        return None
+    target = dt
+    best = None
+    best_delta = None
+    for c in candles:
+        c_dt = c.get("date")
+        if c_dt is None:
+            continue
+        if getattr(c_dt, "tzinfo", None) is not None:
+            c_dt = c_dt.replace(tzinfo=None)
+        delta = abs((c_dt - target).total_seconds())
+        if best_delta is None or delta < best_delta:
+            best_delta = delta
+            best = c
+    return best if best_delta is not None and best_delta <= 300 else (candles[-1] if candles else None)
+
+
+def _close_position(client: ZerodhaClient, store: DataStore, rec: dict[str, Any], *, reason: str) -> dict[str, Any]:
+    sym = str(rec.get("tradingsymbol") or "").replace("NFO:", "").strip()
+    qty = int(rec.get("quantity") or 0)
+    if not sym or qty <= 0:
+        raise ValueError("Invalid position record")
+
+    sl_order_id = rec.get("sl_order_id")
+    if sl_order_id:
+        try:
+            client.cancel_order(str(sl_order_id))
+        except Exception as e:
+            logger.debug("Cancel SL before exit %s: %s", sym, e)
+
+    order_id = client.place_order(
+        tradingsymbol=sym,
+        exchange="NFO",
+        transaction_type="SELL",
+        quantity=qty,
+        product="MIS",
+        order_type="MARKET",
+    )
+    remove_sl_record(store.data_dir, sym, qty)
+    logger.info("Closed %s (%s): %s", sym, reason, order_id)
+    return {"sym": sym, "action": "exit", "reason": reason, "order_id": order_id}
+
+
+def _entry_candle_failed(client: ZerodhaClient, rec: dict[str, Any]) -> tuple[bool, float | None]:
+    """
+    True when entry-candle close < signal-candle high.
+    Uses stored values, refined from live 5-min candle when available.
+    """
+    signal_high = float(rec.get("signal_high") or 0)
+    if signal_high <= 0:
+        return False, None
+
+    entry_close = float(rec.get("entry_candle_close") or 0)
+    token = rec.get("instrument_token")
+    ts = rec.get("signal_timestamp")
+    if token and ts:
+        candle = _option_candle_at_timestamp(client, int(token), str(ts))
+        if candle:
+            entry_close = float(candle.get("close", 0) or entry_close)
+
+    if entry_close <= 0:
+        return False, entry_close
+    return entry_close < signal_high, entry_close
+
+
 def execute_entry_signal(
     client: ZerodhaClient,
     settings: Settings,
@@ -167,7 +268,6 @@ def execute_entry_signal(
     signal: dict[str, Any],
     *,
     lots: int = 1,
-    rr_trail_enabled: bool = False,
 ) -> dict[str, Any]:
     """Place MARKET MIS BUY + SL-M from signal entry/SL (NSE session only)."""
     if not is_nse_session_active():
@@ -196,6 +296,9 @@ def execute_entry_signal(
     if ltp <= 0:
         ltp = entry_ref
 
+    signal_high, entry_candle_close = _signal_candle_fields(signal)
+    signal_ts = str(signal.get("timestamp") or "")
+
     order_id = client.place_order(
         tradingsymbol=sym,
         exchange="NFO",
@@ -206,7 +309,15 @@ def execute_entry_signal(
     )
 
     sl_order_id = None
-    risk_pts = round(ltp - sl_trigger, 2)
+    inst_token = client.get_instrument_token(sym) or 0
+    if inst_token and signal_ts and (signal_high is None or entry_candle_close is None):
+        candle = _option_candle_at_timestamp(client, int(inst_token), signal_ts)
+        if candle:
+            if signal_high is None:
+                signal_high = float(candle.get("high", 0) or 0) or None
+            if entry_candle_close is None:
+                entry_candle_close = float(candle.get("close", 0) or 0) or None
+
     try:
         sl_order_id = client.place_sl_order(
             tradingsymbol=sym,
@@ -216,16 +327,19 @@ def execute_entry_signal(
             trigger_price=sl_trigger,
             product="MIS",
         )
-        inst_token = client.get_instrument_token(sym) or 0
         store_sl(
             store.data_dir, sym, quantity, sl_order_id, sl_trigger, inst_token,
-            entry_price=ltp, initial_sl=sl_trigger, risk_pts=risk_pts,
-            rr_locked=False, rr_trail=rr_trail_enabled, signal_key=signal_key(signal),
+            entry_price=ltp, initial_sl=sl_trigger,
+            signal_key=signal_key(signal),
+            signal_high=signal_high,
+            signal_timestamp=signal_ts or None,
+            entry_candle_close=entry_candle_close,
+            entry_candle_checked=False,
         )
     except Exception as sl_err:
         logger.warning("Auto-trade SL failed for %s: %s", sym, sl_err)
 
-    return {
+    result: dict[str, Any] = {
         "order_id": order_id,
         "sl_order_id": sl_order_id,
         "tradingsymbol": sym,
@@ -234,7 +348,24 @@ def execute_entry_signal(
         "sl_trigger": sl_trigger,
         "signal_type": signal.get("signal_type"),
         "timestamp": signal.get("timestamp"),
+        "signal_high": signal_high,
+        "entry_candle_close": entry_candle_close,
     }
+
+    if sl_order_id and signal_high and entry_candle_close and entry_candle_close < signal_high:
+        try:
+            rec = {
+                "tradingsymbol": sym,
+                "quantity": quantity,
+                "sl_order_id": sl_order_id,
+            }
+            exit_info = _close_position(client, store, rec, reason="entry_close_below_signal_high")
+            result["exited"] = True
+            result["exit"] = exit_info
+        except Exception as e:
+            logger.warning("Immediate exit failed %s: %s", sym, e)
+
+    return result
 
 
 def run_auto_trade_cycle(
@@ -274,7 +405,6 @@ def run_auto_trade_cycle(
     status["candidates"] = len(fresh)
 
     lots = int(cfg.get("lots") or 1)
-    rr_trail = bool(cfg.get("rr_trail_enabled"))
     max_positions = 2
 
     for sig in fresh:
@@ -289,9 +419,7 @@ def run_auto_trade_cycle(
             status["skipped"] = "max_positions"
             break
         try:
-            result = execute_entry_signal(
-                client, settings, store, sig, lots=lots, rr_trail_enabled=rr_trail,
-            )
+            result = execute_entry_signal(client, settings, store, sig, lots=lots)
             mark_executed(store.data_dir, key, {**result, "signal_key": key})
             status["executed"].append(result)
             logger.info("Auto-trade executed %s %s", sym, key)
@@ -303,93 +431,68 @@ def run_auto_trade_cycle(
     return status
 
 
-def _option_ltp(client: ZerodhaClient, sym: str) -> float:
-    quote = client.quote([f"NFO:{sym}"])
-    for v in (quote or {}).values():
-        if isinstance(v, dict):
-            return float(v.get("last_price", 0) or 0)
-    return 0.0
-
-
-def _prev_5m_swing_low(client: ZerodhaClient, token: int) -> float | None:
+def _prev_5m_candle_low(client: ZerodhaClient, token: int) -> float | None:
     """Previous completed 5-min candle low for the option."""
     now = now_ist().replace(second=0, microsecond=0)
+    if getattr(now, "tzinfo", None) is not None:
+        now = now.replace(tzinfo=None)
     to_dt = now - timedelta(minutes=5)
     from_dt = to_dt - timedelta(minutes=30)
     candles = client.historical_data(int(token), from_dt, to_dt, interval="5minute")
-    if not candles or len(candles) < 1:
+    if not candles:
         return None
     prev = candles[-1]
     low = float(prev.get("low", 0) or 0)
     return low if low > 0 else None
 
 
-def run_rr_swing_trail_cycle(
+def run_position_trail_cycle(
     settings: Settings,
     client: ZerodhaClient,
     store: DataStore,
 ) -> dict[str, Any]:
     """
-    Monitor auto positions every 5 min:
-      - At 1:3 RR, lock SL at entry + 1R (entry + (entry - initial_sl))
-      - After lock, trail SL to the latest 5-min swing low when rr_trail enabled
+    Standard position management (always on) every 5 min:
+      1. Exit if entry-candle close < signal-candle high
+      2. Else trail SL to previous 5-min candle low
     """
-    cfg = get_config(store.data_dir)
-
     if not is_nse_session_active():
         return {"skipped": "market_closed", "updated": []}
 
-    if not cfg.get("rr_trail_enabled"):
-        return {"skipped": "rr_trail_disabled", "updated": []}
-
     updated: list[dict[str, Any]] = []
-    for rec in get_rr_trail_positions(store.data_dir):
-        if not rec.get("rr_trail"):
-            continue
+    for rec in get_managed_positions(store.data_dir):
         sym = rec.get("tradingsymbol")
         qty = int(rec.get("quantity") or 0)
-        if not sym or qty <= 0:
-            continue
-        entry = float(rec.get("entry_price") or 0)
-        risk = float(rec.get("risk_pts") or 0)
         sl_order_id = rec.get("sl_order_id")
         current_sl = float(rec.get("sl_trigger") or 0)
-        if entry <= 0 or risk <= 0 or not sl_order_id:
+        if not sym or qty <= 0 or not sl_order_id:
             continue
 
-        ltp = _option_ltp(client, sym)
-        if ltp <= 0:
-            continue
+        try:
+            if not rec.get("entry_candle_checked"):
+                failed, entry_close = _entry_candle_failed(client, rec)
+                mark_entry_candle_checked(store.data_dir, sym, qty)
+                if failed:
+                    exit_info = _close_position(
+                        client, store, rec, reason="entry_close_below_signal_high",
+                    )
+                    updated.append({**exit_info, "entry_close": entry_close, "signal_high": rec.get("signal_high")})
+                    continue
 
-        target_3r = entry + RR_TARGET_MULT * risk
-        lock_sl = round(entry + RR_LOCK_MULT * risk, 2)
-
-        if not rec.get("rr_locked") and ltp >= target_3r:
-            if lock_sl > current_sl:
-                try:
-                    client.modify_sl_order(sl_order_id, lock_sl)
-                    store_update_sl(store.data_dir, sym, qty, lock_sl)
-                    set_rr_locked(store.data_dir, sym, qty, rr_locked=True, sl_trigger=lock_sl)
-                    updated.append({"sym": sym, "action": "rr_lock", "sl": lock_sl, "ltp": ltp})
-                    logger.info("RR lock: %s SL -> %.2f (LTP %.2f)", sym, lock_sl, ltp)
-                    current_sl = lock_sl
-                except Exception as e:
-                    logger.warning("RR lock failed %s: %s", sym, e)
-            else:
-                set_rr_locked(store.data_dir, sym, qty, rr_locked=True)
-
-        if rec.get("rr_locked") or ltp >= target_3r:
             token = rec.get("instrument_token")
             if not token:
                 continue
-            swing_low = _prev_5m_swing_low(client, int(token))
+            swing_low = _prev_5m_candle_low(client, int(token))
             if swing_low and swing_low > current_sl:
-                try:
-                    client.modify_sl_order(sl_order_id, swing_low)
-                    store_update_sl(store.data_dir, sym, qty, swing_low)
-                    updated.append({"sym": sym, "action": "swing_trail", "sl": swing_low, "ltp": ltp})
-                    logger.info("Swing trail: %s SL -> %.2f", sym, swing_low)
-                except Exception as e:
-                    logger.warning("Swing trail failed %s: %s", sym, e)
+                client.modify_sl_order(str(sl_order_id), swing_low)
+                store_update_sl(store.data_dir, sym, qty, swing_low)
+                updated.append({"sym": sym, "action": "swing_trail", "sl": swing_low})
+                logger.info("Swing trail: %s SL -> %.2f", sym, swing_low)
+        except Exception as e:
+            logger.warning("Trail cycle failed %s: %s", sym, e)
 
     return {"updated": updated}
+
+
+# Backward-compatible alias
+run_rr_swing_trail_cycle = run_position_trail_cycle

@@ -96,6 +96,9 @@
     .ot-toggle-btn.off { background: #3f3f46; border-color: #52525b; color: #d4d4d8; }
     .ot-toggle-btn:hover { filter: brightness(1.08); }
     .ot-cond-actions { display: flex; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; }
+    .ot-strategy-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.85rem; }
+    .ot-strategy-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.45rem 0.65rem; border: 1px solid #27272a; border-radius: 6px; background: #141417; }
+    .ot-strategy-row span { font-size: 0.82rem; font-weight: 600; color: #e4e4e7; }
     .ot-cond-actions button {
       padding: 0.2rem 0.55rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid #3f3f46;
       background: #27272a; color: #d4d4d8; cursor: pointer;
@@ -137,6 +140,11 @@
     .chart-panel .chart-sub { margin: 0 0 0.5rem; font-size: 0.72rem; color: #71717a; }
     .chart-wrap { position: relative; height: 200px; }
     .chart-panel-wide .chart-wrap { height: 240px; }
+    .expected-move-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin: 0 0 0.75rem; }
+    .expected-move-stat { border: 1px solid #26262e; border-radius: 8px; padding: 0.45rem 0.6rem; background: #141417; }
+    .expected-move-stat .lbl { font-size: 0.68rem; color: #71717a; text-transform: uppercase; letter-spacing: 0.03em; }
+    .expected-move-stat .val { font-size: 1rem; font-weight: 600; color: #e4e4e7; margin-top: 0.1rem; }
+    .expected-move-stat .sub { font-size: 0.68rem; color: #8a8a93; margin-top: 0.1rem; }
     .confluence-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; }
     .confluence-scores { display: flex; gap: 0.75rem; flex-wrap: wrap; }
     .confluence-score-pill { padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600; border: 1px solid #27272a; background: #141417; }
@@ -273,6 +281,9 @@
         </div>
         <button class="btn btn-refresh" id="btnRefreshOptionsTrading" style="padding:0.4rem 0.85rem;font-size:0.85rem;">Refresh signals</button>
       </div>
+      <h3 class="ot-panel-title">Strategies</h3>
+      <p class="ot-panel-meta">Turn a strategy OFF to hide its signals on the dashboard and skip auto-trade for that strategy.</p>
+      <div id="optionsStrategyToggles" class="ot-strategy-list"></div>
       <div class="ot-cond-actions">
         <button type="button" id="btnOptionsCondReset">Reset all conditions</button>
         <button type="button" id="btnOptionsCondAllOn">All ON</button>
@@ -283,17 +294,14 @@
       <div id="autoTradePanel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.65rem;margin:0 0 1rem;padding:0.75rem 0.9rem;border:1px solid #26262e;border-radius:10px;background:#12121a;">
         <div>
           <h3 style="margin:0 0 0.35rem;font-size:0.9rem;">Auto Trading</h3>
-          <p style="margin:0;font-size:0.72rem;color:#71717a;line-height:1.4;">Every 5 min: rescan ATM CE/PE entry signals (+ radar ignitions) and place MARKET MIS orders with signal SL. <strong>Active Mon–Fri 09:15–15:30 IST only.</strong></p>
+          <p style="margin:0;font-size:0.72rem;color:#71717a;line-height:1.4;">Every 5 min: rescan ATM CE/PE entry signals (+ radar ignitions) and place MARKET MIS orders with signal SL. Positions auto-exit if entry candle closes below signal high; else SL trails to prev 5-min low. <strong>Active Mon–Fri 09:15–15:30 IST only.</strong></p>
         </div>
         <div style="display:flex;flex-direction:column;gap:0.45rem;justify-content:center;">
           <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;cursor:pointer;">
             <input type="checkbox" id="autoTradeEnabled" checked style="width:1rem;height:1rem;">
             <span><strong>Auto Entry</strong> — place orders on new signals (1 lot default)</span>
           </label>
-          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;cursor:pointer;">
-            <input type="checkbox" id="rrTrailEnabled" checked style="width:1rem;height:1rem;">
-            <span><strong>1:3 RR Trail</strong> — lock SL at 1R, then trail on 5-min swing low</span>
-          </label>
+          <p style="margin:0;font-size:0.78rem;color:#a1a1aa;line-height:1.4;"><strong>Trail (always on):</strong> signal SL at entry → exit if entry close &lt; signal high → else trail prev 5-min low.</p>
           <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;">
             <span><strong>Max loss / day</strong></span>
             <span>₹</span>
@@ -647,6 +655,28 @@
       </div>
       <div id="confluenceTimeline" class="confluence-timeline"></div>
     </div>
+    <div id="expectedMoveCard" class="card" style="margin-bottom: 1rem; display: none;">
+      <h3 style="margin: 0 0 0.25rem; font-size: 0.95rem;">ATM Straddle Expected Move</h3>
+      <p id="expectedMoveMeta" style="margin: 0 0 0.65rem; font-size: 0.75rem; color: #71717a;">ATM CE + PE @ session open ≈ 1-day expected range (± from day open)</p>
+      <div id="expectedMoveStats" class="expected-move-stats"></div>
+      <div class="chart-wrap" style="height: 260px;"><canvas id="chartExpectedMove"></canvas></div>
+      <div class="visual-legend" style="margin-top: 0.75rem;">
+        <div class="ce-hint"><strong>Upside room:</strong> spot below upper band — CE targets should fit inside remaining up pts unless trend day / IV expanding.</div>
+        <div class="pe-hint"><strong>Downside room:</strong> spot above lower band — PE targets should fit inside remaining down pts. Breach = market priced more than open straddle.</div>
+      </div>
+      <div class="chart-reading" id="readingExpectedMove"></div>
+    </div>
+    <div id="volCompareCard" class="card" style="margin-bottom: 1rem; display: none;">
+      <h3 style="margin: 0 0 0.25rem; font-size: 0.95rem;">Long ATM Straddle — Realized vs Implied Vol</h3>
+      <p id="volCompareMeta" style="margin: 0 0 0.65rem; font-size: 0.75rem; color: #71717a;">Implied = straddle ÷ spot (market-priced move %) · Realized = session range % + rolling 30-min vol scaled to session</p>
+      <div id="volCompareStats" class="expected-move-stats"></div>
+      <div class="chart-wrap" style="height: 260px;"><canvas id="chartVolCompare"></canvas></div>
+      <div class="visual-legend" style="margin-top: 0.75rem;">
+        <div class="ce-hint"><strong>Expansion (long straddle wins):</strong> realized / rolling RV crosses above implied — movement beats what was priced; straddle P&amp;L % rising.</div>
+        <div class="pe-hint"><strong>Contraction (theta day):</strong> realized range stays below open implied and straddle bleeds — avoid buying premium; stand aside or scalp only.</div>
+      </div>
+      <div class="chart-reading" id="readingVolCompare"></div>
+    </div>
     <div id="analysisChartsCard" class="card" style="margin-bottom: 1rem; display: none;">
       <h3 style="margin: 0 0 0.25rem; font-size: 0.95rem;">Option Buying Visuals</h3>
       <p id="analysisChartsMeta" style="margin: 0 0 0.75rem; font-size: 0.75rem; color: #71717a;">ATM CE &amp; PE · % vs session open (09:15) · click a point to drill down</p>
@@ -910,10 +940,36 @@
     const btnOptionsCondAllOn = document.getElementById('btnOptionsCondAllOn');
 
     const OT_TOGGLE_KEY = 'optionsConditionToggles';
-    const SIGNAL_TYPE_PRIORITY = ['primary', 'cluster_breakout', 'sideways_breakout', 'doji_strong'];
     let optionsTradingRawPayload = null;
     let optionsConditionToggles = {};
     let optionsSignalTypeDefs = [];
+    let optionsStrategyEnabled = {};
+    let optionsStrategyDefs = [];
+
+    function signalTypePriorityList() {
+      if (optionsSignalTypeDefs.length) {
+        return optionsSignalTypeDefs.map(t => t.id);
+      }
+      return ['primary', 'alert_breakout', 'cluster_breakout', 'sideways_breakout', 'doji_strong'];
+    }
+
+    function isStrategyEnabled(typeId) {
+      if (typeId === 'trend_continuation') {
+        return optionsStrategyEnabled.trend_ignition !== false;
+      }
+      return optionsStrategyEnabled[typeId] !== false;
+    }
+
+    function syncStrategyEnabledFromPayload(d) {
+      if (!d?.strategy_enabled) return;
+      optionsStrategyEnabled = { ...d.strategy_enabled };
+      if (optionsStrategyDefs.length) {
+        optionsStrategyDefs = optionsStrategyDefs.map(s => ({
+          ...s,
+          enabled: d.strategy_enabled[s.id] !== false,
+        }));
+      }
+    }
 
     function normalizeSignalTypeDefs(types) {
       return (types || []).map(t => ({
@@ -968,7 +1024,7 @@
     }
 
     function matchedTypesForRow(row) {
-      return SIGNAL_TYPE_PRIORITY.filter(t => typeMatchesRow(row, t));
+      return signalTypePriorityList().filter(t => isStrategyEnabled(t) && typeMatchesRow(row, t));
     }
 
     function enrichRowWithToggles(row) {
@@ -979,6 +1035,7 @@
         signal: matched.length > 0,
         signal_type: top,
         primary_signal: matched.includes('primary'),
+        alert_breakout_signal: matched.includes('alert_breakout'),
         doji_strong_signal: matched.includes('doji_strong'),
         cluster_breakout_signal: matched.includes('cluster_breakout'),
         sideways_breakout_signal: matched.includes('sideways_breakout'),
@@ -1013,6 +1070,7 @@
       const signals = [];
       for (const row of [...ceRows, ...peRows]) {
         for (const typeId of row.matched_types || []) {
+          if (!isStrategyEnabled(typeId)) continue;
           signals.push(buildSignalFromRow(row, typeId, payload));
         }
       }
@@ -1084,6 +1142,74 @@
       btnOptionsCondAllOn.addEventListener('click', () => setAllConditionToggles(true));
     }
 
+    function renderStrategyToggles() {
+      const el = document.getElementById('optionsStrategyToggles');
+      if (!el) return;
+      const list = optionsStrategyDefs.length
+        ? optionsStrategyDefs
+        : signalTypePriorityList().concat(['gamma_ignition', 'trend_ignition']).map(id => ({
+          id,
+          label: signalTypeLabel(id),
+          enabled: isStrategyEnabled(id),
+        }));
+      el.innerHTML = list.map(s => {
+        const on = s.enabled !== false && isStrategyEnabled(s.id);
+        return `<div class="ot-strategy-row" data-strategy="${s.id}">
+          <span>${fmt(s.label)}</span>
+          <button type="button" class="ot-toggle-btn ${on ? 'on' : 'off'}"
+            data-strategy="${s.id}" aria-pressed="${on}">${on ? 'ON' : 'OFF'}</button>
+        </div>`;
+      }).join('');
+
+      el.querySelectorAll('.ot-toggle-btn[data-strategy]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.strategy;
+          const next = !isStrategyEnabled(id);
+          btn.disabled = true;
+          try {
+            const r = await fetch(apiUrl('/api/options-trading/strategies'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ strategy_id: id, enabled: next }),
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail || 'Update failed');
+            optionsStrategyDefs = d.strategies || [];
+            optionsStrategyEnabled = {};
+            for (const s of optionsStrategyDefs) {
+              optionsStrategyEnabled[s.id] = s.enabled !== false;
+            }
+            renderStrategyToggles();
+            if (optionsTradingRawPayload) {
+              optionsTradingRawPayload.strategy_enabled = { ...optionsStrategyEnabled };
+              renderOptionsTradingPayload(optionsTradingRawPayload);
+            }
+          } catch (e) {
+            setStatus('Strategy toggle: ' + e.message, false);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    async function loadStrategyConfig() {
+      try {
+        const r = await fetch(apiUrl('/api/options-trading/strategies'));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'Failed to load strategies');
+        optionsStrategyDefs = d.strategies || [];
+        optionsStrategyEnabled = {};
+        for (const s of optionsStrategyDefs) {
+          optionsStrategyEnabled[s.id] = s.enabled !== false;
+        }
+        renderStrategyToggles();
+      } catch (e) {
+        const el = document.getElementById('optionsStrategyToggles');
+        if (el) el.innerHTML = `<p style="font-size:0.75rem;color:#f87171;margin:0;">Failed to load strategies: ${fmt(e.message)}</p>`;
+      }
+    }
+
     function yn(v) {
       if (v === true) return '<span class="ind-yes">Y</span>';
       if (v === false) return '<span class="ind-no">N</span>';
@@ -1092,13 +1218,14 @@
 
     function signalTypeLabel(t) {
       if (t === 'primary') return 'Primary';
+      if (t === 'alert_breakout') return 'Alert Breakout';
       if (t === 'doji_strong') return 'Doji→Strong';
       if (t === 'cluster_breakout') return 'Cluster+Vol';
       if (t === 'sideways_breakout') return 'Sideways Brk';
-      if (t === 'gamma_ignition') return '🎯 Gamma Ignition';
-      if (t === 'trend_ignition') return '🚀 Trend Ignition';
+      if (t === 'gamma_ignition') return 'Expiry Gamma Ignition';
+      if (t === 'trend_ignition') return 'Trend Ignition';
       if (t === 'trend_continuation') return '↳ Trend Add';
-      return '—';
+      return t || '—';
     }
 
     const SPECIAL_SIGNALS = ['gamma_ignition', 'trend_ignition', 'trend_continuation'];
@@ -1113,15 +1240,17 @@
       }
       if (emptyEl) emptyEl.style.display = 'none';
       const primaryN = signals.filter(s => s.signal_type === 'primary').length;
+      const alertN = signals.filter(s => s.signal_type === 'alert_breakout').length;
       const altN = signals.filter(s => s.signal_type === 'doji_strong').length;
       const clusterN = signals.filter(s => s.signal_type === 'cluster_breakout').length;
       const sidewaysN = signals.filter(s => s.signal_type === 'sideways_breakout').length;
       const ignN = signals.filter(s => s.signal_type === 'gamma_ignition').length;
       const trendN = signals.filter(s => s.signal_type === 'trend_ignition').length;
       const parts = [`${signals.length} ${label} signal(s)`];
-      if (trendN) parts.push(`${trendN} 🚀 trend ignition`);
-      if (ignN) parts.push(`${ignN} 🎯 gamma ignition`);
+      if (trendN) parts.push(`${trendN} trend ignition`);
+      if (ignN) parts.push(`${ignN} gamma ignition`);
       if (primaryN) parts.push(`${primaryN} primary`);
+      if (alertN) parts.push(`${alertN} alert breakout`);
       if (altN) parts.push(`${altN} doji→strong`);
       if (clusterN) parts.push(`${clusterN} cluster+vol`);
       if (sidewaysN) parts.push(`${sidewaysN} sideways brk`);
@@ -1177,6 +1306,7 @@
       if (emptyEl) emptyEl.style.display = 'none';
       const signalCount = rows.filter(r => r.signal).length;
       const primaryCount = rows.filter(r => r.primary_signal || r.signal_type === 'primary').length;
+      const alertCount = rows.filter(r => r.alert_breakout_signal || r.signal_type === 'alert_breakout').length;
       const altCount = rows.filter(r => r.doji_strong_signal || r.signal_type === 'doji_strong').length;
       const clusterCount = rows.filter(r => r.cluster_breakout_signal || r.signal_type === 'cluster_breakout').length;
       const sidewaysCount = rows.filter(r => r.sideways_breakout_signal || r.signal_type === 'sideways_breakout').length;
@@ -1184,6 +1314,7 @@
         let txt = `${rows.length} bar(s) · ${signalCount} signal(s)`;
         const bits = [];
         if (primaryCount) bits.push(`${primaryCount} primary`);
+        if (alertCount) bits.push(`${alertCount} alert breakout`);
         if (altCount) bits.push(`${altCount} doji→strong`);
         if (clusterCount) bits.push(`${clusterCount} cluster+vol`);
         if (sidewaysCount) bits.push(`${sidewaysCount} sideways brk`);
@@ -1195,7 +1326,8 @@
         const statusCls = r.signal ? 'sig-buy' : 'sig-no';
         let sigLabel = 'N';
         if (r.signal) {
-          if (r.signal_type === 'doji_strong') sigLabel = 'Doji';
+          if (r.signal_type === 'alert_breakout') sigLabel = 'Alert';
+          else if (r.signal_type === 'doji_strong') sigLabel = 'Doji';
           else if (r.signal_type === 'cluster_breakout') sigLabel = 'Cluster';
           else if (r.signal_type === 'sideways_breakout') sigLabel = 'Sideways';
           else if (r.signal_type === 'primary') sigLabel = 'Primary';
@@ -1231,6 +1363,8 @@
 
     function renderOptionsTradingPayload(d) {
       optionsTradingRawPayload = d;
+      syncStrategyEnabledFromPayload(d);
+      renderStrategyToggles();
       const defs = d.signal_types || optionsSignalTypeDefs;
       if (defs?.length) {
         optionsSignalTypeDefs = normalizeSignalTypeDefs(defs);
@@ -1242,9 +1376,9 @@
 
       const hasChecks = (d.analysis?.CE?.[0]?.condition_checks) || (d.analysis?.PE?.[0]?.condition_checks);
       const filtered = hasChecks ? buildFilteredOptionsView(d) : {
-        signals: d.signals || [],
-        ceRows: (d.analysis?.CE || []).map(r => ({ ...r })),
-        peRows: (d.analysis?.PE || []).map(r => ({ ...r })),
+        signals: (d.signals || []).filter(s => isStrategyEnabled(s.signal_type || 'primary')),
+        ceRows: (d.analysis?.CE || []).map(r => ({ ...r })).filter(r => !r.signal || isStrategyEnabled(r.signal_type || 'primary')),
+        peRows: (d.analysis?.PE || []).map(r => ({ ...r })).filter(r => !r.signal || isStrategyEnabled(r.signal_type || 'primary')),
       };
 
       const ceSignals = filtered.signals.filter(s => s.option_type === 'CE');
@@ -1321,6 +1455,7 @@
     // Convert the radar's IGNITION triggers into option entry-signal rows (schema-compatible
     // with the ATM CE/PE — Entry Signals tables).
     function gammaIgnitionSignals(d) {
+      if (!isStrategyEnabled('gamma_ignition')) return [];
       if (!d || !d.is_expiry_day || !d.radar || !Array.isArray(d.radar.triggers)) return [];
       return d.radar.triggers.filter(t => t.stage === 'IGNITION').map(t => ({
         timestamp: t.timestamp,
@@ -1367,6 +1502,7 @@
     // Convert Trend-Ignition triggers into option entry-signal rows (schema-compatible
     // with the ATM CE/PE — Entry Signals tables). Both IGNITION and CONTINUATION show.
     function trendIgnitionSignals(d) {
+      if (!isStrategyEnabled('trend_ignition')) return [];
       if (!d || !d.radar || !Array.isArray(d.radar.triggers)) return [];
       return d.radar.triggers.map(t => ({
         timestamp: t.timestamp,
@@ -1489,24 +1625,21 @@
 
     async function loadAutoTradeConfig() {
       const autoCb = document.getElementById('autoTradeEnabled');
-      const rrCb = document.getElementById('rrTrailEnabled');
       const maxLossInput = document.getElementById('dailyMaxLoss');
       const statusEl = document.getElementById('autoTradeStatus');
       const lastEl = document.getElementById('autoTradeLastRun');
       const slEl = document.getElementById('slStatus');
-      if (!autoCb || !rrCb) return;
+      if (!autoCb) return;
       try {
         const r = await fetch(apiUrl('/api/auto-trade/config'));
         const d = await r.json();
         if (!r.ok) throw new Error(d.detail || 'load failed');
         autoCb.checked = !!d.auto_trade_enabled;
-        rrCb.checked = !!d.rr_trail_enabled;
         if (lotsInput && d.lots != null) lotsInput.value = d.lots;
         if (maxLossInput && d.daily_max_loss != null) maxLossInput.value = d.daily_max_loss;
         const entryOn = d.auto_trade_enabled ? 'ON' : 'OFF';
-        const trailOn = d.rr_trail_enabled ? 'ON' : 'OFF';
         const maxLoss = d.daily_max_loss != null ? d.daily_max_loss : 1500;
-        statusEl.innerHTML = `Auto Entry: <span style="color:${d.auto_trade_enabled ? '#22c55e' : '#71717a'}">${entryOn}</span> · RR Trail: <span style="color:${d.rr_trail_enabled ? '#22c55e' : '#71717a'}">${trailOn}</span> · Max loss: <span style="color:#fca5a5;">₹${Number(maxLoss).toLocaleString()}</span>${d.sl_reached ? ' <span style="color:#ef4444;">(HIT)</span>' : ''}`;
+        statusEl.innerHTML = `Auto Entry: <span style="color:${d.auto_trade_enabled ? '#22c55e' : '#71717a'}">${entryOn}</span> · Trail: <span style="color:#22c55e">ON</span> · Max loss: <span style="color:#fca5a5;">₹${Number(maxLoss).toLocaleString()}</span>${d.sl_reached ? ' <span style="color:#ef4444;">(HIT)</span>' : ''}`;
         if (slEl) {
           const pnlTxt = d.day_pnl != null ? ` · P&L ₹${Number(d.day_pnl).toLocaleString()}` : '';
           slEl.textContent = `Max loss: ₹${Number(maxLoss).toLocaleString()} / day${pnlTxt}${d.sl_reached ? ' — REACHED, no further auto trades' : ''}`;
@@ -1543,7 +1676,6 @@
     }
 
     const autoTradeCb = document.getElementById('autoTradeEnabled');
-    const rrTrailCb = document.getElementById('rrTrailEnabled');
     if (autoTradeCb) {
       autoTradeCb.addEventListener('change', async () => {
         autoTradeCb.disabled = true;
@@ -1551,15 +1683,6 @@
           await saveAutoTradeConfig({ auto_trade_enabled: autoTradeCb.checked });
           setStatus(autoTradeCb.checked ? 'Auto entry ENABLED — orders will fire on new signals.' : 'Auto entry disabled.', true);
         } finally { autoTradeCb.disabled = false; }
-      });
-    }
-    if (rrTrailCb) {
-      rrTrailCb.addEventListener('change', async () => {
-        rrTrailCb.disabled = true;
-        try {
-          await saveAutoTradeConfig({ rr_trail_enabled: rrTrailCb.checked });
-          setStatus(rrTrailCb.checked ? '1:3 RR swing trail ENABLED.' : 'RR swing trail disabled.', true);
-        } finally { rrTrailCb.disabled = false; }
       });
     }
     if (lotsInput) {
@@ -1584,6 +1707,7 @@
       loadExpiryGamma();
       loadTrendIgnition();
       loadAutoTradeConfig();
+      await loadStrategyConfig();
       if (!optionsTradingCeBody && !optionsTradingPeBody) return;
       try {
         const r = await fetch(apiUrl('/api/options-trading/signals'));
@@ -1849,11 +1973,9 @@
           const sym = fmt(p.tradingsymbol);
           const slVal = p.sl_trigger != null ? parseFloat(p.sl_trigger) : null;
           const hasSl = p.sl_order_id != null;
-          const autoTrail = p.auto_trail === true;
-          const rrLocked = p.rr_locked === true;
-          const rrTrail = p.rr_trail === true;
-          const trailLbl = rrTrail ? (rrLocked ? 'RR+Swing' : 'RR wait') : (autoTrail ? '1m trail' : '');
-          const trailCls = (autoTrail || rrTrail) ? 'btn-trail on' : 'btn-trail';
+          const trailManaged = p.trail_managed === true;
+          const trailLbl = trailManaged ? '5m trail' : '';
+          const trailCls = trailManaged ? 'btn-trail on' : 'btn-trail';
           return `<tr data-sym="${sym}" data-qty="${qty}">
             <td>${sym}</td>
             <td>${fmt(p.quantity)}</td>
@@ -1867,7 +1989,7 @@
             <td>
               <div class="pos-actions">
                 <button class="btn btn-exit exit-btn" data-sym="${sym}" data-qty="${qty}">Exit</button>
-                ${hasSl ? `<button class="btn ${trailCls} trail-btn" data-sym="${sym}" data-qty="${qty}" data-on="${autoTrail}">${trailLbl || (autoTrail ? 'Trail ON' : 'Auto Trail')}</button>` : ''}
+                ${trailManaged ? `<span class="btn ${trailCls}" style="cursor:default;opacity:0.9;">${trailLbl}</span>` : ''}
               </div>
             </td>
           </tr>`;
@@ -2287,6 +2409,8 @@
         renderBuyersDay(d.buyers_day);
         renderConfluencePanel(summaries, d.selected?.timestamp, d.hourly_levels);
         renderAnalysisCharts(summaries);
+        renderExpectedMoveChart(summaries);
+        renderVolCompareChart(summaries);
         renderDayTimeline(summaries, (ts) => {
           renderConfluencePanel(summaries, ts, d.hourly_levels);
           fetch(apiUrl('/api/analysis-summary', { timestamp: ts })).then(r => r.json()).then(data => renderAnalysis(data.selected));
@@ -2339,6 +2463,8 @@
       } catch (e) {
         document.getElementById('analysisContent').innerHTML = '<p class="status err">Error: ' + e.message + '</p>';
         renderAnalysisCharts([]);
+        renderExpectedMoveChart([]);
+        renderVolCompareChart([]);
         renderConfluencePanel([], null, null);
         renderBuyersDay(null);
       }
@@ -2355,6 +2481,379 @@
           _analysisCharts[k] = null;
         }
       });
+    }
+
+    function renderExpectedMoveChart(summaries) {
+      const card = document.getElementById('expectedMoveCard');
+      const statsEl = document.getElementById('expectedMoveStats');
+      const metaEl = document.getElementById('expectedMoveMeta');
+      if (_analysisCharts.expectedMove) {
+        _analysisCharts.expectedMove.destroy();
+        _analysisCharts.expectedMove = null;
+      }
+      if (!card || typeof Chart === 'undefined') return;
+
+      const hasEm = summaries.some(s => {
+        const em = s.expected_move || {};
+        return em.expected_pts > 0 && em.upper != null && em.lower != null;
+      });
+      if (!summaries.length || !hasEm) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'block';
+
+      const labels = summaries.map(s => shortTs(s.timestamp, 5));
+      const spot = summaries.map(s => s.price_action?.spot ?? null);
+      const upper = summaries.map(s => s.expected_move?.upper ?? null);
+      const lower = summaries.map(s => s.expected_move?.lower ?? null);
+      const dayOpen = summaries.map(s => s.expected_move?.day_open ?? null);
+      const straddle = summaries.map(s => s.expected_move?.straddle_now ?? null);
+
+      const last = summaries[summaries.length - 1];
+      const em = last.expected_move || {};
+      const opt = last.options || {};
+      const strike = opt.atm_strike;
+      if (metaEl) {
+        metaEl.textContent = `ATM strike ${strike || '—'} · straddle @ open ₹${fmt(em.straddle_open)} (CE+PE) · expected ±${fmt(em.expected_pts)} pts from day open ${fmt(em.day_open)}`;
+      }
+      if (statsEl) {
+        const breach = em.breached_upper ? 'Above upper band' : em.breached_lower ? 'Below lower band' : 'Inside band';
+        const breachColor = em.breached_upper || em.breached_lower ? '#f97316' : '#22c55e';
+        statsEl.innerHTML = `
+          <div class="expected-move-stat">
+            <div class="lbl">Expected range</div>
+            <div class="val">${fmt(em.lower)} – ${fmt(em.upper)}</div>
+            <div class="sub">±${fmt(em.expected_pts)} pts from open</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Spot now</div>
+            <div class="val">${fmt(last.price_action?.spot)}</div>
+            <div class="sub">${em.move_from_open_pts >= 0 ? '+' : ''}${fmt(em.move_from_open_pts)} pts from open</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Room up / down</div>
+            <div class="val" style="color:#fca5a5">↑ ${fmt(em.remaining_up_pts)}</div>
+            <div class="sub" style="color:#86efac">↓ ${fmt(em.remaining_down_pts)} pts left</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Range used</div>
+            <div class="val">${fmt(em.range_used_pct)}%</div>
+            <div class="sub">Session ${fmt(em.session_range_pts)} pts (${fmt(em.range_captured_pct)}% of EM)</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Straddle now</div>
+            <div class="val">₹${fmt(em.straddle_now)}</div>
+            <div class="sub" style="color:${breachColor}">${breach}</div>
+          </div>`;
+      }
+
+      const onPointClick = (ts) => {
+        fetch(apiUrl('/api/analysis-summary', { timestamp: ts }))
+          .then(r => r.json())
+          .then(data => renderAnalysis(data.selected));
+      };
+
+      const ctx = document.getElementById('chartExpectedMove');
+      if (ctx) {
+        _analysisCharts.expectedMove = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Spot',
+                data: spot,
+                borderColor: '#60a5fa',
+                backgroundColor: 'rgba(96, 165, 250, 0.08)',
+                fill: false,
+                tension: 0.15,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2.5,
+                yAxisID: 'y',
+              },
+              {
+                label: 'EM upper',
+                data: upper,
+                borderColor: '#fca5a5',
+                borderDash: [6, 4],
+                fill: false,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                yAxisID: 'y',
+              },
+              {
+                label: 'EM lower',
+                data: lower,
+                borderColor: '#86efac',
+                borderDash: [6, 4],
+                fill: false,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Day open',
+                data: dayOpen,
+                borderColor: '#71717a',
+                borderDash: [2, 3],
+                fill: false,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 1,
+                yAxisID: 'y',
+              },
+              {
+                label: 'ATM straddle ₹',
+                data: straddle,
+                borderColor: '#eab308',
+                fill: false,
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                yAxisID: 'y1',
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            onClick: (evt, elements) => {
+              if (!elements.length) return;
+              const idx = elements[0].index;
+              const s = summaries[idx];
+              if (s?.timestamp) onPointClick(s.timestamp);
+            },
+            plugins: {
+              legend: { labels: { color: '#a1a1aa', boxWidth: 12, font: { size: 11 } }, position: 'top', align: 'end' },
+              tooltip: {
+                callbacks: {
+                  label: (c) => {
+                    const v = c.parsed.y;
+                    if (v == null || !Number.isFinite(v)) return `${c.dataset.label}: —`;
+                    const unit = c.dataset.yAxisID === 'y1' ? '₹' : '';
+                    return `${c.dataset.label}: ${unit}${v.toFixed(2)}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: { ticks: { color: '#71717a', maxTicksLimit: 14, font: { size: 9 } }, grid: { color: '#27272a' } },
+              y: {
+                position: 'left',
+                ticks: { color: '#60a5fa' },
+                grid: { color: '#27272a' },
+                title: { display: true, text: 'Index pts', color: '#71717a', font: { size: 10 } },
+              },
+              y1: {
+                position: 'right',
+                ticks: { color: '#eab308', callback: (v) => '₹' + v },
+                grid: { display: false },
+                title: { display: true, text: 'Straddle', color: '#eab308', font: { size: 10 } },
+              },
+            },
+          },
+        });
+        const reading = document.getElementById('readingExpectedMove');
+        if (reading && em.expected_pts) {
+          const inside = !em.breached_upper && !em.breached_lower;
+          reading.innerHTML = `Now: <span class="pill ${inside ? 'ce' : 'pe'}">${inside ? 'INSIDE' : 'BREACHED'}</span><span class="detail">${fmt(em.remaining_up_pts)} pts upside · ${fmt(em.remaining_down_pts)} pts downside remaining vs open straddle</span>`;
+        }
+      }
+    }
+
+    function renderVolCompareChart(summaries) {
+      const card = document.getElementById('volCompareCard');
+      const statsEl = document.getElementById('volCompareStats');
+      const metaEl = document.getElementById('volCompareMeta');
+      if (_analysisCharts.volCompare) {
+        _analysisCharts.volCompare.destroy();
+        _analysisCharts.volCompare = null;
+      }
+      if (!card || typeof Chart === 'undefined') return;
+
+      const hasVol = summaries.some(s => {
+        const v = s.vol_compare || {};
+        return v.implied_open_pct > 0;
+      });
+      if (!summaries.length || !hasVol) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'block';
+
+      const labels = summaries.map(s => shortTs(s.timestamp, 5));
+      const impliedOpen = summaries.map(s => s.vol_compare?.implied_open_pct ?? null);
+      const impliedNow = summaries.map(s => s.vol_compare?.implied_move_pct ?? null);
+      const realizedRange = summaries.map(s => s.vol_compare?.realized_range_pct ?? null);
+      const rollingRv = summaries.map(s => s.vol_compare?.rolling_realized_pct ?? null);
+      const straddlePnl = summaries.map(s => s.vol_compare?.straddle_pnl_pct ?? null);
+
+      const last = summaries[summaries.length - 1];
+      const vc = last.vol_compare || {};
+      const regime = (vc.regime || 'neutral').toUpperCase();
+      const regimeColor = vc.regime === 'expansion' ? '#22c55e' : (vc.regime === 'contraction' ? '#ef4444' : '#eab308');
+
+      if (metaEl) {
+        metaEl.textContent = `Open implied ${fmt(vc.implied_open_pct)}% move · Now implied ${fmt(vc.implied_move_pct)}% · Session realized ${fmt(vc.realized_range_pct)}% · Regime: ${regime}`;
+      }
+      if (statsEl) {
+        statsEl.innerHTML = `
+          <div class="expected-move-stat">
+            <div class="lbl">Implied @ open</div>
+            <div class="val">${fmt(vc.implied_open_pct)}%</div>
+            <div class="sub">Straddle ÷ spot @ 09:15</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Implied now</div>
+            <div class="val">${fmt(vc.implied_move_pct)}%</div>
+            <div class="sub">Live straddle ÷ spot</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Realized range</div>
+            <div class="val" style="color:#86efac">${fmt(vc.realized_range_pct)}%</div>
+            <div class="sub">Session H−L ÷ open</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Rolling RV (30m)</div>
+            <div class="val" style="color:#60a5fa">${fmt(vc.rolling_realized_pct)}%</div>
+            <div class="sub">vs implied ${fmt(vc.rolling_vs_implied)}×</div>
+          </div>
+          <div class="expected-move-stat">
+            <div class="lbl">Long straddle P&amp;L</div>
+            <div class="val" style="color:${(vc.straddle_pnl_pct || 0) >= 0 ? '#22c55e' : '#ef4444'}">${vc.straddle_pnl_pct >= 0 ? '+' : ''}${fmt(vc.straddle_pnl_pct)}%</div>
+            <div class="sub" style="color:${regimeColor}">${regime}</div>
+          </div>`;
+      }
+
+      const onPointClick = (ts) => {
+        fetch(apiUrl('/api/analysis-summary', { timestamp: ts }))
+          .then(r => r.json())
+          .then(data => renderAnalysis(data.selected));
+      };
+
+      const ctx = document.getElementById('chartVolCompare');
+      if (ctx) {
+        _analysisCharts.volCompare = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Rolling realized %',
+                data: rollingRv,
+                borderColor: '#60a5fa',
+                backgroundColor: 'rgba(96, 165, 250, 0.06)',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Session realized range %',
+                data: realizedRange,
+                borderColor: '#86efac',
+                fill: false,
+                tension: 0.15,
+                pointRadius: 0,
+                borderWidth: 2,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Implied now %',
+                data: impliedNow,
+                borderColor: '#f59e0b',
+                fill: false,
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 2,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Implied @ open %',
+                data: impliedOpen,
+                borderColor: '#f59e0b',
+                borderDash: [6, 4],
+                fill: false,
+                tension: 0,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Long straddle P&L %',
+                data: straddlePnl,
+                borderColor: '#a78bfa',
+                fill: false,
+                tension: 0.25,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                yAxisID: 'y1',
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            onClick: (evt, elements) => {
+              if (!elements.length) return;
+              const idx = elements[0].index;
+              const s = summaries[idx];
+              if (s?.timestamp) onPointClick(s.timestamp);
+            },
+            plugins: {
+              legend: { labels: { color: '#a1a1aa', boxWidth: 12, font: { size: 11 } }, position: 'top', align: 'end' },
+              tooltip: {
+                callbacks: {
+                  label: (c) => {
+                    const v = c.parsed.y;
+                    if (v == null || !Number.isFinite(v)) return `${c.dataset.label}: —`;
+                    const sfx = c.dataset.yAxisID === 'y1' ? '% P&L' : '%';
+                    return `${c.dataset.label}: ${v.toFixed(2)}${sfx === '% P&L' ? '%' : '%'}`;
+                  },
+                  afterBody: (items) => {
+                    const i = items[0]?.dataIndex;
+                    if (i == null) return [];
+                    const v = summaries[i]?.vol_compare || {};
+                    const lines = [];
+                    if (v.rv_iv_ratio != null) lines.push(`Range / open implied: ${v.rv_iv_ratio}×`);
+                    if (v.regime) lines.push(`Regime: ${v.regime}`);
+                    return lines;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: { ticks: { color: '#71717a', maxTicksLimit: 14, font: { size: 9 } }, grid: { color: '#27272a' } },
+              y: {
+                position: 'left',
+                ticks: { color: '#a1a1aa', callback: (v) => v + '%' },
+                grid: { color: '#27272a' },
+                title: { display: true, text: 'Move % (RV vs IV proxy)', color: '#71717a', font: { size: 10 } },
+              },
+              y1: {
+                position: 'right',
+                ticks: { color: '#a78bfa', callback: (v) => v + '%' },
+                grid: { display: false },
+                title: { display: true, text: 'Straddle P&L', color: '#a78bfa', font: { size: 10 } },
+              },
+            },
+          },
+        });
+        const reading = document.getElementById('readingVolCompare');
+        if (reading) {
+          const rvGt = vc.rv_gt_iv;
+          const pill = vc.regime === 'expansion' ? 'EXPANSION' : (vc.regime === 'contraction' ? 'CONTRACTION' : 'NEUTRAL');
+          const pillCls = vc.regime === 'expansion' ? 'ce' : (vc.regime === 'contraction' ? 'pe' : 'neutral');
+          reading.innerHTML = `Now: <span class="pill ${pillCls}">${pill}</span><span class="detail">${rvGt ? 'Rolling RV &gt; implied — movement winning' : 'Rolling RV ≤ implied — premium still rich vs travel'} · straddle ${vc.straddle_pnl_pct >= 0 ? '+' : ''}${fmt(vc.straddle_pnl_pct)}%</span>`;
+        }
+      }
     }
 
     function analysisChartBaseOptions(yTitle, summaries, onPointClick) {
@@ -2808,6 +3307,8 @@
       const pa = s.price_action || {};
       const fut = s.futures || {};
       const opt = s.options || {};
+      const em = s.expected_move || {};
+      const vc = s.vol_compare || {};
       const sc = s.scores || {};
       const tp = s.trade_plan || {};
       const rangePct = rangeBarPct(pa.support, pa.resistance, pa.spot);
@@ -2863,6 +3364,25 @@
           </div>
         </div>
         <p style="margin: 0.5rem 0 0; font-size: 0.8rem;">ATM Strike: <strong>${fmt(opt.atm_strike)}</strong> | P/C Ratio: <strong>${fmt(opt.put_call_ratio)}</strong> | Skew: <span class="badge ${badgeClass(opt.skew)}">${fmt(opt.skew)}</span></p>
+        ${em.expected_pts ? `
+        <h3 style="margin: 1rem 0 0.5rem;">Expected Move (ATM straddle)</h3>
+        <table class="analysis-table summary-table" style="max-width: 520px;">
+          <tr><th>Straddle @ open</th><td class="num">₹${fmt(em.straddle_open)}</td><th>Straddle now</th><td class="num">₹${fmt(em.straddle_now)}</td></tr>
+          <tr><th>Expected ±pts</th><td class="num">${fmt(em.expected_pts)}</td><th>Day open</th><td class="num">${fmt(em.day_open)}</td></tr>
+          <tr><th>Upper band</th><td class="num">${fmt(em.upper)}</td><th>Lower band</th><td class="num">${fmt(em.lower)}</td></tr>
+          <tr><th>Room up</th><td class="num pnl-positive">${fmt(em.remaining_up_pts)} pts</td><th>Room down</th><td class="num pnl-negative">${fmt(em.remaining_down_pts)} pts</td></tr>
+          <tr><th>Range used</th><td class="num">${fmt(em.range_used_pct)}%</td><th>Session / EM</th><td class="num">${fmt(em.session_range_pts)} pts (${fmt(em.range_captured_pct)}%)</td></tr>
+        </table>
+        ` : ''}
+        ${vc.implied_open_pct ? `
+        <h3 style="margin: 1rem 0 0.5rem;">Realized vs Implied Vol</h3>
+        <table class="analysis-table summary-table" style="max-width: 520px;">
+          <tr><th>Implied @ open</th><td class="num">${fmt(vc.implied_open_pct)}%</td><th>Implied now</th><td class="num">${fmt(vc.implied_move_pct)}%</td></tr>
+          <tr><th>Realized range</th><td class="num">${fmt(vc.realized_range_pct)}%</td><th>Rolling RV (30m)</th><td class="num">${fmt(vc.rolling_realized_pct)}%</td></tr>
+          <tr><th>Range / open IV</th><td class="num">${fmt(vc.rv_iv_ratio)}×</td><th>Long straddle P&amp;L</th><td class="num ${(vc.straddle_pnl_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${vc.straddle_pnl_pct >= 0 ? '+' : ''}${fmt(vc.straddle_pnl_pct)}%</td></tr>
+          <tr><th>Regime</th><td colspan="3"><span class="badge ${vc.regime === 'expansion' ? 'badge-bull' : (vc.regime === 'contraction' ? 'badge-bear' : 'badge-neutral')}">${fmt(vc.regime)}</span></td></tr>
+        </table>
+        ` : ''}
         ${(s.oi && (s.oi.future_oi || s.oi.call_oi || s.oi.put_oi)) ? `
         <h3 style="margin: 1rem 0 0.5rem;">Open Interest</h3>
         <table class="analysis-table summary-table" style="max-width: 400px;">
@@ -2936,30 +3456,6 @@
             if (!r.ok) throw new Error(d.detail || 'Update failed');
             setStatus('SL updated to ' + val, true);
             loadTradeSummary();
-          } catch (e) {
-            setStatus('Error: ' + e.message, false);
-          } finally {
-            btn.disabled = false;
-          }
-        };
-      });
-      document.querySelectorAll('.trail-btn').forEach(btn => {
-        btn.onclick = async () => {
-          const sym = btn.dataset.sym, qty = parseInt(btn.dataset.qty, 10);
-          const enabled = btn.dataset.on !== 'true';
-          btn.disabled = true;
-          try {
-            const r = await fetch('/api/position/auto-trail', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tradingsymbol: sym, quantity: qty, enabled }),
-            });
-            const d = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(d.detail || 'Toggle failed');
-            btn.dataset.on = enabled;
-            btn.textContent = enabled ? 'Trail ON' : 'Auto Trail';
-            btn.className = 'btn ' + (enabled ? 'btn-trail on' : 'btn-trail');
-            setStatus(enabled ? 'Auto-trail enabled.' : 'Auto-trail disabled.', true);
           } catch (e) {
             setStatus('Error: ' + e.message, false);
           } finally {
