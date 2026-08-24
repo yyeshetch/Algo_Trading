@@ -268,6 +268,10 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     },
     "option_chain": {
         "OPTION_CHAIN_STRIKE_STEP": _L(100, "int", "Strike step when stepping chain (index strikes)."),
+        "OPTION_CHAIN_CE_STRIKES": _L(8, "int", "OTM CE strikes above ATM (100-pt step)."),
+        "OPTION_CHAIN_PE_STRIKES": _L(8, "int", "OTM PE strikes below ATM (100-pt step)."),
+        "OPTION_CHAIN_CE_ITM_STRIKES": _L(4, "int", "ITM CE strikes below ATM (calls in-the-money)."),
+        "OPTION_CHAIN_PE_ITM_STRIKES": _L(4, "int", "ITM PE strikes above ATM (puts in-the-money)."),
     },
     "feature_engineering": {
         "FUT_OI_CHANGE_THRESHOLD_PCT": _L(1.0, "float", "Futures OI change %% to flag up/down."),

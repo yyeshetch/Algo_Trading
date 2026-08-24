@@ -81,9 +81,20 @@ class SectorRsRow:
 
 def load_sector_map(data_dir: Path) -> dict[str, str]:
     """
-    Return {SYMBOL: Sector} from data/reference/ind_nifty500list.csv (Industry column).
-    Falls back to empty dict if the file or column is missing.
+    Return {SYMBOL: NSE sector index name} from live NSE sector constituent pages
+    (https://www.nseindia.com/market-data/live-market-indices).
+
+    Falls back to ind_nifty500list.csv Industry column when NSE map is unavailable.
     """
+    try:
+        from intraday_engine.fetch.nse_market_indices import load_nse_sector_stock_map
+
+        nse_map = load_nse_sector_stock_map(data_dir)
+        if nse_map:
+            return nse_map
+    except Exception as e:
+        logger.warning("NSE sector map unavailable: %s", e)
+
     csv_ref = data_dir / "reference" / "ind_nifty500list.csv"
     mapping: dict[str, str] = {}
     if not csv_ref.exists():

@@ -29,8 +29,15 @@ def option_chain_day_path(data_dir: Path, trade_date: date) -> Path:
     return _partition_dir(data_dir / "option_chain", trade_date) / "option_chain.csv"
 
 
-def options_trading_signals_path(data_dir: Path, trade_date: date) -> Path:
-    return _partition_dir(data_dir / "options_trading", trade_date) / "signals.json"
+def options_trading_signals_path(
+    data_dir: Path,
+    trade_date: date,
+    underlying: str | None = None,
+) -> Path:
+    base = _partition_dir(data_dir / "options_trading", trade_date)
+    if underlying:
+        return base / f"signals_{normalize_underlying(underlying)}.json"
+    return base / "signals.json"
 
 
 def signal_outcomes_day_path(data_dir: Path, trade_date: date) -> Path:
@@ -94,6 +101,16 @@ def silent_accumulation_path(data_dir: Path, trade_date: date) -> Path:
     return silent_accumulation_dir(data_dir) / f"silent_accumulation_{trade_date.isoformat()}.json"
 
 
+def eod_indicators_dir(data_dir: Path) -> Path:
+    p = data_dir / "analysis" / "eod_indicators"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def eod_indicators_path(data_dir: Path, trade_date: date) -> Path:
+    return eod_indicators_dir(data_dir) / f"eod_indicators_{trade_date.isoformat()}.json"
+
+
 def relative_strength_dir(data_dir: Path) -> Path:
     p = data_dir / "analysis" / "relative_strength"
     p.mkdir(parents=True, exist_ok=True)
@@ -146,6 +163,28 @@ def sector_relative_strength_dir(data_dir: Path) -> Path:
 
 def sector_relative_strength_path(data_dir: Path, trade_date: date) -> Path:
     return sector_relative_strength_dir(data_dir) / f"sector_rs_{trade_date.isoformat()}.json"
+
+
+def sector_rotation_dir(data_dir: Path) -> Path:
+    p = data_dir / "analysis" / "sector_rotation"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def sector_rotation_path(data_dir: Path, trade_date: date) -> Path:
+    return sector_rotation_dir(data_dir) / f"sector_rotation_{trade_date.isoformat()}.json"
+
+
+def nse_sector_stock_map_path(data_dir: Path) -> Path:
+    return nse_public_data_dir(data_dir) / "nse_sector_stock_map.json"
+
+
+def nse_sector_rotation_snapshots_path(data_dir: Path, trade_date: date) -> Path:
+    return sector_rotation_dir(data_dir) / f"nse_snapshots_{trade_date.isoformat()}.json"
+
+
+def nse_live_all_indices_cache_path(data_dir: Path) -> Path:
+    return nse_public_data_dir(data_dir) / "live_all_indices.json"
 
 
 def institutional_volume_dir(data_dir: Path) -> Path:
@@ -204,6 +243,16 @@ def combined_signals_dir(data_dir: Path) -> Path:
 
 def combined_signals_csv_path(data_dir: Path, trade_date: date) -> Path:
     return combined_signals_dir(data_dir) / f"combined_{trade_date.isoformat()}.csv"
+
+
+def minervini_trend_template_dir(data_dir: Path) -> Path:
+    p = data_dir / "analysis" / "minervini_template"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def minervini_trend_template_path(data_dir: Path, trade_date: date) -> Path:
+    return minervini_trend_template_dir(data_dir) / f"minervini_template_{trade_date.isoformat()}.json"
 
 
 def _partition_dir(root: Path, trade_date: date) -> Path:

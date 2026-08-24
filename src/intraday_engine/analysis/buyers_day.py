@@ -41,8 +41,11 @@ STRADDLE_DECAY_BAD = -12.0   # bleeding hard
 STRADDLE_MOM_GOOD = 1.0      # last-third expansion %
 STRADDLE_MOM_BAD = -1.0
 
-MIN_CANDLES = 3
+MIN_CANDLES = 1
+MIN_CANDLES_FULL = 3
 ADX_PERIOD = 14
+GAP_FLAT_PCT = 0.15
+GAP_SMALL_PCT = 0.35
 
 
 @dataclass
@@ -64,6 +67,7 @@ class BuyersDay:
     factors: list[dict[str, Any]] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
     info: dict[str, Any] = field(default_factory=dict)
+    gap: dict[str, Any] = field(default_factory=dict)
 
 
 def _f(v: Any, default: float = 0.0) -> float:
@@ -165,18 +169,104 @@ def _state_low_good(value: float, good: float, bad: float) -> tuple[str, int]:
     return "neutral", 0
 
 
-def compute_buyers_day(summaries: list[dict[str, Any]]) -> dict[str, Any]:
+def compute_gap_context(
+    day_open: float,
+    prev_close: float | None,
+) -> dict[str, Any]:
+    """Gap-up / gap-down vs prior session close."""
+    if not day_open or prev_close is None or prev_close <= 0:
+        return {
+            "prev_close": round(prev_close, 2) if prev_close else None,
+            "day_open": round(day_open, 2) if day_open else None,
+            "gap_pts": None,
+            "gap_pct": None,
+            "kind": "UNKNOWN",
+            "label": "Gap unknown (no prior close)",
+            "buyer_hint": "Wait for first candles before sizing premium.",
+        }
+    gap_pts = day_open - prev_close
+    gap_pct = gap_pts / prev_close * 100.0
+    if abs(gap_pct) < GAP_FLAT_PCT:
+        kind = "FLAT"
+        label = f"Flat open ({gap_pct:+.2f}% vs prev close {prev_close:.0f})"
+        hint = "No meaningful gap — regime reads off first 30–45 min action."
+    elif gap_pct >= GAP_SMALL_PCT:
+        kind = "GAP_UP"
+        label = f"Gap up {gap_pct:+.2f}% ({prev_close:.0f} → {day_open:.0f})"
+        hint = "Upside gap — watch for hold/fade; straddle often opens rich on gap days."
+    elif gap_pct <= -GAP_SMALL_PCT:
+        kind = "GAP_DOWN"
+        label = f"Gap down {gap_pct:+.2f}% ({prev_close:.0f} → {day_open:.0f})"
+        hint = "Downside gap — bounce or continuation; avoid chasing until direction confirms."
+    elif gap_pct > 0:
+        kind = "SMALL_GAP_UP"
+        label = f"Small gap up {gap_pct:+.2f}%"
+        hint = "Mild positive gap — premium may still work if follow-through holds."
+    else:
+        kind = "SMALL_GAP_DOWN"
+        label = f"Small gap down {gap_pct:+.2f}%"
+        hint = "Mild negative gap — mixed; let VWAP/range develop."
+    return {
+        "prev_close": round(prev_close, 2),
+        "day_open": round(day_open, 2),
+        "gap_pts": round(gap_pts, 2),
+        "gap_pct": round(gap_pct, 2),
+        "kind": kind,
+        "label": label,
+        "buyer_hint": hint,
+    }
+
+
+def compute_buyers_day(
+    summaries: list[dict[str, Any]],
+    *,
+    prev_close: float | None = None,
+) -> dict[str, Any]:
     """Compute the Buyer's Day Meter from ordered per-candle analysis summaries."""
     summaries = [s for s in (summaries or []) if s]
-    if len(summaries) < MIN_CANDLES:
+    if not summaries:
         return asdict(BuyersDay(
             score=50.0,
             verdict="MIXED",
-            headline="Not enough data yet — wait for a few candles.",
-            candles=len(summaries),
+            headline="No session data yet.",
+            candles=0,
             factors=[],
-            reasons=["Need at least a few candles to assess the regime."],
+            reasons=["Waiting for first 5-min candle."],
             info={},
+            gap={},
+        ))
+
+    first_pa = summaries[0].get("price_action") or {}
+    day_open = _f(first_pa.get("open")) or _f(first_pa.get("spot"))
+    gap = compute_gap_context(day_open, prev_close)
+
+    if len(summaries) < MIN_CANDLES_FULL:
+        gap_kind = gap.get("kind") or "UNKNOWN"
+        early_headline = gap.get("label") or "Early session — partial read."
+        if gap_kind in ("GAP_UP", "GAP_DOWN"):
+            early_score = 45.0 if gap_kind == "GAP_UP" else 42.0
+            early_verdict = "MIXED"
+        else:
+            early_score = 50.0
+            early_verdict = "MIXED"
+        return asdict(BuyersDay(
+            score=early_score,
+            verdict=early_verdict,
+            headline=early_headline,
+            candles=len(summaries),
+            factors=[{
+                "key": "gap",
+                "label": "Opening gap",
+                "value": gap.get("gap_pct"),
+                "state": "good" if (gap.get("gap_pct") or 0) > GAP_SMALL_PCT else (
+                    "bad" if (gap.get("gap_pct") or 0) < -GAP_SMALL_PCT else "neutral"
+                ),
+                "vote": 0,
+                "hint": gap.get("buyer_hint") or gap.get("label") or "",
+            }],
+            reasons=[gap.get("buyer_hint") or "Need a few more candles for full regime read."],
+            info={"day_open": gap.get("day_open"), "prev_close": gap.get("prev_close")},
+            gap=gap,
         ))
 
     highs = [_f(s.get("price_action", {}).get("high")) for s in summaries]
@@ -188,7 +278,6 @@ def compute_buyers_day(summaries: list[dict[str, Any]]) -> dict[str, Any]:
         for s in summaries
     ]
 
-    day_open = _f(summaries[-1].get("price_action", {}).get("open")) or closes[0]
     session_high = max(highs) if highs else 0.0
     session_low = min(lo for lo in lows if lo > 0) if any(lo > 0 for lo in lows) else 0.0
     spot_now = closes[-1]
@@ -302,7 +391,22 @@ def compute_buyers_day(summaries: list[dict[str, Any]]) -> dict[str, Any]:
         "straddle_now": round(straddle_now, 2),
         "expected_move_pts": round(straddle_open, 2),
         "range_capture": round(day_range / straddle_open, 2) if straddle_open > 0 else None,
+        "prev_close": gap.get("prev_close"),
+        "gap_pct": gap.get("gap_pct"),
+        "gap_pts": gap.get("gap_pts"),
     }
+
+    gap_factor = Factor(
+        "gap",
+        "Opening gap",
+        gap.get("gap_pct"),
+        "good" if (gap.get("gap_pct") or 0) > GAP_SMALL_PCT else (
+            "bad" if (gap.get("gap_pct") or 0) < -GAP_SMALL_PCT else "neutral"
+        ),
+        0,
+        gap.get("label") or "",
+    )
+    factors = [gap_factor] + factors
 
     return asdict(BuyersDay(
         score=round(score, 1),
@@ -312,6 +416,7 @@ def compute_buyers_day(summaries: list[dict[str, Any]]) -> dict[str, Any]:
         factors=[asdict(f) for f in factors],
         reasons=reasons,
         info=info,
+        gap=gap,
     ))
 
 
@@ -322,7 +427,11 @@ def _hhmm(ts: str) -> str:
     return s
 
 
-def compute_buyers_day_series(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def compute_buyers_day_series(
+    summaries: list[dict[str, Any]],
+    *,
+    prev_close: float | None = None,
+) -> list[dict[str, Any]]:
     """
     Progressive Buyer's Day score, evaluated cumulatively at each 5-min candle
     (score "as of" that time using all bars up to and including it). Lets the UI
@@ -331,14 +440,13 @@ def compute_buyers_day_series(summaries: list[dict[str, Any]]) -> list[dict[str,
     summaries = [s for s in (summaries or []) if s]
     series: list[dict[str, Any]] = []
     for i in range(len(summaries)):
-        if i + 1 < MIN_CANDLES:
-            continue
-        r = compute_buyers_day(summaries[: i + 1])
+        r = compute_buyers_day(summaries[: i + 1], prev_close=prev_close)
         ts = str(summaries[i].get("timestamp", ""))
         series.append({
             "timestamp": ts,
             "time": _hhmm(ts),
             "score": r["score"],
             "verdict": r["verdict"],
+            "gap_kind": (r.get("gap") or {}).get("kind"),
         })
     return series

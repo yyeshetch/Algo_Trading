@@ -20,8 +20,9 @@ from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.gamma.option_chain_fetcher import (
     OptionChainSnapshot,
     OptionStrikeData,
-    fetch_option_chain_near_spot,
+    fetch_option_chain_atm_ladder,
     load_option_chain_snapshots,
+    resolve_option_chain_strike_counts,
     save_option_chain_snapshot,
 )
 
@@ -251,26 +252,25 @@ class HugeMovePredictor:
         num_strikes: int | None = None,
     ) -> OptionChainSnapshot | None:
         """
-        Fetch option chain (5-10 strikes), save to JSONL, return snapshot.
+        Fetch option chain (ATM ladder: CE up / PE down on 100-pt strikes), save to CSV.
         """
         from datetime import date as date_type
 
-        from intraday_engine.core.tunables import get_int
-
         td = trade_date or date_type.today()
-        ns = num_strikes if num_strikes is not None else get_int("huge_move_predictor", "DEFAULT_NUM_STRIKES", 5)
+        ce, pe = resolve_option_chain_strike_counts(num_strikes)
         if spot_price is None:
             q = self.client.quote([self.settings.spot_symbol])
             spot_price = float(q.get(self.settings.spot_symbol, {}).get("last_price", 0) or 0)
         if spot_price <= 0:
             return None
 
-        snapshot = fetch_option_chain_near_spot(
+        snapshot = fetch_option_chain_atm_ladder(
             self.client,
             self.settings,
             td,
             spot_price,
-            num_strikes_each_side=ns,
+            num_ce_strikes=ce,
+            num_pe_strikes=pe,
             use_expiry_day_only=False,
         )
         if snapshot:

@@ -16,8 +16,9 @@ CONFIGURED_JOBS: list[dict[str, Any]] = [
         "id": "option_chain_scraper",
         "name": "Option chain data scraper",
         "description": (
-            "Fetches ATM ± strikes from Kite every 5 minutes (Mon–Fri 09:15–15:30 IST only) "
-            "and appends snapshots to data/option_chain/date=YYYY-MM-DD/option_chain.csv"
+            "Legacy dashboard job — prefer standalone session pipeline: "
+            "python -m intraday_engine.cli.main --session-scheduler. "
+            "When enabled here: fetches ATM ladder every 5 min to option_chain.csv."
         ),
         "interval_minutes": 5,
         "schedule": "Mon–Fri 09:15–15:30 IST",

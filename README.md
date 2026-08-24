@@ -183,3 +183,100 @@ python backtest_strategies.py --data-dir data/NIFTY500 --exit hybrid --output da
 python volume_breakout.py
 
 PYTHONPATH=src python3 -m intraday_engine.cli --uhv-bt
+
+
+# Running dashboard
+PYTHONPATH=src uvicorn intraday_engine.dashboard:app --reload --host 0.0.0.0 --port 8000
+
+# Read-only dashboard (stored data only — no background fetches/scans)
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --dashboard --read-only --reload --host 0.0.0.0 --port 8000
+
+# Full session pipeline (option chain + index analysis + options-trading scan, every 5 min)
+# Also builds Market Overview once daily at ~09:05 IST (GIFT Nifty, VIX, news, NIFTY plan).
+# On macOS, use caffeinate so the Mac does not sleep through the 09:15 open:
+#   PYTHONPATH=src caffeinate -dims python -m intraday_engine.cli.main --session-scheduler
+PYTHONPATH=src python -m intraday_engine.cli.main --session-scheduler
+
+# One full session cycle (manual)
+PYTHONPATH=src python -m intraday_engine.cli.main --session-once
+
+# Typical setup (2 terminals):
+#   1) --session-scheduler
+#   2) --dashboard --read-only
+
+# Low-level (usually not needed — use --session-scheduler instead):
+# PYTHONPATH=src python -m intraday_engine.cli.main --option-chain-scheduler
+# PYTHONPATH=src python -m intraday_engine.cli.main --capture-option-chain
+
+
+# Running dashboard only
+PYTHONPATH=src python -m intraday_engine.cli.main \ 
+  --dashboard --read-only --reload --host 0.0.0.0 --port 8000
+
+# Running scraper in non sleep mode
+PYTHONPATH=src caffeinate -dims python -m intraday_engine.cli.main --session-scheduler
+
+# Option chain backfill
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --backfill-option-chain \
+  --date 2026-07-30 \
+  --underlying NIFTY \
+  --bar-times 11:10 11:15 \
+  --strike-min 23600 \
+  --strike-max 24900 \
+  --remove-chain-prefix 2026-07-30T11:17
+
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --backfill-option-chain --date 2026-07-30 --underlying NIFTY \
+  --bar-times 11:10 11:15 --strike-min 23600 --strike-max 24900
+
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --backfill-option-chain --date 2026-07-30 --underlying NIFTYBANK \
+  --bar-times 11:10 11:15 --strike-min 56200 --strike-max 57600
+
+
+# 
+        action="store_true",
+        help="Backfill missing 5-min option-chain bars from Kite historical OI (requires --date).",
+        help="Backfill 5-min option-chain bars from Kite historical OI (requires --date).",
+    )
+    if args.backfill_option_chain:
+        from intraday_engine.gamma.option_chain_fetcher import backfill_option_chain_historical
+    if args.backfill_full_day or args.backfill_option_chain:
+                remove_capture_prefixes=args.remove_chain_prefix,
+                replace_existing=replace or True,
+                replace_existing=True,
+            )
+        newline="",
+    )
+FileNotFoundError: [Errno 2] No such file or directory: 'data/option_chain/date=2026-07-30/option_chain.csv'
+session bars 75 09:15 15:25
+present bars 0 sample [] ... []
+  --remove-chain-prefix [REMOVE_CHAIN_PREFIX ...]
+--
+                        prefixes before backfill.
+  --option-strikes OPTION_STRIKES
+                        Legacy: symmetric CE/PE strike count override (default
+Full-day option chain backfill is implemented. Here’s how to use it.
+
+New CLI flag: --backfill-full-day
+Backfills all 75 session bars (09:15 → 15:25, every 5 min) from Kite historical OI.
+
+# Fill only missing bars
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --backfill-full-day \
+  --date 2026-07-30 \
+  --underlying NIFTY
+
+# Rebuild the entire day (drop + refill all session bars):
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --backfill-full-day \
+  --date 2026-07-30 \
+  --underlying NIFTY \
+  --replace-existing
+
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --backfill-full-day \
+  --date 2026-07-30 \
+  --underlying BANKNIFTY

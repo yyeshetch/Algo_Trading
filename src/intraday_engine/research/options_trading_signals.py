@@ -447,6 +447,76 @@ def _option_candles_from_analysis(
     return pd.DataFrame(), "none"
 
 
+def _option_candles_from_chain(
+    data_dir: Path,
+    trade_date: date,
+    underlying: str,
+    option_type: str,
+) -> tuple[pd.DataFrame, str]:
+    """Build ATM 5-min OHLC from stored option_chain.csv snapshots (session scheduler)."""
+    from intraday_engine.gamma.option_chain_fetcher import (
+        _round_to_chain_strike,
+        load_session_option_chain_snapshots,
+    )
+
+    opt = option_type.upper()
+    snapshots, _ = load_session_option_chain_snapshots(
+        data_dir,
+        trade_date,
+        underlying,
+        backfill_from_index=True,
+    )
+    if not snapshots:
+        return pd.DataFrame(), "none"
+
+    rows: list[dict[str, Any]] = []
+    for snap in snapshots:
+        atm = _round_to_chain_strike(int(snap.get("atm_strike") or 0))
+        if atm <= 0:
+            continue
+        leg = next(
+            (
+                s for s in (snap.get("strikes") or [])
+                if str(s.get("option_type", "")).upper() == opt
+                and int(s.get("strike") or 0) == atm
+            ),
+            None,
+        )
+        if not leg:
+            continue
+        ltp = float(leg.get("ltp") or 0)
+        close = float(leg.get("close") or 0) or ltp
+        if close <= 0:
+            continue
+        open_ = float(leg.get("open") or 0) or close
+        high = float(leg.get("high") or 0) or max(open_, close)
+        low = float(leg.get("low") or 0) or min(open_, close)
+        rows.append(
+            {
+                "timestamp": pd.Timestamp(snap["timestamp"]),
+                "open": open_,
+                "high": high,
+                "low": low,
+                "close": close,
+                "volume": float(leg.get("volume") or 0),
+                "tradingsymbol": str(leg.get("tradingsymbol") or f"{atm}{opt}"),
+                "atm_strike": atm,
+                "spot_price": float(snap.get("spot_price") or 0),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(), "none"
+
+    out = (
+        pd.DataFrame(rows)
+        .sort_values("timestamp")
+        .drop_duplicates(subset=["timestamp"], keep="last")
+        .reset_index(drop=True)
+    )
+    return out, "option_chain"
+
+
 def _with_prior_session_warmup(
     candles: pd.DataFrame,
     *,
@@ -1408,32 +1478,24 @@ def scan_options_trading_signals(
     analysis_path = analysis_day_path(data_dir, trade_date, asset_class_for_underlying(u))
     df = _load_index_analysis(data_dir, trade_date, u)
 
-    if df.empty:
-        return {
-            "underlying": u,
-            "trade_date": trade_date.isoformat(),
-            "signals": [],
-            "message": (
-                f"No Index_Analysis data for {u} on {trade_date.isoformat()}. "
-                "Click Refresh on the index dashboard for that date."
-            ),
-            "bars": 0,
-            "data_source": str(analysis_path),
-        }
-
     bars = len(df)
     all_signals: list[dict[str, Any]] = []
     ohlc_sources: dict[str, str] = {}
     analysis: dict[str, list[dict[str, Any]]] = {"CE": [], "PE": []}
 
     for opt_type in ("CE", "PE"):
-        candles, source = _option_candles_from_analysis(
-            df,
-            opt_type,
-            trade_date=trade_date,
-            underlying=u,
-            data_dir=data_dir,
-        )
+        candles = pd.DataFrame()
+        source = "none"
+        if not df.empty:
+            candles, source = _option_candles_from_analysis(
+                df,
+                opt_type,
+                trade_date=trade_date,
+                underlying=u,
+                data_dir=data_dir,
+            )
+        if candles.empty:
+            candles, source = _option_candles_from_chain(data_dir, trade_date, u, opt_type)
         candles = _with_prior_session_warmup(
             candles,
             data_dir=data_dir,
@@ -1442,8 +1504,27 @@ def scan_options_trading_signals(
             option_type=opt_type,
         )
         ohlc_sources[opt_type] = source
+        if source == "option_chain" and not candles.empty:
+            bars = max(bars, len(candles))
         analysis[opt_type] = _analyze_candles(candles, opt_type, trade_date=trade_date)
         all_signals.extend(_scan_candles(candles, opt_type, u, trade_date))
+
+    if not df.empty and bars == 0:
+        bars = len(df)
+
+    if bars == 0 and all(src == "none" for src in ohlc_sources.values()):
+        return {
+            "underlying": u,
+            "trade_date": trade_date.isoformat(),
+            "signals": [],
+            "message": (
+                f"No option OHLC for {u} on {trade_date.isoformat()}. "
+                "Run --session-scheduler (option chain + index pipeline) or refresh index data."
+            ),
+            "bars": 0,
+            "data_source": str(analysis_path),
+            "ohlc_sources": ohlc_sources,
+        }
 
     all_signals.sort(key=lambda s: s.get("timestamp", ""), reverse=True)
 
@@ -1451,17 +1532,22 @@ def scan_options_trading_signals(
     if not all_signals:
         if all(src == "none" for src in ohlc_sources.values()):
             message = (
-                "No option OHLC available. Click Refresh on the index dashboard "
-                "to export call/put OHLC, or ensure Kite credentials are valid."
+                "No option OHLC available. Run --session-scheduler or refresh index data."
             )
         else:
             message = "No entry signals yet for current rules."
+
+    data_sources = [str(analysis_path)]
+    if any(src == "option_chain" for src in ohlc_sources.values()):
+        from intraday_engine.storage.layout import option_chain_day_path
+
+        data_sources.append(str(option_chain_day_path(data_dir, trade_date)))
 
     return {
         "underlying": u,
         "trade_date": trade_date.isoformat(),
         "bars": bars,
-        "data_source": str(analysis_path),
+        "data_source": data_sources[0] if len(data_sources) == 1 else data_sources,
         "ohlc_sources": ohlc_sources,
         "analysis": analysis,
         "signals": all_signals,
@@ -1474,19 +1560,25 @@ def scan_options_trading_signals(
 
 def save_options_trading_signals(data_dir: Path, payload: dict[str, Any]) -> Path:
     td = datetime.strptime(str(payload["trade_date"]), "%Y-%m-%d").date()
-    path = options_trading_signals_path(data_dir, td)
+    u = normalize_underlying(str(payload.get("underlying") or "NIFTY"))
+    path = options_trading_signals_path(data_dir, td, u)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
     return path
 
 
 def load_options_trading_signals(data_dir: Path, trade_date: date, underlying: str) -> dict[str, Any] | None:
-    path = options_trading_signals_path(data_dir, trade_date)
+    u = normalize_underlying(underlying)
+    path = options_trading_signals_path(data_dir, trade_date, u)
     if not path.exists():
-        return None
+        legacy = options_trading_signals_path(data_dir, trade_date)
+        if legacy.exists() and legacy != path:
+            path = legacy
+        else:
+            return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("underlying") != normalize_underlying(underlying):
+        if payload.get("underlying") != u:
             return None
         return payload
     except (json.JSONDecodeError, OSError) as exc:

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta
@@ -35,7 +36,10 @@ from intraday_engine.storage.layout import (
     nifty_index_daily_path,
     relative_strength_path,
 )
-from intraday_engine.storage.nifty500_csv import read_nifty500_symbol_ohlcv
+from intraday_engine.storage.nifty500_csv import (
+    read_nifty500_symbol_ohlcv,
+    write_nifty500_symbol_ohlcv,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +117,62 @@ def _load_nifty_daily(settings: Settings, lookback_days: int = 220) -> pd.DataFr
     if not cached.empty:
         return cached.tail(lookback_days).reset_index(drop=True)
     return pd.DataFrame()
+
+
+def _load_nifty_daily_with_retry(settings: Settings, lookback_days: int = 220) -> pd.DataFrame:
+    """Load NIFTY 50 daily bars; retry once when Kite is cold or contended."""
+    for attempt in range(2):
+        df = _load_nifty_daily(settings, lookback_days=lookback_days)
+        if not df.empty and len(df) >= 65:
+            return df
+        if attempt == 0:
+            time.sleep(1.5)
+    return df
+
+
+def _ensure_stock_daily(
+    client: ZerodhaClient,
+    symbol: str,
+    token: int,
+    data_dir: Path,
+) -> pd.DataFrame:
+    """Read cached 1D bars or fetch from Kite when cache is missing or too thin."""
+    df = read_nifty500_symbol_ohlcv(data_dir, symbol, "1D")
+    if not df.empty and len(df) >= 65:
+        return df
+
+    today = datetime.now()
+    from_dt = today - timedelta(days=240)
+    try:
+        rows = client.historical_data(int(token), from_dt, today, interval="day", oi=False)
+    except Exception as e:
+        logger.debug("RS daily fetch %s: %s", symbol, e)
+        return df
+    if not rows:
+        return df
+
+    fresh = pd.DataFrame(rows)
+    fresh["date"] = pd.to_datetime(fresh["date"], errors="coerce")
+    for col in ("open", "high", "low", "close", "volume"):
+        if col in fresh.columns:
+            fresh[col] = pd.to_numeric(fresh[col], errors="coerce")
+    fresh = fresh.dropna(subset=["date", "close"]).sort_values("date").reset_index(drop=True)
+    if df.empty:
+        merged = fresh
+    else:
+        merged = (
+            pd.concat([df, fresh], ignore_index=True)
+            .dropna(subset=["date"])
+            .sort_values("date")
+            .drop_duplicates(subset=["date"], keep="last")
+            .reset_index(drop=True)
+        )
+    if len(merged) >= 10:
+        try:
+            write_nifty500_symbol_ohlcv(data_dir, date.today(), symbol, None, None, merged)
+        except Exception as e:
+            logger.debug("RS cache write %s: %s", symbol, e)
+    return merged
 
 
 def _align_on_date(stock_df: pd.DataFrame, nifty_df: pd.DataFrame) -> pd.DataFrame:
@@ -212,9 +272,9 @@ def run_relative_strength_scan(
     settings = settings or Settings.from_env(underlying="NIFTY")
     td = trade_date or date.today()
 
-    nifty_df = _load_nifty_daily(settings)
+    nifty_df = _load_nifty_daily_with_retry(settings)
     if nifty_df.empty:
-        payload = {
+        return {
             "trade_date": td.isoformat(),
             "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             "rows": [],
@@ -222,10 +282,6 @@ def run_relative_strength_scan(
             "passed": 0,
             "message": "Could not load NIFTY 50 daily bars (Kite credentials or cache).",
         }
-        out_path = relative_strength_path(settings.data_dir, td)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        return payload
 
     nifty_period = {
         "5d": _pct_change(nifty_df["close"], 5),
@@ -234,13 +290,19 @@ def run_relative_strength_scan(
     }
 
     symbols = load_nifty500_symbols(symbols_file, settings.data_dir)
+    client = ZerodhaClient(settings)
+    token_map = client.nse_eq_token_map()
 
     scored: list[RelativeStrengthRow] = []
     skipped = 0
 
     def job(sym: str) -> RelativeStrengthRow | None:
         try:
-            df = read_nifty500_symbol_ohlcv(settings.data_dir, sym, "1D")
+            tok = token_map.get(sym)
+            if tok is not None:
+                df = _ensure_stock_daily(client, sym, int(tok), settings.data_dir)
+            else:
+                df = read_nifty500_symbol_ohlcv(settings.data_dir, sym, "1D")
             if df.empty:
                 return None
             return _compute_rs_row(sym, df, nifty_df)
@@ -261,19 +323,18 @@ def run_relative_strength_scan(
             scored.append(row)
 
     if not scored:
-        payload = {
+        return {
             "trade_date": td.isoformat(),
             "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             "rows": [],
             "scanned": len(symbols),
             "passed": 0,
             "skipped": skipped,
-            "message": "No RS rows produced. Ensure data/NIFTY500/SYMBOL_1D.csv files exist (run --tomorrow-watchlist once).",
+            "message": (
+                "No RS rows produced after fetching daily bars. "
+                "Check Kite credentials and retry."
+            ),
         }
-        out_path = relative_strength_path(settings.data_dir, td)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        return payload
 
     for r in scored:
         r.strength_score = round(_compute_strength_score(r), 2)
@@ -293,7 +354,7 @@ def run_relative_strength_scan(
 
     top = final[:top_n]
 
-    payload = {
+    payload: dict[str, Any] = {
         "trade_date": td.isoformat(),
         "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "scanned": len(symbols),
@@ -303,28 +364,67 @@ def run_relative_strength_scan(
         "only_outperformers": only_outperformers,
         "rows": [asdict(r) for r in top],
     }
+    if not top and scored:
+        payload["message"] = (
+            f"0 stocks passed the outperformer filter ({len(scored)} computed). "
+            "Uncheck 'Only outperformers' and refresh."
+        )
 
-    out_path = relative_strength_path(settings.data_dir, td)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    logger.info("Relative strength: %d outperformers of %d scanned -> %s", len(final), len(symbols), out_path)
+    if top:
+        out_path = relative_strength_path(settings.data_dir, td)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        logger.info(
+            "Relative strength: %d outperformers of %d scanned -> %s",
+            len(final),
+            len(symbols),
+            out_path,
+        )
+    else:
+        logger.info(
+            "Relative strength: no rows to save (%d scanned, %d passed filter)",
+            len(symbols),
+            len(final),
+        )
     return payload
+
+
+def _read_rs_payload(path: Path) -> dict[str, Any] | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _rs_payload_usable(data: dict[str, Any] | None) -> bool:
+    return bool(data and data.get("rows"))
 
 
 def load_stored_relative_strength(data_dir: Path, trade_date: date) -> dict[str, Any] | None:
     p = relative_strength_path(data_dir, trade_date)
     if p.exists():
-        try:
-            return json.loads(p.read_text(encoding="utf-8"))
-        except Exception:
-            return None
-    folder = p.parent
+        data = _read_rs_payload(p)
+        if _rs_payload_usable(data):
+            return data
+
+    folder = relative_strength_path(data_dir, trade_date).parent
     if not folder.exists():
         return None
     files = sorted(folder.glob("relative_strength_*.json"))
-    if not files:
+    best: dict[str, Any] | None = None
+    for f in reversed(files):
+        data = _read_rs_payload(f)
+        if _rs_payload_usable(data):
+            best = data
+            break
+    if not best:
         return None
-    try:
-        return json.loads(files[-1].read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    shown = best.get("trade_date") or "unknown"
+    if shown != trade_date.isoformat():
+        best = dict(best)
+        best["stale"] = True
+        best["message"] = (
+            f"No saved RS scan for {trade_date.isoformat()}. "
+            f"Showing last successful run ({shown})."
+        )
+    return best

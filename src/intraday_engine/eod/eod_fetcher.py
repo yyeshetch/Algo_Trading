@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from intraday_engine.core.config import Settings
+from intraday_engine.storage.layout import eod_indicators_path
 from intraday_engine.core.underlyings import LIQUID_FNO_STOCKS, get_underlying_config
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
@@ -287,3 +290,56 @@ def run_eod_scan(
         logger.info("EOD: %d succeeded, %d failed: %s", len(results), len(failed), [f["symbol"] for f in failed])
     results.sort(key=lambda x: x.get("spot_volume", 0) or 0, reverse=True)
     return results, failed
+
+
+def run_and_save_eod_scan(
+    data_dir: Path,
+    trade_date: date | None = None,
+    stock_limit: int | None = None,
+) -> dict[str, Any]:
+    """Run live EOD scan, persist JSON, and return the saved payload."""
+    td = trade_date or date.today()
+    results, failed = run_eod_scan(trade_date=td, stock_limit=stock_limit)
+    payload: dict[str, Any] = {
+        "trade_date": td.isoformat(),
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "indicators": results,
+        "count": len(results),
+        "failed": failed,
+        "failed_count": len(failed),
+    }
+    out_path = eod_indicators_path(data_dir, td)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    logger.info("EOD indicators: %d symbols saved -> %s", len(results), out_path)
+    return payload
+
+
+def load_stored_eod_indicators(data_dir: Path, trade_date: date) -> dict[str, Any] | None:
+    """Load saved EOD scan for trade_date, or most recent file with stale flag."""
+    p = eod_indicators_path(data_dir, trade_date)
+    if p.exists():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            data.pop("stale", None)
+            data.pop("message", None)
+            return data
+        except Exception:
+            return None
+    folder = p.parent
+    if not folder.exists():
+        return None
+    files = sorted(folder.glob("eod_indicators_*.json"))
+    if not files:
+        return None
+    try:
+        data = json.loads(files[-1].read_text(encoding="utf-8"))
+        shown = data.get("trade_date") or files[-1].stem.replace("eod_indicators_", "")
+        data["stale"] = True
+        data["message"] = (
+            f"No saved EOD scan for {trade_date.isoformat()}. "
+            f"Showing last saved run ({shown}). Click Refresh EOD for {trade_date.isoformat()}."
+        )
+        return data
+    except Exception:
+        return None

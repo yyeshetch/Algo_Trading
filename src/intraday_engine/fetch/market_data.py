@@ -162,6 +162,10 @@ class MarketDataFetcher:
             out_cols.append("call_volume")
         if "put_volume" in merged.columns:
             out_cols.append("put_volume")
+        if "spot_volume" in merged.columns:
+            out_cols.append("spot_volume")
+        if "future_volume" in merged.columns:
+            out_cols.append("future_volume")
         return merged[[c for c in out_cols if c in merged.columns]]
 
 

@@ -33,6 +33,7 @@ from intraday_engine.core.underlyings import list_index_underlyings
 from intraday_engine.engine import DirectionEngine
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.market_data import MarketDataFetcher
+from intraday_engine.fetch.nse_market_indices import build_nse_sector_stock_map
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.storage import DataStore, load_signal_rows
 from intraday_engine.storage.data_store import _flatten_for_csv
@@ -41,10 +42,20 @@ from intraday_engine.analysis.hourly_levels import fetch_hourly_spot_levels, hou
 from intraday_engine.analysis.option_confluence import attach_confluence_to_summaries
 from intraday_engine.analysis.realized_implied_vol import attach_volatility_compare
 from intraday_engine.analysis.buyers_day import compute_buyers_day, compute_buyers_day_series
+from intraday_engine.analysis.prior_session import (
+    load_prior_session_summaries,
+    prior_session_close,
+)
+from intraday_engine.analysis.price_action_volume import compute_price_action_volume
+from intraday_engine.analysis.pro_print import compute_pro_print
+from intraday_engine.analysis.atr_squeeze import compute_atr_squeeze
+from intraday_engine.analysis.strike_oi_change import compute_strike_oi_change
+from intraday_engine.analysis.futures_oi_buildup import compute_futures_oi_buildup
 from intraday_engine.analysis.expiry_gamma_radar import compute_expiry_gamma_radar, expiry_window_tape
 from intraday_engine.analysis.trend_ignition import compute_trend_ignition, trend_ignition_tape
+from intraday_engine.analysis.intraday_trend_change import compute_intraday_trend_change
 from intraday_engine.gamma.expiry_utils import is_expiry_day
-from intraday_engine.eod.eod_fetcher import run_eod_scan
+from intraday_engine.eod.eod_fetcher import load_stored_eod_indicators, run_and_save_eod_scan
 from intraday_engine.engine.stock_signal_engine import run_stock_analysis_30min
 from intraday_engine.research.tomorrow_watchlist_scanner import (
     load_stored_tomorrow_watchlist_fresh_or_previous,
@@ -62,6 +73,10 @@ from intraday_engine.research.relative_strength_scanner import (
     load_stored_relative_strength,
     run_relative_strength_scan,
 )
+from intraday_engine.research.minervini_trend_template_scanner import (
+    load_stored_minervini_trend_template,
+    run_minervini_trend_template_scan,
+)
 from intraday_engine.research.intraday_relative_strength_scanner import (
     load_stored_intraday_relative_strength,
     run_intraday_relative_strength_scan,
@@ -69,6 +84,10 @@ from intraday_engine.research.intraday_relative_strength_scanner import (
 from intraday_engine.research.sector_relative_strength_scanner import (
     load_stored_sector_relative_strength,
     run_sector_relative_strength_scan,
+)
+from intraday_engine.research.sector_rotation_scanner import (
+    load_stored_sector_rotation,
+    run_sector_rotation_scan,
 )
 from intraday_engine.research.institutional_volume_scanner import (
     api_institutional_volume_payload,
@@ -90,7 +109,6 @@ from intraday_engine.research.market_overview import (
     run_market_overview_scan,
 )
 from intraday_engine.storage.layout import combined_signals_csv_path
-from intraday_engine.gamma.huge_move_predictor import HugeMovePredictor
 from intraday_engine.jobs.registry import get_job_states
 from intraday_engine.jobs.option_chain_scraper import (
     ensure_option_chain_data,
@@ -114,6 +132,22 @@ logger = logging.getLogger(__name__)
 
 _jobs_loop_task: asyncio.Task | None = None
 _auto_trade_task: asyncio.Task | None = None
+
+
+def _skip_dashboard_option_chain_job() -> bool:
+    if _read_only_dashboard():
+        return True
+    return os.getenv("INTRADAY_NO_OPTION_CHAIN_JOB", "").strip().lower() in ("1", "true", "yes")
+
+
+def _read_only_dashboard() -> bool:
+    return os.getenv("INTRADAY_READ_ONLY_DASHBOARD", "").strip().lower() in ("1", "true", "yes")
+
+
+def _skip_auto_trade_loop() -> bool:
+    if _read_only_dashboard():
+        return True
+    return os.getenv("INTRADAY_NO_AUTO_TRADE_LOOP", "").strip().lower() in ("1", "true", "yes")
 
 
 async def _auto_trade_loop():
@@ -154,8 +188,19 @@ async def _lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Could not ensure config.json: %s", e)
     data_dir = Settings.from_env().data_dir
-    _jobs_loop_task = asyncio.create_task(run_configured_jobs_loop(data_dir))
-    _auto_trade_task = asyncio.create_task(_auto_trade_loop())
+    skip_jobs = frozenset({"option_chain_scraper"}) if _skip_dashboard_option_chain_job() else frozenset()
+    if _read_only_dashboard():
+        logger.info("Dashboard read-only mode (INTRADAY_READ_ONLY_DASHBOARD): stored data only, no background fetches.")
+    elif skip_jobs:
+        logger.info("Dashboard option-chain job disabled (INTRADAY_NO_OPTION_CHAIN_JOB).")
+    if not _read_only_dashboard():
+        _jobs_loop_task = asyncio.create_task(
+            run_configured_jobs_loop(data_dir, skip_job_ids=skip_jobs),
+        )
+    if not _skip_auto_trade_loop():
+        _auto_trade_task = asyncio.create_task(_auto_trade_loop())
+    else:
+        logger.info("Dashboard auto-trade / direction-engine loop disabled.")
     yield
     for task in (_jobs_loop_task, _auto_trade_task):
         if task:
@@ -170,6 +215,27 @@ app = FastAPI(title="Intraday Direction Engine Dashboard", lifespan=_lifespan)
 _engines: dict[str, DirectionEngine] = {}
 _clients: dict[str, ZerodhaClient] = {}
 _settings_cache: dict[str, Settings] = {}
+
+
+@app.get("/api/dashboard/mode")
+async def api_dashboard_mode():
+    """Whether the dashboard is read-only (stored data only, no background pipeline)."""
+    return {
+        "read_only": _read_only_dashboard(),
+        "option_chain_job": not _skip_dashboard_option_chain_job(),
+        "auto_trade_loop": not _skip_auto_trade_loop(),
+    }
+
+
+def _require_pipeline_writes():
+    if _read_only_dashboard():
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Dashboard is read-only. Run the session pipeline separately: "
+                "python -m intraday_engine.cli.main --session-scheduler"
+            ),
+        )
 
 
 def _underlying_key(underlying: str | None) -> str:
@@ -238,7 +304,10 @@ async def dashboard():
     path = _templates_dir() / "dashboard.html"
     if not path.exists():
         raise HTTPException(status_code=500, detail="Dashboard template not found.")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        path.read_text(encoding="utf-8"),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/stocks", response_class=HTMLResponse)
@@ -247,7 +316,10 @@ async def stocks_dashboard():
     path = _templates_dir() / "stocks_dashboard.html"
     if not path.exists():
         raise HTTPException(status_code=500, detail="Stocks dashboard template not found.")
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        path.read_text(encoding="utf-8"),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/tunables", response_class=HTMLResponse)
@@ -590,6 +662,54 @@ async def api_relative_strength_refresh(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/stocks/minervini-template")
+async def api_minervini_template_get(trade_date: str | None = None):
+    try:
+        td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
+        data = load_stored_minervini_trend_template(settings.data_dir, td)
+        if not data:
+            return {
+                "trade_date": td.isoformat(),
+                "rows": [],
+                "message": "No saved Minervini scan yet. Click Refresh to run.",
+            }
+        return _sanitize_for_json(data)
+    except Exception as e:
+        logger.exception("Minervini template load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/minervini-template/refresh")
+async def api_minervini_template_refresh(
+    trade_date: str | None = None,
+    top_n: int = 50,
+    max_workers: int = 8,
+    rs_min_percentile: float = 70.0,
+    only_full_pass: bool = False,
+    mode: str = "setup",
+):
+    try:
+        td = _parse_trade_date(trade_date)
+        scan_mode = mode if mode in ("setup", "extended") else "setup"
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_minervini_trend_template_scan(
+                trade_date=td,
+                top_n=top_n,
+                max_workers=max_workers,
+                rs_min_percentile=rs_min_percentile,
+                only_full_pass=only_full_pass,
+                mode=scan_mode,
+            ),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("Minervini template refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/stocks/intraday-rs")
 async def api_intraday_rs_get(trade_date: str | None = None):
     """Load last stored intraday RS scan (NIFTY 500 vs NIFTY 50, 15-min cache)."""
@@ -658,15 +778,87 @@ async def api_sector_rs_get(trade_date: str | None = None):
 async def api_sector_rs_refresh(trade_date: str | None = None):
     try:
         td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
         loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: build_nse_sector_stock_map(settings.data_dir, force_refresh=True),
+        )
         payload = await loop.run_in_executor(
             None,
             lambda: run_sector_relative_strength_scan(trade_date=td),
         )
+        rotation = await loop.run_in_executor(
+            None,
+            lambda: run_sector_rotation_scan(trade_date=td),
+        )
+        payload = dict(payload)
+        payload["sector_rotation"] = rotation
         return _sanitize_for_json(payload)
     except Exception as e:
         logger.exception("Sector RS refresh failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/sector-rotation")
+async def api_sector_rotation_get(trade_date: str | None = None):
+    try:
+        td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
+        data = load_stored_sector_rotation(settings.data_dir, td)
+        if not data:
+            return {
+                "trade_date": td.isoformat(),
+                "rotations": [],
+                "headline": "No sector rotation scan yet. Refresh Sector RS tab.",
+            }
+        return _sanitize_for_json(data)
+    except Exception as e:
+        logger.exception("Sector rotation load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/sector-rotation/refresh")
+async def api_sector_rotation_refresh(trade_date: str | None = None):
+    try:
+        td = _parse_trade_date(trade_date)
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_sector_rotation_scan(trade_date=td),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("Sector rotation refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/trend-change")
+async def get_trend_change(trade_date: str | None = None, underlying: str | None = None):
+    """Intraday trend regime flips (bull ↔ bear) on index 5-min summaries."""
+    store = _get_store(underlying)
+    settings = _get_settings(underlying)
+    date_str = trade_date or date.today().isoformat()
+
+    snap_df = store.load_snapshots()
+    sig_df = store.load_signals()
+    if snap_df.empty or "timestamp" not in snap_df.columns:
+        return {
+            "trade_date": date_str,
+            "active_side": None,
+            "change_count": 0,
+            "headline": "No snapshot data yet.",
+            "changes": [],
+            "series": [],
+        }
+    snap_df = snap_df[snap_df["timestamp"].astype(str).str.startswith(date_str)]
+    if not sig_df.empty and "timestamp" in sig_df.columns:
+        sig_df = sig_df[sig_df["timestamp"].astype(str).str.startswith(date_str)]
+    summaries = [s for s in build_analysis_summaries(snap_df, sig_df, lookback=settings.lookback_bars) if s]
+    return _sanitize_for_json({
+        "trade_date": date_str,
+        **compute_intraday_trend_change(summaries),
+    })
 
 
 @app.get("/api/stocks/institutional-volume")
@@ -919,7 +1111,7 @@ async def api_market_overview_get(trade_date: str | None = None):
         if not data:
             return {
                 "trade_date": td.isoformat(),
-                "message": "No saved overview yet. Click Refresh to build one.",
+                "message": "No saved overview yet. Session-scheduler builds one daily at ~09:05 IST.",
                 "empty": True,
             }
         return _sanitize_for_json(data)
@@ -967,6 +1159,7 @@ async def api_jobs_list():
 @app.post("/api/jobs/option-chain/run")
 async def api_jobs_option_chain_run(trade_date: str | None = None):
     """Manually trigger the option chain scraper job."""
+    _require_pipeline_writes()
     try:
         td = _parse_trade_date(trade_date)
         settings = Settings.from_env()
@@ -1003,9 +1196,22 @@ async def api_options_trading_signals(underlying: str | None = None, trade_date:
     settings = _get_settings(underlying)
     store = _get_store(underlying)
     stored = load_options_trading_signals(settings.data_dir, td, u_key)
-    if stored and stored.get("analysis"):
+    if stored and (stored.get("analysis") is not None or stored.get("signals") is not None):
         stored["strategy_enabled"] = get_enabled_map(store.data_dir)
         return _sanitize_for_json(stored)
+    if _read_only_dashboard():
+        return _sanitize_for_json({
+            "available": False,
+            "underlying": u_key,
+            "trade_date": td.isoformat(),
+            "signals": [],
+            "analysis": {"CE": [], "PE": []},
+            "message": (
+                f"No stored options-trading signals for {u_key}. "
+                "Run --session-scheduler (writes signals per underlying)."
+            ),
+            "strategy_enabled": get_enabled_map(store.data_dir),
+        })
     loop = asyncio.get_event_loop()
     payload = await loop.run_in_executor(
         None,
@@ -1018,6 +1224,7 @@ async def api_options_trading_signals(underlying: str | None = None, trade_date:
 @app.post("/api/options-trading/refresh")
 async def api_options_trading_refresh(underlying: str | None = None, trade_date: str | None = None):
     """Rescan Index_Analysis data and rebuild options-trading signals."""
+    _require_pipeline_writes()
     try:
         u_key = _underlying_key(underlying)
         td = _parse_trade_date(trade_date)
@@ -1058,28 +1265,49 @@ async def api_stocks_list():
 
 
 @app.get("/api/stocks/eod-indicators")
-async def api_stocks_eod_indicators(trade_date: str | None = None, limit: int | None = None):
-    """Return EOD FnO market indicators for all liquid FnO symbols."""
+async def api_stocks_eod_indicators(trade_date: str | None = None):
+    """Load last saved EOD FnO scan (falls back to most recent file)."""
     try:
-        sel_date = None
-        if trade_date:
-            try:
-                sel_date = datetime.strptime(trade_date, "%Y-%m-%d").date()
-            except ValueError:
-                pass
-        loop = asyncio.get_event_loop()
-        results, failed = await loop.run_in_executor(
-            None,
-            lambda: run_eod_scan(trade_date=sel_date, stock_limit=limit),
-        )
-        return {
-            "indicators": [_sanitize_for_json(r) for r in results],
-            "count": len(results),
-            "failed": [_sanitize_for_json(f) for f in failed],
-            "failed_count": len(failed),
-        }
+        td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
+        data = load_stored_eod_indicators(settings.data_dir, td)
+        if not data:
+            return {
+                "trade_date": td.isoformat(),
+                "indicators": [],
+                "count": 0,
+                "failed": [],
+                "failed_count": 0,
+                "message": "No saved EOD scan yet. Click Refresh EOD to fetch from Kite.",
+            }
+        return _sanitize_for_json(data)
     except Exception as e:
-        logger.exception("EOD indicators failed: %s", e)
+        logger.exception("EOD indicators load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/eod-indicators/refresh")
+async def api_stocks_eod_indicators_refresh(
+    trade_date: str | None = None,
+    limit: int | None = None,
+):
+    """Run live EOD Kite scan for all liquid FnO symbols (slow) and save to disk."""
+    try:
+        td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
+        lim = limit if limit is not None and limit > 0 else None
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_and_save_eod_scan(
+                settings.data_dir,
+                trade_date=td,
+                stock_limit=lim,
+            ),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("EOD indicators refresh failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1259,20 +1487,37 @@ async def get_analysis_summary(timestamp: str | None = None, underlying: str | N
     summaries = [s for s in summaries if s]
 
     trade_d = date.fromisoformat(date_str) if date_str else date.today()
-    hourly_levels = None
-    try:
-        client = _get_client(underlying)
-        hourly_levels = fetch_hourly_spot_levels(client, settings, trade_d)
-    except Exception as e:
-        logger.debug("Hourly levels via Kite skipped: %s", e)
-    if not hourly_levels or hourly_levels.get("support") is None:
-        hourly_levels = hourly_levels_from_snapshots(snap_df)
+    hourly_levels = hourly_levels_from_snapshots(snap_df)
+    if not _read_only_dashboard():
+        try:
+            client = _get_client(underlying)
+            live = fetch_hourly_spot_levels(client, settings, trade_d)
+            if live and live.get("support") is not None:
+                hourly_levels = live
+        except Exception as e:
+            logger.debug("Hourly levels via Kite skipped: %s", e)
     snap_records = snap_df.to_dict(orient="records") if not snap_df.empty else None
     summaries = attach_confluence_to_summaries(summaries, hourly_levels, snap_records)
     summaries = attach_volatility_compare(summaries)
+    prior_summaries = load_prior_session_summaries(
+        settings.data_dir,
+        settings.underlying,
+        trade_d,
+        lookback_bars=settings.lookback_bars,
+    )
+    prev_close = prior_session_close(settings.data_dir, settings.underlying, trade_d)
+    price_action_volume = _sanitize_for_json(compute_price_action_volume(summaries, snap_records))
+    pro_print = _sanitize_for_json(compute_pro_print(summaries, snap_records))
+    atr_squeeze = _sanitize_for_json(
+        compute_atr_squeeze(summaries, prior_summaries=prior_summaries)
+    )
 
-    buyers_day = _sanitize_for_json(compute_buyers_day(summaries))
-    buyers_day["series"] = _sanitize_for_json(compute_buyers_day_series(summaries))
+    buyers_day = _sanitize_for_json(
+        compute_buyers_day(summaries, prev_close=prev_close)
+    )
+    buyers_day["series"] = _sanitize_for_json(
+        compute_buyers_day_series(summaries, prev_close=prev_close)
+    )
     try:
         expiry_gamma = _sanitize_for_json(
             compute_expiry_gamma_radar(summaries, trade_date=trade_d, underlying=settings.underlying)
@@ -1280,6 +1525,8 @@ async def get_analysis_summary(timestamp: str | None = None, underlying: str | N
     except Exception as e:
         logger.debug("Expiry gamma radar skipped: %s", e)
         expiry_gamma = None
+
+    trend_change = _sanitize_for_json(compute_intraday_trend_change(summaries))
 
     for s in summaries:
         for k, v in s.items():
@@ -1291,14 +1538,22 @@ async def get_analysis_summary(timestamp: str | None = None, underlying: str | N
             "selected": selected,
             "hourly_levels": _sanitize_for_json(hourly_levels),
             "buyers_day": buyers_day,
+            "price_action_volume": price_action_volume,
+            "pro_print": pro_print,
+            "atr_squeeze": atr_squeeze,
             "expiry_gamma": expiry_gamma,
+            "trend_change": trend_change,
         }
     return {
         "summaries": summaries,
         "selected": summaries[-1] if summaries else None,
         "hourly_levels": _sanitize_for_json(hourly_levels),
         "buyers_day": buyers_day,
+        "price_action_volume": price_action_volume,
+        "pro_print": pro_print,
+        "atr_squeeze": atr_squeeze,
         "expiry_gamma": expiry_gamma,
+        "trend_change": trend_change,
     }
 
 
@@ -1516,6 +1771,7 @@ async def get_trade_summary(underlying: str | None = None):
 
 @app.post("/api/refresh")
 async def refresh(request: Request):
+    _require_pipeline_writes()
     try:
         body = await request.json()
     except Exception:
@@ -1561,18 +1817,7 @@ async def refresh(request: Request):
             except Exception as e:
                 logger.warning("Options trading scan failed: %s", e)
 
-        # Huge move uses live option chain; only meaningful for today.
-        huge_move = None
         option_chain_info = None
-        if sel_date == date.today() and u_key in list_index_underlyings():
-            try:
-                loop = asyncio.get_event_loop()
-                huge_move = await loop.run_in_executor(
-                    None,
-                    lambda: _run_huge_move_prediction(u_key),
-                )
-            except Exception as e:
-                logger.warning("Huge move prediction failed: %s", e)
 
         msg = (
             f"Data fetched and signals generated for {target_date}."
@@ -1583,7 +1828,6 @@ async def refresh(request: Request):
             "status": "ok",
             "message": msg,
             "trade_date": target_date,
-            "huge_move": _sanitize_for_json(huge_move) if huge_move else None,
             "option_chain": _sanitize_for_json(option_chain_info) if option_chain_info else None,
             "options_trading": _sanitize_for_json(options_signals) if options_signals else None,
         }
@@ -1594,44 +1838,46 @@ async def refresh(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _run_huge_move_prediction(underlying: str) -> dict | None:
-    """Run option chain capture + huge move prediction. Returns dict for API or None."""
-    settings = Settings.from_env(underlying=underlying)
-    client = ZerodhaClient(settings)
-    predictor = HugeMovePredictor(client, settings)
-    pred = predictor.predict(num_strikes=5, use_stored=False)
-    if pred is None:
-        return None
-    return {
-        "direction": pred.direction,
-        "confidence": pred.confidence,
-        "prob_huge_up": pred.prob_huge_up,
-        "prob_huge_down": pred.prob_huge_down,
-        "prob_no_move": pred.prob_no_move,
-        "pcr_oi": pred.pcr_oi,
-        "pcr_volume": pred.pcr_volume,
-        "max_pain": pred.max_pain,
-        "spot_vs_max_pain": pred.spot_vs_max_pain,
-        "suggested_strike": pred.suggested_strike,
-        "reasons": pred.reasons,
-    }
-
-
-@app.get("/api/huge-move")
-async def get_huge_move(underlying: str | None = None):
-    """Fetch option chain and run huge move prediction. Returns probability of 100+ point move."""
+@app.get("/api/strike-oi-change")
+async def get_strike_oi_change(underlying: str | None = None, trade_date: str | None = None):
+    """Multi-strike OI % change over time from stored option-chain snapshots."""
     u_key = _underlying_key(underlying)
     if u_key not in list_index_underlyings():
-        return {"huge_move": None, "message": "Huge move analysis only for indices (NIFTY, BANKNIFTY)."}
+        return {"strike_oi_change": None, "message": "Strike OI tracking only for indices (NIFTY, BANKNIFTY)."}
+    settings = _get_settings(underlying)
+    td = date.fromisoformat(trade_date) if trade_date else date.today()
     try:
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None,
-            lambda: _run_huge_move_prediction(u_key),
+            lambda: compute_strike_oi_change(settings.data_dir, td, u_key),
         )
-        return {"huge_move": _sanitize_for_json(result), "status": "ok"}
+        return {"strike_oi_change": _sanitize_for_json(result), "status": "ok"}
     except Exception as e:
-        logger.exception("Huge move failed: %s", e)
+        logger.exception("Strike OI change failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/futures-oi-buildup")
+async def get_futures_oi_buildup(underlying: str | None = None, trade_date: str | None = None):
+    """Bar-by-bar futures OI buildup from stored Index_Analysis.csv (5-min bars)."""
+    u_key = _underlying_key(underlying)
+    if u_key not in list_index_underlyings():
+        return {
+            "futures_oi_buildup": None,
+            "message": "Futures OI buildup only for indices (NIFTY, BANKNIFTY).",
+        }
+    settings = _get_settings(underlying)
+    td = date.fromisoformat(trade_date) if trade_date else date.today()
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: compute_futures_oi_buildup(settings.data_dir, td, u_key),
+        )
+        return {"futures_oi_buildup": _sanitize_for_json(result), "status": "ok"}
+    except Exception as e:
+        logger.exception("Futures OI buildup failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

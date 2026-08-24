@@ -39,18 +39,25 @@ def run_every_five_minutes(engine: DirectionEngine, interval_minutes: int) -> No
 
 
 def _capture_option_chain(engine: DirectionEngine) -> None:
-    """Capture 5-10 strikes option chain and save to JSONL (for indices only)."""
+    """Capture ATM ladder option chain and append to day CSV (indices only)."""
     from intraday_engine.core.underlyings import list_index_underlyings
     from intraday_engine.gamma.huge_move_predictor import HugeMovePredictor
+    from intraday_engine.gamma.option_chain_fetcher import resolve_option_chain_strike_counts
 
     if engine.settings.underlying not in list_index_underlyings():
         return
     client = engine.fetcher.resolver.client
     predictor = HugeMovePredictor(client, engine.settings)
-    num_strikes = int(os.getenv("OPTION_STRIKES", "5"))
-    snapshot = predictor.capture_and_store(num_strikes=num_strikes)
+    ce, pe = resolve_option_chain_strike_counts()
+    snapshot = predictor.capture_and_store()
     if snapshot:
-        logger.debug("Option chain captured: %d strikes", len(snapshot.strikes))
+        logger.debug(
+            "Option chain captured: %d legs (%d CE + %d PE strikes), ATM %d",
+            len(snapshot.strikes),
+            ce,
+            pe,
+            snapshot.atm_strike,
+        )
 
 
 def _seconds_to_next_boundary(interval_minutes: int) -> int:

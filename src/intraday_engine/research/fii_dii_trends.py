@@ -97,7 +97,7 @@ def hydrate_fii_dii_from_cache(
     as_of: date | None = None,
 ) -> dict[str, Any]:
     """Rebuild cash FII/DII rows from trade-date cache (no NSE fetch)."""
-    fii_dii_rows = get_fii_dii_30d_history(data_dir, days=days)
+    fii_dii_rows = get_fii_dii_30d_history(data_dir, days=days, as_of=as_of or date.today())
     fii_dii_chart = get_fii_dii_trading_window(
         data_dir, chart_trading_days, as_of=as_of or date.today()
     )
@@ -129,7 +129,7 @@ def run_fii_dii_trends_scan(
     td = trade_date or date.today()
 
     coverage = ensure_fii_dii_oi_history(settings.data_dir, trading_days=days)
-    fii_dii_rows = get_fii_dii_30d_history(settings.data_dir, days=days)
+    fii_dii_rows = get_fii_dii_30d_history(settings.data_dir, days=days, as_of=td)
     fii_dii_chart = get_fii_dii_trading_window(
         settings.data_dir, FII_DII_CHART_TRADING_DAYS, as_of=td
     )
@@ -191,7 +191,7 @@ def load_stored_fii_dii_trends(
                 except Exception:
                     payload = None
     if payload is None:
-        fii_dii_rows = get_fii_dii_30d_history(data_dir, days=days)
+        fii_dii_rows = get_fii_dii_30d_history(data_dir, days=days, as_of=trade_date)
         if not fii_dii_rows:
             return None
         payload = {
@@ -202,5 +202,7 @@ def load_stored_fii_dii_trends(
             "data_status": {"fii_dii_rows": len(fii_dii_rows)},
         }
     if hydrate_cache:
-        payload = hydrate_fii_dii_from_cache(data_dir, payload, days=days)
+        payload = hydrate_fii_dii_from_cache(
+            data_dir, payload, days=days, as_of=trade_date
+        )
     return payload

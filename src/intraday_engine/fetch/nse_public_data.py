@@ -196,6 +196,7 @@ def get_delivery_history(data_dir: Path, days: int = 30) -> pd.DataFrame:
 _BULK_CACHE = "bulk_deals_history.json"
 _BLOCK_CACHE = "block_deals_history.json"
 _BLOCK_URL = "https://www.nseindia.com/api/historical/cm/block"
+_MOST_ACTIVE_URL = "https://www.nseindia.com/api/live-analysis-most-active-underlying"
 
 
 def _load_history_json(data_dir: Path, name: str) -> list[dict[str, Any]]:
@@ -550,9 +551,26 @@ def get_fii_dii_cached_history(
     return list(reversed(rows))
 
 
-def get_fii_dii_30d_history(data_dir: Path, days: int = 30) -> list[dict[str, Any]]:
-    """Last N trading sessions from trade-date keyed cache."""
-    return get_fii_dii_cached_history(data_dir, within_trading_days=days)
+def get_fii_dii_30d_history(
+    data_dir: Path,
+    days: int = 30,
+    *,
+    as_of: date | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Last N trading sessions (newest first). Sessions without cached FII/DII
+    still appear with ``date`` only so the daily table shows calendar gaps.
+    """
+    return get_fii_dii_trading_window(data_dir, days, as_of=as_of or date.today())
+
+
+def get_fii_dii_cached_only_history(
+    data_dir: Path,
+    *,
+    within_trading_days: int = 30,
+) -> list[dict[str, Any]]:
+    """Cached trade dates only (legacy helper)."""
+    return get_fii_dii_cached_history(data_dir, within_trading_days=within_trading_days)
 
 
 def get_fii_dii_trading_window(
@@ -752,3 +770,134 @@ def participant_oi_long_short(df: pd.DataFrame) -> list[dict[str, Any]]:
             row[key] = float(r[col]) if col is not None and pd.notna(r[col]) else 0.0
         out.append(row)
     return out
+
+
+# ---------- Most-active F&O underlyings (live intraday) ----------
+
+_MOST_ACTIVE_TTL_SECONDS = 300  # cache short — this changes intraday
+_most_active_mem: dict[str, Any] = {"ts": 0.0, "payload": []}
+
+
+def _parse_most_active_payload(payload: Any) -> list[dict[str, Any]]:
+    """Walk NSE's most-active JSON and return a flat list of dicts. The live-analysis
+    endpoint (as of 2026-08) returns `{"data": [row, ...], "timestamp": "..."}` where
+    each row has keys: symbol, futVolume, optVolume, totVolume, futTurnover, optTurnover,
+    totTurnover, preTurnover, latestOI, underlying (= spot LTP, misnamed by NSE).
+
+    We normalize to: {symbol, ltp, fut_volume, opt_volume, total_volume,
+                      fut_turnover, opt_turnover, total_turnover, prev_turnover, oi}.
+    Turnover values are already in lakhs on the wire; convert to ₹ crore for display."""
+    out: list[dict[str, Any]] = []
+    if not payload:
+        return out
+    buckets: list[Any] = []
+    if isinstance(payload, list):
+        buckets.append(payload)
+    elif isinstance(payload, dict):
+        for k in ("data", "Volume", "Value", "OIChange", "OI"):
+            v = payload.get(k)
+            if isinstance(v, list):
+                buckets.append(v)
+            elif isinstance(v, dict):
+                for kk in ("data", "underlying", "Volume", "Value"):
+                    if isinstance(v.get(kk), list):
+                        buckets.append(v[kk])
+    seen: set[str] = set()
+    for bucket in buckets:
+        for row in bucket:
+            if not isinstance(row, dict):
+                continue
+            sym = str(row.get("symbol") or "").strip().upper()
+            if not sym or sym in seen:
+                continue
+            seen.add(sym)
+
+            def _f(*keys: str) -> float | None:
+                for k in keys:
+                    v = row.get(k)
+                    if v is None:
+                        continue
+                    try:
+                        return float(str(v).replace(",", ""))
+                    except Exception:
+                        continue
+                return None
+
+            fut_turnover_l = _f("futTurnover")  # lakhs
+            opt_turnover_l = _f("optTurnover")
+            total_turnover_l = _f("totTurnover")
+            prev_turnover_l = _f("preTurnover")
+            out.append({
+                "symbol": sym,
+                "ltp": _f("underlying"),  # NSE misnames the spot LTP as "underlying"
+                "fut_volume": _f("futVolume"),
+                "opt_volume": _f("optVolume"),
+                "total_volume": _f("totVolume"),
+                "fut_turnover_cr": (fut_turnover_l / 100.0) if fut_turnover_l is not None else None,
+                "opt_turnover_cr": (opt_turnover_l / 100.0) if opt_turnover_l is not None else None,
+                "total_turnover_cr": (total_turnover_l / 100.0) if total_turnover_l is not None else None,
+                "prev_turnover_cr": (prev_turnover_l / 100.0) if prev_turnover_l is not None else None,
+                "oi": _f("latestOI"),
+            })
+    return out
+
+
+def fetch_most_active_underlyings(
+    data_dir: Path,
+    ttl_seconds: int = _MOST_ACTIVE_TTL_SECONDS,
+) -> list[dict[str, Any]]:
+    """Live-analysis most-active F&O underlyings from NSE.
+
+    Returns a de-duped list of dicts sorted by descending traded value (₹).
+    Short in-memory + on-disk TTL cache (default 5 min) so the endpoint isn't
+    hammered on every dashboard refresh. Fails soft — returns [] on any error
+    (dashboard should fall back to the liquid FnO watchlist)."""
+    now = time.time()
+    if _most_active_mem["payload"] and (now - float(_most_active_mem["ts"])) < ttl_seconds:
+        return list(_most_active_mem["payload"])
+
+    cache_name = f"most_active_underlying_{date.today().isoformat()}.json"
+    cached_raw = _load_cache_text(data_dir, cache_name)
+    if cached_raw:
+        try:
+            cached_wrapper = json.loads(cached_raw)
+            cached_ts = float(cached_wrapper.get("ts", 0))
+            if now - cached_ts < ttl_seconds:
+                payload = cached_wrapper.get("payload") or []
+                _most_active_mem["ts"] = cached_ts
+                _most_active_mem["payload"] = payload
+                return list(payload)
+        except Exception:
+            pass
+
+    live = _get_live()
+    if live is None:
+        return []
+    try:
+        r = live.s.get(
+            _MOST_ACTIVE_URL,
+            headers={"Referer": "https://www.nseindia.com/market-data/most-active-underlying"},
+            timeout=25,
+        )
+        if r.status_code != 200 or not r.text or not r.text.strip():
+            return []
+        raw = r.json()
+    except Exception as e:
+        logger.debug("most-active fetch err: %s", e)
+        return []
+
+    parsed = _parse_most_active_payload(raw)
+    if not parsed:
+        return []
+    parsed.sort(key=lambda x: (x.get("total_turnover_cr") or 0), reverse=True)
+    try:
+        _save_cache(
+            data_dir,
+            cache_name,
+            json.dumps({"ts": now, "payload": parsed}, ensure_ascii=False),
+        )
+    except Exception:
+        pass
+    _most_active_mem["ts"] = now
+    _most_active_mem["payload"] = parsed
+    return list(parsed)

@@ -12,9 +12,16 @@ from intraday_engine.core.config import Settings
 from intraday_engine.core.underlyings import list_index_underlyings
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.gamma.huge_move_predictor import HugeMovePredictor
+from intraday_engine.gamma.option_chain_fetcher import resolve_option_chain_strike_counts
 from intraday_engine.jobs.registry import update_job_state
 from intraday_engine.storage.layout import normalize_underlying, option_chain_day_path
-from intraday_engine.utils.nse_session import is_nse_session_active, session_label
+from intraday_engine.utils.nse_session import (
+    is_nse_session_active,
+    seconds_to_next_interval_within_session,
+    session_label,
+    sleep_until_next_interval,
+    wait_until_nse_session_open,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +104,7 @@ def capture_option_chain_for_underlying(
     underlying: str,
     trade_date: date | None = None,
     *,
-    num_strikes: int = 5,
+    num_strikes: int | None = None,
 ) -> dict:
     """Fetch and store one option-chain snapshot. Returns status dict."""
     td = trade_date or date.today()
@@ -105,6 +112,7 @@ def capture_option_chain_for_underlying(
     if u not in list_index_underlyings():
         return {"underlying": u, "status": "skipped", "reason": "not an index underlying"}
 
+    ce, pe = resolve_option_chain_strike_counts(num_strikes)
     settings = Settings.from_env(underlying=u)
     client = ZerodhaClient(settings)
     predictor = HugeMovePredictor(client, settings)
@@ -120,6 +128,8 @@ def capture_option_chain_for_underlying(
         "atm_strike": snapshot.atm_strike,
         "spot_price": snapshot.spot_price,
         "strikes": len(snapshot.strikes),
+        "ce_strikes": ce,
+        "pe_strikes": pe,
     }
 
 
@@ -128,7 +138,7 @@ def run_option_chain_scraper_job(
     *,
     underlyings: tuple[str, ...] = DEFAULT_SCRAPER_UNDERLYINGS,
     trade_date: date | None = None,
-    num_strikes: int = 5,
+    num_strikes: int | None = None,
     respect_market_hours: bool = True,
 ) -> dict:
     """Run the configured option-chain scraper for all target underlyings."""
@@ -189,7 +199,7 @@ def ensure_option_chain_data(
     underlying: str,
     trade_date: date,
     *,
-    num_strikes: int = 5,
+    num_strikes: int | None = None,
 ) -> dict:
     """Capture option chain when missing for the given date/underlying."""
     if option_chain_data_available(data_dir, trade_date, underlying):
@@ -201,3 +211,39 @@ def ensure_option_chain_data(
     st["action"] = "captured"
     st["capture"] = cap
     return st
+
+
+def run_option_chain_scheduler_loop(
+    data_dir: Path,
+    *,
+    underlyings: tuple[str, ...] = DEFAULT_SCRAPER_UNDERLYINGS,
+    interval_minutes: int = 5,
+) -> None:
+    """
+    Blocking loop: capture option chain every 5 min during NSE session (09:15–15:30 IST).
+    Run standalone — no dashboard required. Use CLI: --option-chain-scheduler
+    """
+    ce, pe = resolve_option_chain_strike_counts()
+    logger.info(
+        "Option chain scheduler started (%s, every %d min, %d CE + %d PE @ 100-pt).",
+        session_label(),
+        interval_minutes,
+        ce,
+        pe,
+    )
+    while True:
+        if not is_nse_session_active():
+            wait_until_nse_session_open(log=logger)
+            continue
+
+        try:
+            run_option_chain_scraper_job(
+                data_dir,
+                underlyings=underlyings,
+                respect_market_hours=True,
+            )
+        except Exception as exc:
+            logger.exception("Option chain scheduler cycle failed: %s", exc)
+
+        sleep_s = seconds_to_next_interval_within_session(interval_minutes)
+        sleep_until_next_interval(sleep_s)

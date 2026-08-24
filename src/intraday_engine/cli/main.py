@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from datetime import date, datetime
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from intraday_engine.research.tomorrow_watchlist_scanner import run_tomorrow_wat
 from intraday_engine.research.silent_accumulation_scanner import run_silent_accumulation_scan
 from intraday_engine.research.fii_dii_trends import run_fii_dii_trends_scan
 from intraday_engine.research.relative_strength_scanner import run_relative_strength_scan
+from intraday_engine.research.minervini_trend_template_scanner import run_minervini_trend_template_scan
 from intraday_engine.research.fundamentals_screener import run_fundamentals_scan
 from intraday_engine.research.stock_news_scanner import run_news_scan
 from intraday_engine.research.combined_signals_scanner import run_combined_scan
@@ -108,13 +110,130 @@ def main() -> None:
     parser.add_argument(
         "--capture-option-chain",
         action="store_true",
-        help="Capture and store option chain (5-10 strikes near spot) to JSONL.",
+        help="Capture and store one option-chain snapshot (ATM ladder) to CSV.",
+    )
+    parser.add_argument(
+        "--option-chain-scheduler",
+        action="store_true",
+        help="Option chain only, every 5 min. Prefer --session-scheduler for the full pipeline.",
+    )
+    parser.add_argument(
+        "--session-scheduler",
+        action="store_true",
+        help=(
+            "Full intraday pipeline every 5 min (Mon–Fri 09:15–15:30 IST): option chain → "
+            "index analysis → options-trading scan. Dashboard reads stored output."
+        ),
+    )
+    parser.add_argument(
+        "--session-once",
+        action="store_true",
+        help="Run one full session cycle (option chain + index pipeline) and exit.",
+    )
+    parser.add_argument(
+        "--index-pipeline-scheduler",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--index-pipeline-once",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--backfill-option-chain",
+        action="store_true",
+        help="Backfill 5-min option-chain bars from Kite historical OI (requires --date).",
+    )
+    parser.add_argument(
+        "--backfill-full-day",
+        action="store_true",
+        help=(
+            "Backfill entire session (09:15–15:25) for --underlying. "
+            "Fills only missing bars unless --replace-existing."
+        ),
+    )
+    parser.add_argument(
+        "--bar-times",
+        type=str,
+        nargs="+",
+        default=["11:10", "11:15"],
+        help="Bar open times HH:MM (with --backfill-option-chain, not --backfill-full-day).",
+    )
+    parser.add_argument(
+        "--strike-min",
+        type=int,
+        default=None,
+        help="Min strike for backfill (default: auto from CSV or Index Analysis).",
+    )
+    parser.add_argument(
+        "--strike-max",
+        type=int,
+        default=None,
+        help="Max strike for backfill (default: auto from CSV or Index Analysis).",
+    )
+    parser.add_argument(
+        "--replace-existing",
+        action="store_true",
+        help="With backfill: drop existing captures in target bars before rebuilding.",
+    )
+    parser.add_argument(
+        "--no-skip-existing",
+        action="store_true",
+        help="With --backfill-full-day: rewrite all session bars (same as --replace-existing).",
+    )
+    parser.add_argument(
+        "--remove-chain-prefix",
+        type=str,
+        nargs="*",
+        default=None,
+        help="Drop snapshots whose timestamp starts with these prefixes before backfill.",
     )
     parser.add_argument(
         "--option-strikes",
         type=int,
-        default=5,
-        help="Number of strikes each side of ATM for option chain (default 5).",
+        default=None,
+        help="Legacy: symmetric CE/PE strike count override (default from OPTION_CHAIN_* env).",
+    )
+    parser.add_argument(
+        "--dashboard",
+        action="store_true",
+        help="Run FastAPI dashboard (uvicorn). Same as: uvicorn intraday_engine.dashboard:app",
+    )
+    parser.add_argument(
+        "--no-option-chain-job",
+        action="store_true",
+        help="With --dashboard: do not schedule the built-in option-chain scraper job.",
+    )
+    parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help=(
+            "With --dashboard: stored data only — no background fetches, scans, or pipeline loops. "
+            "Implies --no-option-chain-job and disables auto-trade/direction-engine loop."
+        ),
+    )
+    parser.add_argument(
+        "--no-auto-trade-loop",
+        action="store_true",
+        help="With --dashboard: do not run the 5-min direction-engine / auto-trade background loop.",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Dashboard bind host (with --dashboard). Default 0.0.0.0.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Dashboard bind port (with --dashboard). Default 8000.",
+    )
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable uvicorn auto-reload (with --dashboard).",
     )
     parser.add_argument(
         "--btst",
@@ -203,6 +322,34 @@ def main() -> None:
         "--relative-strength",
         action="store_true",
         help="Scan NIFTY 500 daily bars for stocks outperforming NIFTY 50 (RS line).",
+    )
+    parser.add_argument(
+        "--minervini-template",
+        action="store_true",
+        help="Scan NIFTY 500 for Minervini Stage-2 Trend Template + VCP readiness.",
+    )
+    parser.add_argument(
+        "--minervini-mode",
+        choices=("setup", "extended"),
+        default="setup",
+        help="setup = pre-breakout VCP (default); extended = full Stage-2 template.",
+    )
+    parser.add_argument(
+        "--minervini-top",
+        type=int,
+        default=50,
+        help="Top-N Minervini candidates in output JSON. Default 50.",
+    )
+    parser.add_argument(
+        "--minervini-rs-min",
+        type=float,
+        default=70.0,
+        help="Minimum RS rank percentile for full pass (default 70).",
+    )
+    parser.add_argument(
+        "--minervini-all-partial",
+        action="store_true",
+        help="Include partial template matches, not only full Trend Template + RS pass.",
     )
     parser.add_argument(
         "--rs-top",
@@ -359,6 +506,33 @@ def main() -> None:
             )
         return
 
+    if args.minervini_template:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        payload = run_minervini_trend_template_scan(
+            settings=settings,
+            top_n=args.minervini_top,
+            rs_min_percentile=args.minervini_rs_min,
+            mode=args.minervini_mode,
+            only_full_pass=not args.minervini_all_partial and args.minervini_mode == "extended",
+            trade_date=selected_date or date.today(),
+        )
+        rows = payload.get("rows", [])
+        print(
+            f"Minervini {payload.get('scan_mode', 'setup')}: {payload.get('passed', 0)} pass, "
+            f"{len(rows)} shown of {payload.get('evaluated', 0)} evaluated "
+            f"({payload.get('scanned', 0)} symbols)"
+        )
+        for r in rows[:15]:
+            score = r.get('setup_score') if r.get('scan_mode') == 'setup' else r.get('composite_score')
+            print(
+                f"  {r.get('stock'):12} score={score:>5}  "
+                f"rules={r.get('criteria_passed')}/{r.get('criteria_total')}  "
+                f"RS={r.get('rs_rank_percentile'):>5.0f}  VCP={r.get('vcp_score'):>4.0f}  "
+                f"to pivot={r.get('dist_to_pivot_pct')}%"
+            )
+        return
+
     if args.fundamentals:
         settings = Settings.from_env(underlying="NIFTY")
         setup_logging(settings.log_level, settings.data_dir)
@@ -477,6 +651,80 @@ def main() -> None:
         )
         return
 
+    if args.backfill_full_day or args.backfill_option_chain:
+        from intraday_engine.gamma.option_chain_fetcher import (
+            backfill_option_chain_full_day,
+            backfill_option_chain_historical,
+        )
+
+        td = selected_date or date.today()
+        settings = Settings.from_env(underlying=underlying)
+        setup_logging(settings.log_level, settings.data_dir)
+        replace = args.replace_existing or args.no_skip_existing
+        if args.backfill_full_day:
+            result = backfill_option_chain_full_day(
+                settings.data_dir,
+                td,
+                underlying,
+                skip_existing=not replace,
+                replace_existing=replace,
+                strike_min=args.strike_min,
+                strike_max=args.strike_max,
+                remove_capture_prefixes=args.remove_chain_prefix,
+            )
+        else:
+            strike_min = args.strike_min if args.strike_min is not None else 23600
+            strike_max = args.strike_max if args.strike_max is not None else 24900
+            result = backfill_option_chain_historical(
+                settings.data_dir,
+                td,
+                underlying,
+                args.bar_times,
+                strike_min=strike_min,
+                strike_max=strike_max,
+                remove_capture_prefixes=args.remove_chain_prefix,
+                replace_existing=True,
+            )
+        print(result)
+        return
+
+    if args.option_chain_scheduler:
+        from intraday_engine.jobs.option_chain_scraper import run_option_chain_scheduler_loop
+
+        settings = Settings.from_env(underlying=underlying)
+        setup_logging(settings.log_level, settings.data_dir)
+        run_option_chain_scheduler_loop(settings.data_dir)
+        return
+
+    if args.session_scheduler or args.index_pipeline_scheduler:
+        if args.index_pipeline_scheduler:
+            logging.getLogger(__name__).warning(
+                "--index-pipeline-scheduler is deprecated; use --session-scheduler "
+                "(includes option chain + index pipeline)."
+            )
+        _run_session_scheduler(underlying=underlying)
+        return
+
+    if args.session_once or args.index_pipeline_once:
+        if args.index_pipeline_once:
+            logging.getLogger(__name__).warning(
+                "--index-pipeline-once is deprecated; use --session-once "
+                "(includes option chain + index pipeline)."
+            )
+        _run_session_once(underlying=underlying, trade_date=selected_date)
+        return
+
+    if args.dashboard:
+        _run_dashboard(
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+            no_option_chain_job=args.no_option_chain_job,
+            read_only=args.read_only,
+            no_auto_trade_loop=args.no_auto_trade_loop,
+        )
+        return
+
     engine = build_engine(underlying=underlying)
     if args.once or selected_date is not None:
         engine.run_cycle(trade_date=selected_date)
@@ -519,11 +767,72 @@ def _run_gamma_blast_scan(trade_date: date | None, underlying: str | None = None
     logger.info("Suggested strike: %d | %s", signal.suggested_strike, signal.reason)
 
 
+def _run_session_scheduler(*, underlying: str | None) -> None:
+    from intraday_engine.jobs.session_pipeline import run_session_scheduler_loop
+
+    settings = Settings.from_env(underlying=underlying or "NIFTY")
+    setup_logging(settings.log_level, settings.data_dir)
+    run_session_scheduler_loop(settings.data_dir)
+
+
+def _run_session_once(*, underlying: str | None, trade_date: date | None) -> None:
+    from intraday_engine.jobs.session_pipeline import run_session_cycle
+
+    settings = Settings.from_env(underlying=underlying or "NIFTY")
+    setup_logging(settings.log_level, settings.data_dir)
+    summary = run_session_cycle(settings.data_dir, trade_date=trade_date)
+    logging.getLogger(__name__).info("Session pipeline once: %s", summary)
+
+
+def _run_dashboard(
+    *,
+    host: str,
+    port: int,
+    reload: bool,
+    no_option_chain_job: bool,
+    read_only: bool,
+    no_auto_trade_loop: bool,
+) -> None:
+    """Launch uvicorn dashboard; optionally skip background pipeline jobs."""
+    if read_only:
+        os.environ["INTRADAY_READ_ONLY_DASHBOARD"] = "1"
+        os.environ["INTRADAY_NO_OPTION_CHAIN_JOB"] = "1"
+    elif no_option_chain_job:
+        os.environ["INTRADAY_NO_OPTION_CHAIN_JOB"] = "1"
+    if read_only or no_auto_trade_loop:
+        os.environ["INTRADAY_NO_AUTO_TRADE_LOOP"] = "1"
+
+    settings = Settings.from_env()
+    setup_logging(settings.log_level, settings.data_dir)
+    logger = logging.getLogger(__name__)
+    if read_only:
+        logger.info("Dashboard starting in read-only mode (stored data only).")
+    else:
+        parts = []
+        if no_option_chain_job or read_only:
+            parts.append("option-chain job off")
+        if no_auto_trade_loop or read_only:
+            parts.append("auto-trade loop off")
+        if parts:
+            logger.info("Dashboard starting (%s).", ", ".join(parts))
+        else:
+            logger.info("Dashboard starting with all background jobs enabled.")
+
+    import uvicorn
+
+    uvicorn.run(
+        "intraday_engine.dashboard:app",
+        host=host,
+        port=port,
+        reload=reload,
+    )
+
+
 def _run_huge_move_or_capture(
     capture_only: bool,
     trade_date: date,
     underlying: str | None,
-    num_strikes: int = 5,
+    num_strikes: int | None = None,
 ) -> None:
     """Capture option chain and optionally run huge move prediction."""
     settings = Settings.from_env(underlying=underlying)

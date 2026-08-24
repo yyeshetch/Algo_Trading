@@ -234,9 +234,10 @@
       <p class="sub">F&amp;O research scanners • 30-min analysis • EOD indicators • multi-timeframe watchlist</p>
     </header>
     <div class="toolbar">
-      <button class="btn btn-primary" id="btnRefreshAll">Refresh Tomorrow Watchlist</button>
+      <button class="btn btn-primary" id="btnRefreshAll">Refresh dashboard</button>
       <span class="status" id="refreshAllStatus"></span>
-      <span class="status" id="refreshAllMeta">Last shared refresh: —</span>
+      <span class="status" id="refreshAllMeta">Last dashboard refresh: —</span>
+      <span class="status" style="color:var(--text-muted);font-size:0.78rem;">Runs scanners first (Silent → Watchlist last). EOD is a live Kite pull and runs near the end. 30-min &amp; Combined are manual.</span>
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="30min">30-min Analysis</button>
@@ -245,6 +246,7 @@
       <button class="tab" data-tab="silent">Silent Accumulation</button>
       <button class="tab" data-tab="fiidii">FII/DII &amp; OI Trends</button>
       <button class="tab" data-tab="rs">RS vs NIFTY</button>
+      <button class="tab" data-tab="minervini">Minervini SEPA</button>
       <button class="tab" data-tab="intraday-rs">Intraday RS</button>
       <button class="tab" data-tab="sector-rs">Sector RS</button>
       <button class="tab" data-tab="instvol">Institutional Volume</button>
@@ -328,11 +330,11 @@
           <label for="eodDate">Date:</label>
           <input type="date" id="eodDate" style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
         </div>
-        <button class="btn btn-primary" id="btnEod">Fetch EOD Indicators</button>
-        <span class="status" id="eodStatus"></span>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="eod">Refresh EOD</button>
+        <span class="status" id="eodStatus">Use header Refresh dashboard or Refresh EOD.</span>
       </div>
       <div id="eodContent">
-        <div class="loading" id="eodLoading">Click Fetch EOD Indicators to load daily FnO market data for all liquid symbols.</div>
+        <div class="loading" id="eodLoading">Open this tab to load saved EOD data, or click Refresh EOD for a live Kite pull.</div>
         <div id="eodResults" style="display:none;">
           <div class="panel" style="margin-top: 1rem;">
             <div class="panel-head">FnO Market Indicators (NIFTY, BANKNIFTY + selected liquid symbols)</div>
@@ -369,7 +371,8 @@
     </div>
     <div id="panel-tomorrow" class="tab-panel">
       <div class="toolbar">
-        <span class="status" id="twStatus">Uses data from shared refresh.</span>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="tomorrow">Refresh watchlist</button>
+        <span class="status" id="twStatus">Uses data from dashboard refresh.</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 900px;">
         End-of-day style scan: <strong>15m equity history only</strong> (chunked backward when needed), aggregated locally to <strong>1D</strong> and <strong>1H</strong>; raw 15m drives VWAP and compression. FnO names may add one short future daily call for OI. Rate-limited; typically faster than separate day+hour+15m pulls.
@@ -411,17 +414,17 @@
 
     <div id="panel-silent" class="tab-panel">
       <div class="toolbar">
-        <button type="button" class="btn btn-primary" id="btnSilentRefresh">Refresh</button>
         <label style="font-size: 0.85rem; color: var(--text-muted);">
           <input type="checkbox" id="silentUseNse" checked> Include NSE delivery % &amp; bulk-deal data
         </label>
-        <span class="status" id="silentStatus">Click Refresh to scan NIFTY 500 daily bars.</span>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="silent">Refresh</button>
+        <span class="status" id="silentStatus">Use Refresh dashboard in the header.</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
         Daily-bar Wyckoff/footprint scan: rising OBV inside flat price range, persistent positive CMF, up-day vs down-day volume ratio &gt; 1.3, closes in upper third, higher swing lows. Adds NSE delivery % trend and FII/MF bulk-deal buys when available. Higher score = stealthier accumulation.
       </p>
       <div id="silentLoading" class="loading" style="display:none;">Loading silent-accumulation results…</div>
-      <div id="silentEmpty" class="empty" style="display:none;">No saved scan yet. Click Refresh.</div>
+      <div id="silentEmpty" class="empty" style="display:none;">No saved scan yet. Run Refresh dashboard.</div>
       <div id="silentContent" style="display:none;">
         <div id="silentMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
         <div class="panel" style="box-shadow: var(--shadow);">
@@ -456,14 +459,14 @@
 
     <div id="panel-fiidii" class="tab-panel">
       <div class="toolbar">
-        <button class="btn btn-primary" id="btnFiidiiRefresh">Refresh</button>
-        <span class="status" id="fiidiiStatus">Click Refresh to fetch latest FII/DII + participant OI.</span>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="fiidii">Refresh</button>
+        <span class="status" id="fiidiiStatus">Use Refresh dashboard in the header.</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
         Last 30 days. <strong>Top:</strong> Cash-segment net FII vs DII (₹ crore). <strong>Bottom:</strong> Participant-wise net F&amp;O Open Interest (Index Future longs minus shorts) for Client / FII / Pro / DII. Data from NSE public reports — may be empty if NSE rate-limited the download.
       </p>
       <div id="fiidiiLoading" class="loading" style="display:none;">Loading…</div>
-      <div id="fiidiiEmpty" class="empty" style="display:none;">No FII/DII data available. Click Refresh.</div>
+      <div id="fiidiiEmpty" class="empty" style="display:none;">No FII/DII data yet. Run Refresh dashboard.</div>
       <div id="fiidiiContent" style="display:none;">
         <!-- Today's numbers, large and clear -->
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
@@ -598,17 +601,17 @@
 
     <div id="panel-rs" class="tab-panel">
       <div class="toolbar">
-        <button type="button" class="btn btn-primary" id="btnRsRefresh">Refresh</button>
         <label style="font-size: 0.85rem; color: var(--text-muted);">
           <input type="checkbox" id="rsOnlyOuter" checked> Only outperformers (RS slope &gt; 0)
         </label>
-        <span class="status" id="rsStatus">Uses cached daily bars under data/NIFTY500.</span>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="rs">Refresh</button>
+        <span class="status" id="rsStatus">Use Refresh dashboard in the header.</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
         Mansfield-style RS vs NIFTY 50 daily. Sparkline shows the RS line (stock/NIFTY normalized). Strength score = weighted blend of 5d/20d/60d RS slope + 20d/60d excess return over NIFTY. Sortable by clicking column headers.
       </p>
       <div id="rsLoading" class="loading" style="display:none;">Loading RS results…</div>
-      <div id="rsEmpty" class="empty" style="display:none;">No saved RS scan yet. Click Refresh.</div>
+      <div id="rsEmpty" class="empty" style="display:none;">No saved RS scan yet. Run Refresh dashboard.</div>
       <div id="rsContent" style="display:none;">
         <div id="rsMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
         <div class="panel" style="box-shadow: var(--shadow);">
@@ -637,10 +640,63 @@
       </div>
     </div>
 
+    <div id="panel-minervini" class="tab-panel">
+      <div class="toolbar">
+        <label style="font-size: 0.85rem; color: var(--text-muted);">
+          Mode
+          <select id="minerviniMode" style="margin-left:0.35rem;padding:0.2rem 0.4rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+            <option value="setup" selected>Pre-breakout VCP (about to move)</option>
+            <option value="extended">Extended Stage-2 (already moved)</option>
+          </select>
+        </label>
+        <label id="minerviniExtendedOnlyWrap" style="font-size: 0.85rem; color: var(--text-muted); display:none;">
+          <input type="checkbox" id="minerviniOnlyFull"> Only full Trend Template + RS
+        </label>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="minervini">Refresh</button>
+        <span class="status" id="minerviniStatus">Use Refresh dashboard in the header.</span>
+      </div>
+      <p id="minerviniDesc" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
+        <strong>Pre-breakout VCP</strong> — tight daily base under a pivot, volume dry, higher lows,
+        close still <em>below</em> pivot (no breakout yet), 200-DMA rising, RS improving, not extended above 50-DMA.
+        These are setups <em>before</em> the move, not names already at 52-week highs.
+      </p>
+      <div id="minerviniLoading" class="loading" style="display:none;">Scanning NIFTY 500 daily bars…</div>
+      <div id="minerviniEmpty" class="empty" style="display:none;">No saved scan yet. Run Refresh dashboard.</div>
+      <div id="minerviniContent" style="display:none;">
+        <div id="minerviniMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head" id="minerviniPanelHead">Pre-breakout VCP setups (sorted by setup score)</div>
+          <div class="panel-body" style="max-height: 720px; overflow: auto;">
+            <table id="minerviniTable" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Stock</th>
+                  <th class="num">Score</th>
+                  <th class="num">Price</th>
+                  <th>Rules</th>
+                  <th class="num">RS %ile</th>
+                  <th class="num">VCP</th>
+                  <th class="num">To pivot</th>
+                  <th class="num">Base</th>
+                  <th class="num">↑50MA</th>
+                  <th class="num">20d mv</th>
+                  <th class="num">Pivot</th>
+                  <th>RS line</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="minerviniTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="panel-intraday-rs" class="tab-panel">
       <div class="toolbar">
-        <button type="button" class="btn btn-primary" id="btnIntradayRsRefresh">Refresh</button>
-        <span class="status" id="intradayRsStatus">Uses cached 15-min bars under data/NIFTY500 + live NIFTY 50 15-min.</span>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="intraday-rs">Refresh</button>
+        <span class="status" id="intradayRsStatus">Use Refresh dashboard in the header.</span>
         <span class="status" id="intradayRsMeta" style="color: var(--text-muted);">—</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
@@ -649,7 +705,7 @@
         Sparkline is the per-bar intraday RS ratio (100 baseline = matching NIFTY since open).
       </p>
       <div id="intradayRsLoading" class="loading" style="display:none;">Loading intraday RS…</div>
-      <div id="intradayRsEmpty" class="empty" style="display:none;">No saved intraday RS yet. Click Refresh.</div>
+      <div id="intradayRsEmpty" class="empty" style="display:none;">No saved intraday RS yet. Run Refresh dashboard.</div>
       <div id="intradayRsContent" class="grid" style="display:none;">
         <div class="panel buy" style="box-shadow: var(--shadow);">
           <div class="panel-head">▲ Stronger than NIFTY (intraday)</div>
@@ -702,19 +758,38 @@
 
     <div id="panel-sector-rs" class="tab-panel">
       <div class="toolbar">
-        <button type="button" class="btn btn-primary" id="btnSectorRsRefresh">Refresh</button>
-        <span class="status" id="sectorRsStatus">Groups NIFTY 500 by sector (Industry) and ranks each sector vs NIFTY 50.</span>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="sector-rs">Refresh</button>
+        <span class="status" id="sectorRsStatus">Use Refresh dashboard in the header.</span>
         <span class="status" id="sectorRsMeta" style="color: var(--text-muted);">—</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
-        Sectors ranked by average member out/under-performance vs NIFTY 50 today (open → latest 15-min close).
+        Sectors ranked by average member out/under-performance vs NIFTY 50 today (15-min bars).
+        Stock → sector mapping comes from
+        <a href="https://www.nseindia.com/market-data/live-market-indices" target="_blank" rel="noopener" style="color:#60a5fa;">NSE live sector indices</a>
+        constituent lists (not Industry column).
         <strong style="color:#10b981;">Avg excess &gt; 0</strong> = sector leading the index; <strong style="color:#ef4444;">&lt; 0</strong> = lagging.
         <em>Breadth</em> = share of the sector's stocks beating NIFTY. Click a sector to see its
         <strong style="color:#10b981;">runners</strong> (ride these) and <strong style="color:#ef4444;">laggards</strong> (avoid / short candidates).
       </p>
       <div id="sectorRsLoading" class="loading" style="display:none;">Loading sector RS…</div>
-      <div id="sectorRsEmpty" class="empty" style="display:none;">No saved sector RS yet. Click Refresh.</div>
+      <div id="sectorRsEmpty" class="empty" style="display:none;">No saved sector RS yet. Run Refresh dashboard.</div>
       <div id="sectorRsContent" style="display:none;">
+        <div class="panel" style="box-shadow: var(--shadow); margin-bottom: 1rem;">
+          <div class="panel-head">Relative Rotation Graph vs NIFTY 50</div>
+          <div class="panel-body">
+            <p id="sectorRotationHeadline" style="margin:0 0 0.5rem;font-size:0.85rem;color:var(--text-muted);">—</p>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0.35rem;margin-bottom:0.65rem;font-size:0.72rem;text-align:center;">
+              <div style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);border-radius:6px;padding:0.35rem;color:#10b981;">Leading</div>
+              <div style="background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.35);border-radius:6px;padding:0.35rem;color:#eab308;">Weakening</div>
+              <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.35);border-radius:6px;padding:0.35rem;color:#ef4444;">Lagging</div>
+              <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.35);border-radius:6px;padding:0.35rem;color:#60a5fa;">Improving</div>
+            </div>
+            <div style="position:relative;height:420px;width:100%;">
+              <canvas id="sectorRrgChart"></canvas>
+            </div>
+            <p style="margin:0.5rem 0 0;font-size:0.72rem;color:var(--text-muted);">NSE live sector indices vs NIFTY 50 · X = RS-Ratio · Y = momentum (snapshot open→now) · tail = refresh snapshots</p>
+          </div>
+        </div>
         <div class="panel" style="box-shadow: var(--shadow);">
           <div class="panel-head">Sector strength vs NIFTY 50 (strongest first)</div>
           <div class="panel-body" style="overflow:auto;">
@@ -740,7 +815,6 @@
 
     <div id="panel-instvol" class="tab-panel">
       <div class="toolbar">
-        <button type="button" class="btn btn-primary" id="btnInstVolRefresh">Refresh (1y daily for NIFTY 500)</button>
         <label style="font-size: 0.85rem; color: var(--text-muted); display:inline-flex; align-items:center; gap:0.35rem;">
           Recent days:
           <select id="instVolRecentDays" style="padding: 0.2rem 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem;">
@@ -751,6 +825,7 @@
             <option value="120">120</option>
           </select>
         </label>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="instvol">Refresh</button>
         <label style="font-size: 0.85rem; color: var(--text-muted); display:inline-flex; align-items:center; gap:0.35rem;">
           Filter:
           <select id="instVolLabelFilter" style="padding: 0.2rem 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem;">
@@ -762,7 +837,7 @@
             <option value="month">Highest in Month</option>
           </select>
         </label>
-        <span class="status" id="instVolStatus">Click Refresh to scrape daily bars and label institutional-volume candles.</span>
+        <span class="status" id="instVolStatus">Use Refresh dashboard in the header.</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; max-width: 1100px;">
         Each stock shows a strip of the last N trading days as dots (oldest → newest). A
@@ -773,7 +848,7 @@
       </p>
       <div id="instVolLegend" style="display:flex; flex-wrap:wrap; gap:0.45rem; margin-bottom: 0.9rem; font-size:0.75rem; align-items:center;"></div>
       <div id="instVolLoading" class="loading" style="display:none;">Loading institutional-volume scan…</div>
-      <div id="instVolEmpty" class="empty" style="display:none;">No saved scan yet. Click Refresh.</div>
+      <div id="instVolEmpty" class="empty" style="display:none;">No saved scan yet. Run Refresh dashboard.</div>
       <div id="instVolContent" style="display:none;">
         <div id="instVolMeta" class="card" style="margin-bottom: 1rem; font-size: 0.88rem; color: var(--text-muted);"></div>
         <div class="panel" style="box-shadow: var(--shadow);">
@@ -875,6 +950,11 @@
       if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '—';
       return String(v);
     }
+    function deltaCls(v) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n) || n === 0) return '';
+      return n > 0 ? 'pnl-positive' : 'pnl-negative';
+    }
     function shiftIsoTs(ts, minutes = 0) {
       if (!ts) return '';
       const d = new Date(ts);
@@ -962,7 +1042,7 @@
     function setRefreshAllMeta(tsIso, tradeDate) {
       if (!refreshAllMeta) return;
       if (!tsIso) {
-        refreshAllMeta.textContent = 'Last shared refresh: —';
+        refreshAllMeta.textContent = 'Last dashboard refresh: —';
         return;
       }
       const d = new Date(tsIso);
@@ -970,32 +1050,30 @@
         ? String(tsIso).replace('T', ' ')
         : d.toLocaleString('en-IN', { hour12: false });
       const td = tradeDate ? ` (${tradeDate})` : '';
-      refreshAllMeta.textContent = `Last shared refresh: ${shown}${td}`;
+      refreshAllMeta.textContent = `Last dashboard refresh: ${shown}${td}`;
     }
 
-    async function refreshAllTabs() {
-      if (btnRefreshAll) btnRefreshAll.disabled = true;
-      setRefreshAllStatus('Refreshing tomorrow watchlist…', null);
-      try {
-        const r = await fetch('/api/stocks/refresh-all', { method: 'POST' });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'Refresh failed');
-        await loadTomorrowWatchlist();
-        const twPicks = d?.tomorrow_watchlist?.picks ?? 0;
-        const scanned = d?.tomorrow_watchlist?.scanned ?? 0;
-        setRefreshAllStatus(
-          `Updated: ${twPicks} picks from ${scanned} symbols scanned.`,
-          true
-        );
-        setRefreshAllMeta(new Date().toISOString(), d?.trade_date);
-      } catch (e) {
-        setRefreshAllStatus('Error: ' + e.message, false);
-      } finally {
-        if (btnRefreshAll) btnRefreshAll.disabled = false;
+    async function postRefreshJson(url, label) {
+      const r = await fetch(url, { method: 'POST', cache: 'no-store' });
+      const text = await r.text();
+      let d = {};
+      if (text) {
+        try {
+          d = JSON.parse(text);
+        } catch (e) {
+          throw new Error(`${label || 'Refresh'} returned invalid JSON (${text.length} bytes)`);
+        }
       }
+      if (!r.ok) throw new Error(d.detail || `${label || 'Refresh'} failed (${r.status})`);
+      return d;
     }
 
-    btnRefreshAll?.addEventListener('click', refreshAllTabs);
+    async function stocksGetJson(url) {
+      const r = await fetch(url, { cache: 'no-store' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `Request failed (${r.status})`);
+      return d;
+    }
 
     // Open 30min tab from hash (#30min)
     if (window.location.hash === '#30min') {
@@ -1013,10 +1091,12 @@
         t.classList.add('active');
         document.getElementById('panel-' + t.dataset.tab).classList.add('active');
         if (t.dataset.tab === '30min') loadStocksFor30min();
+        if (t.dataset.tab === 'eod') loadEodTab();
         if (t.dataset.tab === 'tomorrow') loadTomorrowWatchlist();
         if (t.dataset.tab === 'silent') loadSilentAccumulation();
         if (t.dataset.tab === 'fiidii') loadFiiDiiTrends();
         if (t.dataset.tab === 'rs') loadRelativeStrength();
+        if (t.dataset.tab === 'minervini') loadMinerviniTemplate();
         if (t.dataset.tab === 'intraday-rs') loadIntradayRs();
         if (t.dataset.tab === 'sector-rs') loadSectorRs();
         if (t.dataset.tab === 'instvol') loadInstitutionalVolume();
@@ -1025,7 +1105,6 @@
     });
 
     // EOD FnO Analysis tab
-    const btnEod = document.getElementById('btnEod');
     const eodDate = document.getElementById('eodDate');
     const eodStatus = document.getElementById('eodStatus');
     const eodLoading = document.getElementById('eodLoading');
@@ -1035,6 +1114,111 @@
       eodDate.value = new Date().toISOString().slice(0, 10);
       eodDate.max = new Date().toISOString().slice(0, 10);
     }
+    let _eodLoadedKey = null;
+
+    function renderEodPayload(d) {
+      const indicators = d.indicators || [];
+      eodTbody.innerHTML = indicators.map(i => {
+        const spotChg = (i.spot_change_pct || 0);
+        const futOiChg = (i.fut_oi_change_pct || 0);
+        const ceOiChg = (i.ce_oi_change_pct || 0);
+        const peOiChg = (i.pe_oi_change_pct || 0);
+        const futVsSpot = (i.fut_vs_spot_pct || 0);
+        const cePremChg = (i.ce_premium_change_pct || 0);
+        const pePremChg = (i.pe_premium_change_pct || 0);
+        const ind = i.fno_indicator || '—';
+        const indCls = ind === 'BULLISH' ? 'badge-bull' : ind === 'BEARISH' ? 'badge-bear' : 'badge-neutral';
+        const oiBuildup = i.oi_buildup || '—';
+        const oiBuildupCls = (oiBuildup === 'LONG_BUILDUP' || oiBuildup === 'SHORT_COVERING') ? 'badge-bull' : (oiBuildup === 'SHORT_BUILDUP' || oiBuildup === 'LONG_UNWINDING') ? 'badge-bear' : 'badge-neutral';
+        return `<tr>
+          <td class="stock">${fmt(i.stock)}</td>
+          <td><span class="badge ${oiBuildupCls}">${oiBuildup !== '—' ? oiBuildup.replace(/_/g, ' ') : '—'}</span></td>
+          <td><span class="badge ${indCls}">${ind}</span></td>
+          <td class="num">${fmt(i.spot_close)}</td>
+          <td class="num ${spotChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${spotChg >= 0 ? '+' : ''}${fmt(spotChg)}%</td>
+          <td class="num">${(i.spot_volume || 0).toLocaleString()}</td>
+          <td class="num">${(i.fut_oi || 0).toLocaleString()}</td>
+          <td class="num ${futOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${futOiChg >= 0 ? '+' : ''}${fmt(futOiChg)}%</td>
+          <td class="num ${futVsSpot >= 0 ? 'pnl-positive' : 'pnl-negative'}">${futVsSpot >= 0 ? '+' : ''}${fmt(futVsSpot)}%</td>
+          <td class="num">${(i.ce_oi || 0).toLocaleString()}</td>
+          <td class="num ${ceOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${ceOiChg >= 0 ? '+' : ''}${fmt(ceOiChg)}%</td>
+          <td class="num">${(i.pe_oi || 0).toLocaleString()}</td>
+          <td class="num ${peOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${peOiChg >= 0 ? '+' : ''}${fmt(peOiChg)}%</td>
+          <td class="num">${fmt(i.pcr)}</td>
+          <td class="num ${cePremChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${cePremChg >= 0 ? '+' : ''}${fmt(cePremChg)}%</td>
+          <td class="num ${pePremChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${pePremChg >= 0 ? '+' : ''}${fmt(pePremChg)}%</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="16">No data.</td></tr>';
+      eodLoading.style.display = 'none';
+      eodResults.style.display = 'block';
+      const failedCount = d.failed_count || 0;
+      const gen = d.generated_at ? ` · saved ${fmt(d.generated_at).replace('T', ' ')}` : '';
+      let status = `Loaded ${indicators.length} symbols${gen}.`;
+      if (failedCount) status += ` (${failedCount} failed: ${(d.failed || []).map(f => f.symbol).join(', ')})`;
+      if (d.stale && d.message) {
+        eodStatus.textContent = d.message + ' ' + status;
+        eodStatus.className = 'status warn';
+      } else if (!indicators.length && d.message) {
+        eodStatus.textContent = d.message;
+        eodStatus.className = 'status';
+        eodResults.style.display = 'none';
+        eodLoading.style.display = 'block';
+        eodLoading.textContent = d.message;
+      } else {
+        eodStatus.textContent = status;
+        eodStatus.className = 'status ok';
+      }
+    }
+
+    async function loadEodTab(force = false) {
+      if (!eodTbody) return;
+      const tradeDate = eodDate?.value || new Date().toISOString().slice(0, 10);
+      const cacheKey = tradeDate;
+      if (!force && _eodLoadedKey === cacheKey && eodResults.style.display !== 'none') return;
+      eodLoading.style.display = 'block';
+      eodLoading.textContent = 'Loading saved EOD scan…';
+      eodResults.style.display = 'none';
+      eodStatus.textContent = '';
+      try {
+        const d = await stocksGetJson('/api/stocks/eod-indicators?trade_date=' + encodeURIComponent(tradeDate));
+        renderEodPayload(d);
+        _eodLoadedKey = cacheKey;
+      } catch (e) {
+        eodLoading.textContent = 'Could not load saved EOD data.';
+        eodLoading.style.display = 'block';
+        eodStatus.textContent = 'Error: ' + e.message;
+        eodStatus.className = 'status err';
+      }
+    }
+
+    async function refreshEodTab() {
+      if (!eodTbody) throw new Error('EOD tab not ready');
+      const tradeDate = eodDate?.value || new Date().toISOString().slice(0, 10);
+      eodLoading.style.display = 'block';
+      eodLoading.textContent = 'Fetching live EOD data from Kite for all liquid FnO symbols… (several minutes)';
+      eodResults.style.display = 'none';
+      eodStatus.textContent = '';
+      try {
+        const d = await postRefreshJson(
+          '/api/stocks/eod-indicators/refresh?trade_date=' + encodeURIComponent(tradeDate),
+          'EOD FnO scan'
+        );
+        renderEodPayload(d);
+        _eodLoadedKey = tradeDate;
+        return d;
+      } catch (e) {
+        eodLoading.textContent = 'EOD refresh failed — try again or load saved data.';
+        eodLoading.style.display = 'block';
+        eodStatus.textContent = 'Error: ' + e.message;
+        eodStatus.className = 'status err';
+        throw e;
+      }
+    }
+
+    eodDate?.addEventListener('change', () => {
+      _eodLoadedKey = null;
+      if (document.getElementById('panel-eod')?.classList.contains('active')) loadEodTab(true);
+    });
     // Watchlist for Tomorrow
     const twStatus = document.getElementById('twStatus');
     const twLoading = document.getElementById('twLoading');
@@ -1058,9 +1242,7 @@
       twStatus.textContent = '';
       twStatus.className = 'status';
       try {
-        const r = await fetch('/api/stocks/tomorrow-watchlist', { method: 'GET' });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'Request failed');
+        const d = await stocksGetJson('/api/stocks/tomorrow-watchlist');
         const picks = d.picks || [];
         twTbody.innerHTML = picks.map(p => {
           const tp = p.trade_plan || {};
@@ -1113,63 +1295,6 @@
       }
     }
 
-    btnEod.addEventListener('click', async () => {
-      btnEod.disabled = true;
-      eodLoading.style.display = 'block';
-      eodLoading.textContent = 'Fetching EOD data for all liquid FnO symbols…';
-      eodResults.style.display = 'none';
-      eodStatus.textContent = '';
-      try {
-        const tradeDate = eodDate?.value || new Date().toISOString().slice(0, 10);
-        const r = await fetch('/api/stocks/eod-indicators?trade_date=' + encodeURIComponent(tradeDate));
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'EOD fetch failed');
-        const indicators = d.indicators || [];
-        eodTbody.innerHTML = indicators.map(i => {
-          const spotChg = (i.spot_change_pct || 0);
-          const futOiChg = (i.fut_oi_change_pct || 0);
-          const ceOiChg = (i.ce_oi_change_pct || 0);
-          const peOiChg = (i.pe_oi_change_pct || 0);
-          const futVsSpot = (i.fut_vs_spot_pct || 0);
-          const cePremChg = (i.ce_premium_change_pct || 0);
-          const pePremChg = (i.pe_premium_change_pct || 0);
-          const ind = i.fno_indicator || '—';
-          const indCls = ind === 'BULLISH' ? 'badge-bull' : ind === 'BEARISH' ? 'badge-bear' : 'badge-neutral';
-          const oiBuildup = i.oi_buildup || '—';
-          const oiBuildupCls = (oiBuildup === 'LONG_BUILDUP' || oiBuildup === 'SHORT_COVERING') ? 'badge-bull' : (oiBuildup === 'SHORT_BUILDUP' || oiBuildup === 'LONG_UNWINDING') ? 'badge-bear' : 'badge-neutral';
-          return `<tr>
-            <td class="stock">${fmt(i.stock)}</td>
-            <td><span class="badge ${oiBuildupCls}">${oiBuildup !== '—' ? oiBuildup.replace(/_/g, ' ') : '—'}</span></td>
-            <td><span class="badge ${indCls}">${ind}</span></td>
-            <td class="num">${fmt(i.spot_close)}</td>
-            <td class="num ${spotChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${spotChg >= 0 ? '+' : ''}${fmt(spotChg)}%</td>
-            <td class="num">${(i.spot_volume || 0).toLocaleString()}</td>
-            <td class="num">${(i.fut_oi || 0).toLocaleString()}</td>
-            <td class="num ${futOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${futOiChg >= 0 ? '+' : ''}${fmt(futOiChg)}%</td>
-            <td class="num ${futVsSpot >= 0 ? 'pnl-positive' : 'pnl-negative'}">${futVsSpot >= 0 ? '+' : ''}${fmt(futVsSpot)}%</td>
-            <td class="num">${(i.ce_oi || 0).toLocaleString()}</td>
-            <td class="num ${ceOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${ceOiChg >= 0 ? '+' : ''}${fmt(ceOiChg)}%</td>
-            <td class="num">${(i.pe_oi || 0).toLocaleString()}</td>
-            <td class="num ${peOiChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${peOiChg >= 0 ? '+' : ''}${fmt(peOiChg)}%</td>
-            <td class="num">${fmt(i.pcr)}</td>
-            <td class="num ${cePremChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${cePremChg >= 0 ? '+' : ''}${fmt(cePremChg)}%</td>
-            <td class="num ${pePremChg >= 0 ? 'pnl-positive' : 'pnl-negative'}">${pePremChg >= 0 ? '+' : ''}${fmt(pePremChg)}%</td>
-          </tr>`;
-        }).join('') || '<tr><td colspan="16">No data.</td></tr>';
-        eodLoading.style.display = 'none';
-        eodResults.style.display = 'block';
-        const failedCount = d.failed_count || 0;
-        eodStatus.textContent = `Loaded ${indicators.length} symbols.` + (failedCount ? ` (${failedCount} failed: ${(d.failed || []).map(f => f.symbol).join(', ')})` : '');
-        eodStatus.className = 'status ok';
-      } catch (e) {
-        eodLoading.textContent = 'Click Fetch EOD Indicators to load.';
-        eodLoading.style.display = 'block';
-        eodStatus.textContent = 'Error: ' + e.message;
-        eodStatus.className = 'status err';
-      } finally {
-        btnEod.disabled = false;
-      }
-    });
 
     // 30-min Analysis tab
     const stock30Select = document.getElementById('stock30');
@@ -1402,7 +1527,6 @@
     }
 
     // ---------- Silent Accumulation ----------
-    const btnSilentRefresh = document.getElementById('btnSilentRefresh');
     const silentStatus = document.getElementById('silentStatus');
     const silentLoading = document.getElementById('silentLoading');
     const silentEmpty = document.getElementById('silentEmpty');
@@ -1418,26 +1542,10 @@
       return n.toFixed(dp);
     }
 
-    async function postRefreshJson(url, label) {
-      const r = await fetch(url, { method: 'POST' });
-      const text = await r.text();
-      let d = {};
-      if (text) {
-        try {
-          d = JSON.parse(text);
-        } catch (e) {
-          throw new Error(`${label || 'Refresh'} returned invalid JSON (${text.length} bytes)`);
-        }
-      }
-      if (!r.ok) throw new Error(d.detail || `${label || 'Refresh'} failed (${r.status})`);
-      return d;
-    }
-
     function refreshStamp(d) {
       const ts = d && d.generated_at ? String(d.generated_at).replace('T', ' ') : '';
       return ts ? ` · updated ${ts}` : '';
     }
-    function deltaCls(v) { return (parseFloat(v) || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'; }
     function trendBadge(t) {
       if (t === 'rising') return '<span class="badge sig-buy">rising</span>';
       if (t === 'falling') return '<span class="badge sig-sell">falling</span>';
@@ -1490,9 +1598,7 @@
       silentEmpty.style.display = 'none';
       silentContent.style.display = 'none';
       try {
-        const r = await fetch('/api/stocks/silent-accumulation');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'load failed');
+        const d = await stocksGetJson('/api/stocks/silent-accumulation');
         renderSilentPayload(d);
       } catch (e) {
         silentLoading.style.display = 'none';
@@ -1525,8 +1631,7 @@
       silentStatus.className = 'status ok';
     }
 
-    btnSilentRefresh?.addEventListener('click', async () => {
-      btnSilentRefresh.disabled = true;
+    async function refreshSilentTab() {
       silentStatus.textContent = 'Scanning NIFTY 500 daily bars… (may take 30–60s)';
       silentStatus.className = 'status';
       silentLoading.style.display = 'block';
@@ -1539,19 +1644,18 @@
           'Silent accumulation'
         );
         renderSilentPayload(d);
+        return d;
       } catch (e) {
         silentLoading.style.display = 'none';
         silentEmpty.style.display = 'block';
         silentEmpty.textContent = 'Refresh error: ' + e.message;
         silentStatus.textContent = 'Error: ' + e.message;
         silentStatus.className = 'status err';
-      } finally {
-        btnSilentRefresh.disabled = false;
+        throw e;
       }
-    });
+    }
 
     // ---------- Institutional Volume ----------
-    const btnInstVolRefresh = document.getElementById('btnInstVolRefresh');
     const instVolRecentDays = document.getElementById('instVolRecentDays');
     const instVolLabelFilter = document.getElementById('instVolLabelFilter');
     const instVolStatus = document.getElementById('instVolStatus');
@@ -1717,9 +1821,7 @@
       instVolEmpty.style.display = 'none';
       instVolContent.style.display = 'none';
       try {
-        const r = await fetch('/api/stocks/institutional-volume');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'load failed');
+        const d = await stocksGetJson('/api/stocks/institutional-volume');
         renderInstVolPayload(d);
       } catch (e) {
         instVolLoading.style.display = 'none';
@@ -1730,8 +1832,7 @@
 
     instVolLabelFilter?.addEventListener('change', renderInstVolRows);
 
-    btnInstVolRefresh?.addEventListener('click', async () => {
-      btnInstVolRefresh.disabled = true;
+    async function refreshInstVolTab() {
       instVolStatus.textContent = 'Scraping ~1y of daily bars for NIFTY 500… first run can take a few minutes.';
       instVolStatus.className = 'status';
       instVolLoading.style.display = 'block';
@@ -1744,16 +1845,16 @@
           'Institutional volume'
         );
         renderInstVolPayload(d);
+        return d;
       } catch (e) {
         instVolLoading.style.display = 'none';
         instVolEmpty.style.display = 'block';
         instVolEmpty.textContent = 'Refresh error: ' + e.message;
         instVolStatus.textContent = 'Error: ' + e.message;
         instVolStatus.className = 'status err';
-      } finally {
-        btnInstVolRefresh.disabled = false;
+        throw e;
       }
-    });
+    }
 
     // ---------- Combined Signals (Institutional + Fundamentals + News) ----------
     const btnCombinedRefresh = document.getElementById('btnCombinedRefresh');
@@ -1892,9 +1993,7 @@
       combinedEmpty.style.display = 'none';
       combinedContent.style.display = 'none';
       try {
-        const r = await fetch('/api/stocks/combined-signals');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'load failed');
+        const d = await stocksGetJson('/api/stocks/combined-signals');
         renderCombinedPayload(d);
       } catch (e) {
         combinedLoading.style.display = 'none';
@@ -1947,7 +2046,6 @@
     });
 
     // ---------- FII/DII Trends ----------
-    const btnFiidiiRefresh = document.getElementById('btnFiidiiRefresh');
     const fiidiiStatus = document.getElementById('fiidiiStatus');
     const fiidiiLoading = document.getElementById('fiidiiLoading');
     const fiidiiEmpty = document.getElementById('fiidiiEmpty');
@@ -2309,7 +2407,7 @@
       fiidiiLoading.style.display = 'none';
       if (!rows.length && !(d.participant_oi || []).length) {
         fiidiiEmpty.style.display = 'block';
-        fiidiiEmpty.textContent = d.message || 'No NSE data available (NSE may have rate-limited the download). Click Refresh to retry.';
+        fiidiiEmpty.textContent = d.message || 'No NSE data available (NSE may have rate-limited the download). Run Refresh dashboard to retry.';
         fiidiiContent.style.display = 'none';
         return;
       }
@@ -2333,13 +2431,15 @@
       document.getElementById('heroDiiTrend').innerHTML = trendLabel(dii);
       document.getElementById('heroNetTrend').innerHTML = trendLabel(net);
 
-      // descending order for table (newest first)
+      // descending order for table (newest first) — all 30 sessions, gaps show em dash
       const tableRows = rows.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
       fiidiiTbody.innerHTML = tableRows.map(r => {
         const cls = (v) => deltaCls(v);
-        const combined = (parseFloat(r.fii_net) || 0) + (parseFloat(r.dii_net) || 0);
-        return `<tr>
-          <td>${fmt(r.date)}</td>
+        const hasData = fiidiiNetValue(r.fii_net) != null || fiidiiNetValue(r.dii_net) != null;
+        const combined = hasData ? (parseFloat(r.fii_net) || 0) + (parseFloat(r.dii_net) || 0) : null;
+        const gapNote = hasData ? '' : ' <span style="color:var(--text-muted);font-size:0.72rem;">(no cache)</span>';
+        return `<tr style="${hasData ? '' : 'opacity:0.65'}">
+          <td>${fmt(r.date)}${gapNote}</td>
           <td class="num">${fmtNum(r.fii_buy, 0)}</td>
           <td class="num">${fmtNum(r.fii_sell, 0)}</td>
           <td class="num ${cls(r.fii_net)}">${fmtNum(r.fii_net, 0)}</td>
@@ -2357,7 +2457,7 @@
       const fiiHave = cov.fii_dii_have != null ? cov.fii_dii_have : dataRows.length;
       const chartDays = d.data_status?.fii_dii_chart_days || chartRows.length || 6;
       const tgt = cov.trading_days_requested || 30;
-      let status = `${dataRows.length} FII/DII cached · chart last ${chartDays} sessions · ${(d.participant_oi || []).length} OI rows · cache ${oiHave}/${tgt} OI, ${fiiHave}/${tgt} FII/DII`;
+      let status = `${tableRows.length} sessions · ${dataRows.length} with FII/DII · chart last ${chartDays} sessions · ${(d.participant_oi || []).length} OI rows · cache ${oiHave}/${tgt} OI, ${fiiHave}/${tgt} FII/DII`;
       if (cov.participant_oi_fetched > 0) status += ` · fetched ${cov.participant_oi_fetched} OI file(s)`;
       if (cov.fii_dii_missing && cov.fii_dii_missing.length) {
         status += ` · FII/DII gaps: ${cov.fii_dii_missing.length} (NSE publishes live day only)`;
@@ -2371,9 +2471,7 @@
       fiidiiEmpty.style.display = 'none';
       fiidiiContent.style.display = 'none';
       try {
-        const r = await fetch('/api/stocks/fii-dii-trends');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'load failed');
+        const d = await stocksGetJson('/api/stocks/fii-dii-trends');
         renderFiidiiPayload(d);
       } catch (e) {
         fiidiiLoading.style.display = 'none';
@@ -2382,31 +2480,27 @@
       }
     }
 
-    btnFiidiiRefresh?.addEventListener('click', async () => {
-      btnFiidiiRefresh.disabled = true;
+    async function refreshFiidiiTab() {
       fiidiiStatus.textContent = 'Fetching NSE FII/DII + participant OI…';
       fiidiiStatus.className = 'status';
       fiidiiLoading.style.display = 'block';
       fiidiiEmpty.style.display = 'none';
       fiidiiContent.style.display = 'none';
       try {
-        const r = await fetch('/api/stocks/fii-dii-trends/refresh', { method: 'POST' });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'refresh failed');
+        const d = await postRefreshJson('/api/stocks/fii-dii-trends/refresh', 'FII/DII trends');
         renderFiidiiPayload(d);
+        return d;
       } catch (e) {
         fiidiiLoading.style.display = 'none';
         fiidiiEmpty.style.display = 'block';
         fiidiiEmpty.textContent = 'Refresh error: ' + e.message;
         fiidiiStatus.textContent = 'Error: ' + e.message;
         fiidiiStatus.className = 'status err';
-      } finally {
-        btnFiidiiRefresh.disabled = false;
+        throw e;
       }
-    });
+    }
 
     // ---------- Relative Strength ----------
-    const btnRsRefresh = document.getElementById('btnRsRefresh');
     const rsStatus = document.getElementById('rsStatus');
     const rsLoading = document.getElementById('rsLoading');
     const rsEmpty = document.getElementById('rsEmpty');
@@ -2500,6 +2594,8 @@
         rsEmpty.style.display = 'block';
         rsEmpty.textContent = d.message || 'No RS rows.';
         rsContent.style.display = 'none';
+        rsStatus.textContent = d.message || 'No RS rows.';
+        rsStatus.className = d.message ? 'status warn' : 'status';
         return;
       }
       rsEmpty.style.display = 'none';
@@ -2512,8 +2608,14 @@
         `<strong>Outperformers:</strong> ${fmt(d.passed)} of ${fmt(d.scanned)}`;
       _rsRowsCache = rows;
       renderRsTable();
-      rsStatus.textContent = `${rows.length} outperformers shown (${fmt(d.passed)} passed / ${fmt(d.scanned)} scanned)${refreshStamp(d)}.`;
-      rsStatus.className = 'status ok';
+      const summary = `${rows.length} outperformers shown (${fmt(d.passed)} passed / ${fmt(d.scanned)} scanned)${refreshStamp(d)}.`;
+      if (d.stale && d.message) {
+        rsStatus.textContent = d.message + ' ' + summary;
+        rsStatus.className = 'status warn';
+      } else {
+        rsStatus.textContent = summary;
+        rsStatus.className = 'status ok';
+      }
     }
 
     document.querySelectorAll('#rsTable th[data-sort]').forEach(th => {
@@ -2526,24 +2628,34 @@
       });
     });
 
-    async function loadRelativeStrength() {
+    let _rsLoadedKey = null;
+
+    async function loadRelativeStrength(force = false) {
+      const cacheKey = rsOnlyOuter?.checked ? 'outer' : 'all';
+      if (!force && _rsLoadedKey === cacheKey && rsContent.style.display !== 'none') return;
       rsLoading.style.display = 'block';
+      rsLoading.textContent = 'Loading saved RS scan…';
       rsEmpty.style.display = 'none';
       rsContent.style.display = 'none';
+      rsStatus.textContent = '';
       try {
-        const r = await fetch('/api/stocks/relative-strength');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'load failed');
+        const d = await stocksGetJson('/api/stocks/relative-strength');
         renderRsPayload(d);
+        if ((d.rows || []).length) _rsLoadedKey = cacheKey;
       } catch (e) {
         rsLoading.style.display = 'none';
         rsEmpty.style.display = 'block';
         rsEmpty.textContent = 'Load error: ' + e.message;
+        rsStatus.textContent = 'Error: ' + e.message;
+        rsStatus.className = 'status err';
       }
     }
 
-    btnRsRefresh?.addEventListener('click', async () => {
-      btnRsRefresh.disabled = true;
+    rsOnlyOuter?.addEventListener('change', () => {
+      _rsLoadedKey = null;
+    });
+
+    async function refreshRsTab() {
       rsStatus.textContent = 'Computing RS for NIFTY 500…';
       rsStatus.className = 'status';
       rsLoading.style.display = 'block';
@@ -2556,19 +2668,157 @@
           'Relative strength'
         );
         renderRsPayload(d);
+        _rsLoadedKey = rsOnlyOuter?.checked ? 'outer' : 'all';
+        return d;
       } catch (e) {
         rsLoading.style.display = 'none';
         rsEmpty.style.display = 'block';
         rsEmpty.textContent = 'Refresh error: ' + e.message;
         rsStatus.textContent = 'Error: ' + e.message;
         rsStatus.className = 'status err';
-      } finally {
-        btnRsRefresh.disabled = false;
+        throw e;
       }
-    });
+    }
+
+    // ---------- Minervini Trend Template (SEPA / Stage 2) ----------
+    const minerviniMode = document.getElementById('minerviniMode');
+    const minerviniOnlyFull = document.getElementById('minerviniOnlyFull');
+    const minerviniExtendedOnlyWrap = document.getElementById('minerviniExtendedOnlyWrap');
+    const minerviniDesc = document.getElementById('minerviniDesc');
+    const minerviniPanelHead = document.getElementById('minerviniPanelHead');
+    const minerviniStatus = document.getElementById('minerviniStatus');
+    const minerviniLoading = document.getElementById('minerviniLoading');
+    const minerviniEmpty = document.getElementById('minerviniEmpty');
+    const minerviniContent = document.getElementById('minerviniContent');
+    const minerviniMeta = document.getElementById('minerviniMeta');
+    const minerviniTbody = document.getElementById('minerviniTbody');
+
+    function syncMinerviniModeUi() {
+      const extended = minerviniMode && minerviniMode.value === 'extended';
+      if (minerviniExtendedOnlyWrap) minerviniExtendedOnlyWrap.style.display = extended ? '' : 'none';
+      if (minerviniPanelHead) {
+        minerviniPanelHead.textContent = extended
+          ? 'Extended Stage-2 (sorted by composite score)'
+          : 'Pre-breakout VCP setups (sorted by setup score)';
+      }
+      if (minerviniDesc) {
+        minerviniDesc.innerHTML = extended
+          ? 'Classic <strong>Stage-2 Trend Template</strong> — names already in a strong uptrend near 52-week highs. '
+            + 'Use for confirmation, not early entries.'
+          : '<strong>Pre-breakout VCP</strong> — tight daily base under a pivot, volume dry, higher lows, '
+            + 'close still <em>below</em> pivot (no breakout yet), 200-DMA rising, RS improving, not extended above 50-DMA. '
+            + 'These are setups <em>before</em> the move.';
+      }
+    }
+    minerviniMode?.addEventListener('change', syncMinerviniModeUi);
+    syncMinerviniModeUi();
+
+    function minerviniCriteriaTip(criteria, labels) {
+      if (!criteria) return '';
+      return Object.entries(criteria).map(([k, v]) => {
+        const lbl = (labels && labels[k]) || k;
+        return `${v ? '✓' : '✗'} ${lbl}`;
+      }).join('\n');
+    }
+
+    function renderMinerviniRow(r, idx) {
+      const isSetup = (r.scan_mode || 'setup') === 'setup';
+      const score = isSetup ? r.setup_score : r.composite_score;
+      const pass = isSetup ? r.setup_pass : r.full_pass;
+      const tplCls = pass ? 'pnl-positive' : (r.criteria_passed >= r.criteria_total - 1 ? '' : 'pnl-negative');
+      const tip = minerviniCriteriaTip(r.criteria, window._minerviniLabels || {});
+      const extCls = (v) => {
+        const n = parseFloat(v) || 0;
+        if (n > 15) return 'pnl-negative';
+        if (n < 8) return 'pnl-positive';
+        return '';
+      };
+      return `<tr>
+        <td class="num">${idx + 1}</td>
+        <td class="stock"><strong>${fmt(r.stock)}</strong></td>
+        <td class="num"><strong>${fmtNum(score, 1)}</strong></td>
+        <td class="num">${fmtNum(r.current_price)}</td>
+        <td class="num ${tplCls}" title="${tip.replace(/"/g, '&quot;')}">${r.criteria_passed}/${r.criteria_total}${pass ? ' ✓' : ''}</td>
+        <td class="num ${r.rs_pass ? 'pnl-positive' : 'pnl-negative'}">${fmtNum(r.rs_rank_percentile, 0)}</td>
+        <td class="num">${fmtNum(r.vcp_score, 0)}</td>
+        <td class="num pnl-positive">${fmtNum(r.dist_to_pivot_pct, 1)}%</td>
+        <td class="num" title="${fmtNum(r.base_width_pct, 1)}% wide, ${fmt(r.base_bars)} bars">${fmtNum(r.base_width_pct, 1)}%</td>
+        <td class="num ${extCls(r.pct_above_ma50)}">${fmtNum(r.pct_above_ma50, 1)}%</td>
+        <td class="num">${fmtNum(r.recent_move_20d_pct, 1)}%</td>
+        <td class="num">${fmtNum(r.pivot_price)}</td>
+        <td>${typeof sparklineSvg === 'function' ? sparklineSvg(r.rs_line || [], 100, 26) : '—'}</td>
+        <td style="max-width:220px;font-size:0.76rem;color:var(--text-muted);">${(r.reasons || []).join(' · ') || '—'}</td>
+      </tr>`;
+    }
+
+    function renderMinerviniPayload(d) {
+      minerviniLoading.style.display = 'none';
+      window._minerviniLabels = d.criteria_labels || {};
+      if (minerviniMode && d.scan_mode) minerviniMode.value = d.scan_mode;
+      syncMinerviniModeUi();
+      const rows = d.rows || [];
+      const isSetup = (d.scan_mode || 'setup') === 'setup';
+      if (!rows.length) {
+        minerviniEmpty.style.display = 'block';
+        minerviniEmpty.textContent = d.message || 'No Minervini candidates.';
+        minerviniContent.style.display = 'none';
+        return;
+      }
+      minerviniEmpty.style.display = 'none';
+      minerviniContent.style.display = 'block';
+      minerviniMeta.innerHTML =
+        `<strong>Mode:</strong> ${isSetup ? 'Pre-breakout VCP' : 'Extended Stage-2'} &nbsp;|&nbsp; ` +
+        `<strong>Generated:</strong> ${fmt(d.generated_at).replace('T', ' ')} &nbsp;|&nbsp; ` +
+        `<strong>Pass:</strong> ${fmt(d.passed)} &nbsp;|&nbsp; ` +
+        `<strong>Shown:</strong> ${rows.length}`;
+      minerviniTbody.innerHTML = rows.map((r, i) => renderMinerviniRow(r, i)).join('');
+      minerviniStatus.textContent =
+        `${d.passed || 0} ${isSetup ? 'setups' : 'Stage-2 pass'} · ${rows.length} shown · ${fmt(d.scanned)} scanned${refreshStamp(d)}.`;
+      minerviniStatus.className = 'status ok';
+    }
+
+    async function loadMinerviniTemplate() {
+      minerviniLoading.style.display = 'block';
+      minerviniEmpty.style.display = 'none';
+      minerviniContent.style.display = 'none';
+      try {
+        const d = await stocksGetJson('/api/stocks/minervini-template');
+        renderMinerviniPayload(d);
+      } catch (e) {
+        minerviniLoading.style.display = 'none';
+        minerviniEmpty.style.display = 'block';
+        minerviniEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    async function refreshMinerviniTab() {
+      const mode = minerviniMode ? minerviniMode.value : 'setup';
+      minerviniStatus.textContent = mode === 'setup'
+        ? 'Scanning for pre-breakout VCP setups…'
+        : 'Running extended Stage-2 scan…';
+      minerviniStatus.className = 'status';
+      minerviniLoading.style.display = 'block';
+      minerviniEmpty.style.display = 'none';
+      minerviniContent.style.display = 'none';
+      try {
+        const full = minerviniOnlyFull && minerviniOnlyFull.checked ? 'true' : 'false';
+        const d = await postRefreshJson(
+          `/api/stocks/minervini-template/refresh?mode=${encodeURIComponent(mode)}&only_full_pass=${full}`,
+          'Minervini scan'
+        );
+        renderMinerviniPayload(d);
+        return d;
+      } catch (e) {
+        minerviniLoading.style.display = 'none';
+        minerviniEmpty.style.display = 'block';
+        minerviniEmpty.textContent = 'Refresh error: ' + e.message;
+        minerviniStatus.textContent = 'Error: ' + e.message;
+        minerviniStatus.className = 'status err';
+        throw e;
+      }
+    }
 
     // ---------- Intraday Relative Strength (15-min, vs NIFTY 50) ----------
-    const btnIntradayRsRefresh = document.getElementById('btnIntradayRsRefresh');
     const intradayRsStatus = document.getElementById('intradayRsStatus');
     const intradayRsMeta = document.getElementById('intradayRsMeta');
     const intradayRsLoading = document.getElementById('intradayRsLoading');
@@ -2701,9 +2951,7 @@
       intradayRsEmpty.style.display = 'none';
       intradayRsContent.style.display = 'none';
       try {
-        const r = await fetch('/api/stocks/intraday-rs');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'load failed');
+        const d = await stocksGetJson('/api/stocks/intraday-rs');
         renderIntradayRsPayload(d);
       } catch (e) {
         intradayRsLoading.style.display = 'none';
@@ -2712,8 +2960,7 @@
       }
     }
 
-    btnIntradayRsRefresh?.addEventListener('click', async () => {
-      btnIntradayRsRefresh.disabled = true;
+    async function refreshIntradayRsTab() {
       intradayRsStatus.textContent = 'Computing intraday RS from 15-min cache…';
       intradayRsStatus.className = 'status';
       intradayRsLoading.style.display = 'block';
@@ -2722,20 +2969,19 @@
       try {
         const d = await postRefreshJson('/api/stocks/intraday-rs/refresh', 'Intraday RS');
         renderIntradayRsPayload(d);
+        return d;
       } catch (e) {
         intradayRsLoading.style.display = 'none';
         intradayRsEmpty.style.display = 'block';
         intradayRsEmpty.textContent = 'Refresh error: ' + e.message;
         intradayRsStatus.textContent = 'Error: ' + e.message;
         intradayRsStatus.className = 'status err';
-      } finally {
-        btnIntradayRsRefresh.disabled = false;
+        throw e;
       }
-    });
+    }
 
 
     // ---------- Sector Relative Strength (15-min, vs NIFTY 50) ----------
-    const btnSectorRsRefresh = document.getElementById('btnSectorRsRefresh');
     const sectorRsStatus = document.getElementById('sectorRsStatus');
     const sectorRsMeta = document.getElementById('sectorRsMeta');
     const sectorRsLoading = document.getElementById('sectorRsLoading');
@@ -2744,6 +2990,7 @@
     const sectorRsTbody = document.getElementById('sectorRsTbody');
     let _sectorRsCache = [];
     let _sectorRsExpanded = null;
+    let _sectorRrgChart = null;
 
     function sectorPct(v) {
       const n = Number(v);
@@ -2817,7 +3064,157 @@
       });
     }
 
-    function renderSectorRsPayload(d) {
+    const RRG_QUAD_COLOR = {
+      leading: '#10b981',
+      weakening: '#eab308',
+      lagging: '#ef4444',
+      improving: '#60a5fa',
+    };
+
+    function renderSectorRrg(rot) {
+      const head = document.getElementById('sectorRotationHeadline');
+      const canvas = document.getElementById('sectorRrgChart');
+      if (!head || !canvas || typeof Chart === 'undefined') return;
+      if (_sectorRrgChart) { _sectorRrgChart.destroy(); _sectorRrgChart = null; }
+
+      const rrg = rot && rot.rrg;
+      const points = (rrg && rrg.points) || [];
+      head.textContent = (rot?.headline || 'Refresh Sector RS to build Relative Rotation Graph.')
+        + (rot?.trail_note ? ` · ${rot.trail_note}` : '');
+
+      if (!points.length) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#71717a';
+          ctx.font = '13px system-ui';
+          ctx.fillText('No RRG data — refresh Sector RS tab', 16, 28);
+        }
+        return;
+      }
+
+      const pivot = (rrg && rrg.pivot) || 100;
+      const top = points.slice(0, 14);
+      const trailDs = top.map(p => ({
+        label: p.sector,
+        data: (p.trail || []).map(t => ({ x: t.rs_ratio, y: t.rs_momentum })),
+        showLine: true,
+        borderColor: 'rgba(161,161,170,0.35)',
+        borderWidth: 1,
+        pointRadius: 0,
+        tension: 0.15,
+      }));
+      const headDs = top.map(p => ({
+        label: p.sector,
+        data: [{ x: p.rs_ratio, y: p.rs_momentum }],
+        showLine: false,
+        pointRadius: 7,
+        pointHoverRadius: 9,
+        backgroundColor: RRG_QUAD_COLOR[p.quadrant] || '#a1a1aa',
+        borderColor: '#0b0b0f',
+        borderWidth: 1,
+      }));
+
+      const xs = points.map(p => p.rs_ratio);
+      const ys = points.map(p => p.rs_momentum);
+      const padX = Math.max(0.8, (Math.max(...xs) - Math.min(...xs)) * 0.12 || 0.8);
+      const padY = Math.max(0.15, (Math.max(...ys) - Math.min(...ys)) * 0.15 || 0.15);
+      const xMin = Math.min(pivot - 1.2, ...xs) - padX;
+      const xMax = Math.max(pivot + 1.2, ...xs) + padX;
+      const yMin = Math.min(-0.2, ...ys) - padY;
+      const yMax = Math.max(0.2, ...ys) + padY;
+
+      _sectorRrgChart = new Chart(canvas, {
+        type: 'scatter',
+        data: { datasets: [...trailDs, ...headDs] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const p = top[ctx.datasetIndex >= trailDs.length
+                    ? ctx.datasetIndex - trailDs.length
+                    : Math.min(ctx.datasetIndex, top.length - 1)];
+                  if (!p) return ctx.dataset.label || '';
+                  return `${p.sector}: RS ${p.rs_ratio.toFixed(2)} · Mom ${p.rs_momentum >= 0 ? '+' : ''}${p.rs_momentum.toFixed(2)}% (${p.quadrant})`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              min: xMin,
+              max: xMax,
+              title: { display: true, text: rrg.x_label || 'RS-Ratio', color: '#a1a1aa' },
+              grid: { color: 'rgba(255,255,255,0.06)' },
+              ticks: { color: '#71717a' },
+            },
+            y: {
+              type: 'linear',
+              min: yMin,
+              max: yMax,
+              title: { display: true, text: rrg.y_label || 'RS-Momentum', color: '#a1a1aa' },
+              grid: { color: 'rgba(255,255,255,0.06)' },
+              ticks: { color: '#71717a' },
+            },
+          },
+        },
+        plugins: [{
+          id: 'rrgQuadrants',
+          beforeDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea) return;
+            const x0 = scales.x.getPixelForValue(pivot);
+            const y0 = scales.y.getPixelForValue(0);
+            const fills = [
+              ['rgba(16,185,129,0.07)', chartArea.left, chartArea.top, x0 - chartArea.left, y0 - chartArea.top],
+              ['rgba(234,179,8,0.07)', x0, chartArea.top, chartArea.right - x0, y0 - chartArea.top],
+              ['rgba(239,68,68,0.07)', chartArea.left, y0, x0 - chartArea.left, chartArea.bottom - y0],
+              ['rgba(59,130,246,0.07)', x0, y0, chartArea.right - x0, chartArea.bottom - y0],
+            ];
+            fills.forEach(([c, x, y, w, h]) => {
+              ctx.fillStyle = c;
+              ctx.fillRect(x, y, w, h);
+            });
+            ctx.strokeStyle = 'rgba(161,161,170,0.45)';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x0, chartArea.top);
+            ctx.lineTo(x0, chartArea.bottom);
+            ctx.moveTo(chartArea.left, y0);
+            ctx.lineTo(chartArea.right, y0);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          },
+        }, {
+          id: 'rrgLabels',
+          afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            top.forEach((p, i) => {
+              const dsIndex = trailDs.length + i;
+              const meta = chart.getDatasetMeta(dsIndex);
+              const el = meta.data[0];
+              if (!el) return;
+              ctx.save();
+              ctx.font = '10px system-ui';
+              ctx.fillStyle = '#e4e4e7';
+              ctx.fillText(p.sector.length > 22 ? p.sector.slice(0, 20) + '…' : p.sector, el.x + 8, el.y - 4);
+              ctx.restore();
+            });
+          },
+        }],
+      });
+    }
+
+    function renderSectorRotation(rot) {
+      renderSectorRrg(rot);
+    }
+
+    function renderSectorRsPayload(d, rotation) {
       sectorRsLoading.style.display = 'none';
       const sectors = d.sectors || [];
       const nifty = d.nifty || null;
@@ -2847,6 +3244,7 @@
       }
       _sectorRsCache = sectors;
       _sectorRsExpanded = null;
+      renderSectorRotation(rotation || d.sector_rotation);
       renderSectorRsTable();
       sectorRsStatus.textContent =
         `${sectors.length} sectors, ${fmt(d.passed || 0)} of ${fmt(d.scanned || 0)} stocks${refreshStamp(d)}.`;
@@ -2858,10 +3256,11 @@
       sectorRsEmpty.style.display = 'none';
       sectorRsContent.style.display = 'none';
       try {
-        const r = await fetch('/api/stocks/sector-rs');
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.detail || 'load failed');
-        renderSectorRsPayload(d);
+        const [d, rot] = await Promise.all([
+          stocksGetJson('/api/stocks/sector-rs'),
+          stocksGetJson('/api/stocks/sector-rotation'),
+        ]);
+        renderSectorRsPayload(d, rot);
       } catch (e) {
         sectorRsLoading.style.display = 'none';
         sectorRsEmpty.style.display = 'block';
@@ -2869,30 +3268,172 @@
       }
     }
 
-    btnSectorRsRefresh?.addEventListener('click', async () => {
-      btnSectorRsRefresh.disabled = true;
-      sectorRsStatus.textContent = 'Computing sector RS from 15-min cache…';
+    async function refreshSectorRsTab() {
+      sectorRsStatus.textContent = 'Computing sector RS + rotation from 15-min cache…';
       sectorRsStatus.className = 'status';
       sectorRsLoading.style.display = 'block';
       sectorRsEmpty.style.display = 'none';
       sectorRsContent.style.display = 'none';
       try {
         const d = await postRefreshJson('/api/stocks/sector-rs/refresh', 'Sector RS');
-        renderSectorRsPayload(d);
+        renderSectorRsPayload(d, d.sector_rotation);
+        return d;
       } catch (e) {
         sectorRsLoading.style.display = 'none';
         sectorRsEmpty.style.display = 'block';
         sectorRsEmpty.textContent = 'Refresh error: ' + e.message;
         sectorRsStatus.textContent = 'Error: ' + e.message;
         sectorRsStatus.className = 'status err';
-      } finally {
-        btnSectorRsRefresh.disabled = false;
+        throw e;
       }
+    }
+
+    async function refreshTomorrowWatchlistTab() {
+      const d = await postRefreshJson('/api/stocks/tomorrow-watchlist/refresh', 'Tomorrow watchlist');
+      await loadTomorrowWatchlist();
+      return d;
+    }
+
+    let _dashboardRefreshing = false;
+
+    const TAB_REFRESH_FNS = {
+      eod: refreshEodTab,
+      tomorrow: refreshTomorrowWatchlistTab,
+      silent: refreshSilentTab,
+      fiidii: refreshFiidiiTab,
+      rs: refreshRsTab,
+      minervini: refreshMinerviniTab,
+      'intraday-rs': refreshIntradayRsTab,
+      'sector-rs': refreshSectorRsTab,
+      instvol: refreshInstVolTab,
+    };
+
+    function setRefreshControlsDisabled(disabled) {
+      if (btnRefreshAll) btnRefreshAll.disabled = disabled;
+      document.querySelectorAll('.btn-tab-refresh').forEach(btn => { btn.disabled = disabled; });
+    }
+
+    async function runRefreshStep(step, stepNum, totalSteps) {
+      setRefreshAllStatus(`Step ${stepNum}/${totalSteps}: ${step.label}…`, null);
+      try {
+        const result = await step.fn();
+        return { ok: true, label: step.label, result };
+      } catch (e) {
+        console.error(`Refresh failed (${step.label}):`, e);
+        return { ok: false, label: step.label, error: e.message || String(e) };
+      }
+    }
+
+    async function refreshTabByKey(key) {
+      const fn = TAB_REFRESH_FNS[key];
+      if (!fn) throw new Error('Unknown tab refresh: ' + key);
+      if (_dashboardRefreshing) {
+        setRefreshAllStatus('Dashboard refresh already running…', null);
+        return;
+      }
+      setRefreshControlsDisabled(true);
+      setRefreshAllStatus(`Refreshing ${key}…`, null);
+      try {
+        const result = await fn();
+        setRefreshAllStatus(`${key} refreshed.`, true);
+        if (result?.trade_date) setRefreshAllMeta(new Date().toISOString(), result.trade_date);
+      } catch (e) {
+        setRefreshAllStatus(`${key} failed: ${e.message}`, false);
+      } finally {
+        setRefreshControlsDisabled(false);
+      }
+    }
+
+    async function reloadAllDesignatedTabs() {
+      await Promise.allSettled([
+        loadTomorrowWatchlist(),
+        loadSilentAccumulation(),
+        loadFiiDiiTrends(),
+        loadRelativeStrength(),
+        loadMinerviniTemplate(),
+        loadIntradayRs(),
+        loadSectorRs(),
+        loadInstitutionalVolume(),
+      ]);
+    }
+
+    async function refreshAllDashboard() {
+      if (_dashboardRefreshing) return;
+      _dashboardRefreshing = true;
+      setRefreshControlsDisabled(true);
+      setRefreshAllStatus('Refreshing dashboard…', null);
+      // Fast stored scans first (parallel pairs). EOD + watchlist are slow live pulls — run last.
+      const scannerSteps = [
+        { label: 'Silent Accumulation', fn: refreshSilentTab },
+        { label: 'FII/DII & OI Trends', fn: refreshFiidiiTab },
+        { label: 'RS vs NIFTY', fn: refreshRsTab },
+        { label: 'Minervini SEPA', fn: refreshMinerviniTab },
+        { label: 'Intraday RS', fn: refreshIntradayRsTab },
+        { label: 'Sector RS', fn: refreshSectorRsTab },
+      ];
+      const slowSteps = [
+        { label: 'Institutional Volume', fn: refreshInstVolTab },
+        { label: 'EOD FnO Analysis', fn: refreshEodTab },
+        { label: 'Watchlist for Tomorrow', fn: refreshTomorrowWatchlistTab },
+      ];
+      const steps = [...scannerSteps, ...slowSteps];
+      const errors = [];
+      let tradeDate = null;
+      let stepNum = 0;
+
+      for (let i = 0; i < scannerSteps.length; i += 2) {
+        const batch = scannerSteps.slice(i, i + 2);
+        const results = await Promise.all(
+          batch.map(step => runRefreshStep(step, ++stepNum, steps.length))
+        );
+        for (const r of results) {
+          if (!r.ok) errors.push(`${r.label}: ${r.error}`);
+          else if (r.result?.trade_date) tradeDate = r.result.trade_date;
+        }
+      }
+
+      for (const step of slowSteps) {
+        const r = await runRefreshStep(step, ++stepNum, steps.length);
+        if (!r.ok) errors.push(`${r.label}: ${r.error}`);
+        else if (r.result?.trade_date) tradeDate = r.result.trade_date;
+      }
+
+      setRefreshAllStatus('Updating tab views…', null);
+      await reloadAllDesignatedTabs();
+      if (errors.length) {
+        setRefreshAllStatus(
+          `Done with ${errors.length} error(s): ${errors.slice(0, 2).join(' · ')}${errors.length > 2 ? '…' : ''}`,
+          false
+        );
+      } else {
+        setRefreshAllStatus(`All ${steps.length} tabs refreshed (30-min & Combined skipped).`, true);
+      }
+      setRefreshAllMeta(new Date().toISOString(), tradeDate);
+      setRefreshControlsDisabled(false);
+      _dashboardRefreshing = false;
+    }
+
+    btnRefreshAll?.addEventListener('click', () => {
+      refreshAllDashboard().catch(e => {
+        console.error('Dashboard refresh crashed:', e);
+        setRefreshAllStatus('Dashboard refresh crashed: ' + (e.message || e), false);
+        setRefreshControlsDisabled(false);
+        _dashboardRefreshing = false;
+      });
     });
 
+    document.querySelectorAll('.btn-tab-refresh').forEach(btn => {
+      btn.addEventListener('click', () => {
+        refreshTabByKey(btn.dataset.refresh).catch(e => {
+          console.error('Tab refresh crashed:', e);
+          setRefreshControlsDisabled(false);
+          _dashboardRefreshing = false;
+        });
+      });
+    });
 
     // Allow opening new tabs by hash
-    if (['#silent', '#fiidii', '#rs', '#intraday-rs', '#sector-rs', '#instvol'].includes(window.location.hash)) {
+    if (['#silent', '#fiidii', '#rs', '#minervini', '#intraday-rs', '#sector-rs', '#instvol'].includes(window.location.hash)) {
       const tab = window.location.hash.replace('#', '');
       document.querySelector(`.tab[data-tab="${tab}"]`)?.click();
     }
