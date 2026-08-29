@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The 30-Day Option Buyer's Field Guide</title>
+<style>
+  :root{
+    --bg:#0a0e13; --panel:#111823; --panel2:#0e141d; --line:#1e2733;
+    --txt:#e6edf3; --muted:#94a3b8; --dim:#64748b;
+    --green:#22c55e; --red:#ef4444; --amber:#f59e0b; --blue:#38bdf8; --violet:#a78bfa;
+    --shadow:0 8px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.65;font-size:16px}
+  a{color:var(--blue);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .layout{display:grid;grid-template-columns:270px 1fr;max-width:1500px;margin:0 auto}
+  /* sidebar */
+  nav.side{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    padding:1.4rem 1rem;border-right:1px solid var(--line);background:var(--panel2)}
+  nav.side h2{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:1.2rem .4rem .4rem}
+  nav.side a{display:block;color:var(--muted);padding:.28rem .5rem;border-radius:7px;font-size:.86rem}
+  nav.side a:hover{background:#182130;color:var(--txt);text-decoration:none}
+  nav.side .brand{font-weight:800;font-size:1rem;color:var(--txt);padding:.2rem .4rem 0}
+  nav.side .brand span{color:var(--green)}
+  main{padding:0 clamp(1rem,4vw,3.2rem) 6rem;min-width:0}
+  /* hero */
+  header.hero{position:relative;margin:0 0 2.5rem;border-radius:0 0 18px 18px;overflow:hidden}
+  header.hero img{width:100%;display:block;max-height:340px;object-fit:cover}
+  header.hero .overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;
+    padding:2rem clamp(1.2rem,4vw,3rem);background:linear-gradient(180deg,rgba(10,14,19,.1) 0%,rgba(10,14,19,.92) 100%)}
+  header.hero h1{font-size:clamp(1.6rem,4vw,2.7rem);margin:0 0 .4rem;font-weight:800;letter-spacing:-.02em}
+  header.hero p{margin:0;color:var(--muted);max-width:720px;font-size:1.02rem}
+  .kicker{display:inline-block;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--green);font-weight:700;margin-bottom:.5rem}
+  h2.section{font-size:1.5rem;margin:3rem 0 .4rem;letter-spacing:-.01em;scroll-margin-top:1rem}
+  .phase-band{display:flex;align-items:center;gap:.9rem;margin:3.4rem 0 1.2rem;padding:1rem 1.2rem;
+    border-radius:14px;border:1px solid var(--line);background:linear-gradient(90deg,var(--panel),transparent)}
+  .phase-band .num{font-size:1.9rem;font-weight:800;color:var(--green);line-height:1}
+  .phase-band h2{margin:0;font-size:1.3rem;scroll-margin-top:1rem}
+  .phase-band p{margin:.15rem 0 0;color:var(--muted);font-size:.9rem}
+  .lead{color:var(--muted);font-size:1.05rem;max-width:760px}
+  /* day cards */
+  .day{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;
+    margin:1rem 0;box-shadow:var(--shadow);scroll-margin-top:1rem}
+  .day-head{display:flex;align-items:baseline;gap:.8rem;margin-bottom:.5rem}
+  .day-head .d{font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--bg);
+    background:var(--green);padding:.2rem .55rem;border-radius:20px;white-space:nowrap}
+  .day-head h3{margin:0;font-size:1.15rem}
+  .day h4{margin:1rem 0 .3rem;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+  .day h4.why{color:var(--amber)}
+  .day h4.drill{color:var(--green)}
+  .day p{margin:.3rem 0}
+  .callout{border-left:3px solid var(--amber);background:#171307;border-radius:0 10px 10px 0;
+    padding:.7rem .9rem;margin:.9rem 0;font-size:.93rem}
+  .callout.rule{border-color:var(--green);background:#0c1710}
+  .callout.trap{border-color:var(--red);background:#1a0d0d}
+  .callout b{color:var(--txt)}
+  .tag{color:var(--dim);font-size:.85rem}
+  figure{margin:1.2rem 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem}
+  figure svg{width:100%;height:auto;display:block}
+  figcaption{color:var(--muted);font-size:.83rem;margin-top:.6rem;text-align:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  code{background:#0c1119;border:1px solid var(--line);border-radius:5px;padding:.05rem .35rem;font-size:.9em;color:#e2e8f0}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;padding:.12rem .5rem;border-radius:20px;margin-right:.3rem}
+  .pill.ce{background:rgba(239,68,68,.15);color:#fca5a5}
+  .pill.pe{background:rgba(34,197,94,.15);color:#86efac}
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.92rem}
+  th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+  .disclaimer{margin:3rem 0 0;padding:1.2rem 1.4rem;border:1px dashed var(--red);border-radius:12px;
+    background:#150c0c;color:var(--muted);font-size:.9rem}
+  .toolbox{background:linear-gradient(135deg,#0c1a12,#0e141d);border:1px solid #1c3327;border-radius:14px;padding:1.2rem 1.4rem;margin:1rem 0}
+  .toolbox h3{margin:.1rem 0 .5rem;color:var(--green)}
+  .svg-lbl{fill:var(--muted);font-size:12px;font-family:inherit}
+  .svg-axis{stroke:#334155;stroke-width:1}
+  .svg-grid{stroke:#1c2734;stroke-width:1;stroke-dasharray:3 3}
+  @media(max-width:900px){
+    .layout{grid-template-columns:1fr}
+    nav.side{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}
+    .grid2{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="side">
+    <div class="brand">Option Buyer's <span>Field Guide</span></div>
+    <h2>Start</h2>
+    <a href="#intro">How to use this</a>
+    <a href="#mindset">The buyer's edge (read first)</a>
+    <h2>Phase 1 · Foundations</h2>
+    <a href="#d1">D1 · What an option is</a>
+    <a href="#d2">D2 · Calls, puts & payoff</a>
+    <a href="#d3">D3 · Moneyness</a>
+    <a href="#d4">D4 · Premium anatomy</a>
+    <a href="#d5">D5 · Expiry mechanics</a>
+    <a href="#d6">D6 · The buyer's problem</a>
+    <h2>Phase 2 · The Greeks</h2>
+    <a href="#d7">D7 · Delta</a>
+    <a href="#d8">D8 · Gamma</a>
+    <a href="#d9">D9 · Theta</a>
+    <a href="#d10">D10 · Vega</a>
+    <a href="#d11">D11 · Greeks gang up</a>
+    <a href="#d12">D12 · Picking a strike</a>
+    <a href="#d13">D13 · Greeks review</a>
+    <h2>Phase 3 · Volatility</h2>
+    <a href="#d14">D14 · Implied Volatility</a>
+    <a href="#d15">D15 · IV Percentile</a>
+    <a href="#d16">D16 · IV crush</a>
+    <a href="#d17">D17 · Expected move</a>
+    <a href="#d18">D18 · Realized vs implied</a>
+    <a href="#d19">D19 · Vol regime</a>
+    <h2>Phase 4 · Reading the tape</h2>
+    <a href="#d20">D20 · VWAP</a>
+    <a href="#d21">D21 · OI + premium flow</a>
+    <a href="#d22">D22 · PCR & skew</a>
+    <a href="#d23">D23 · Levels</a>
+    <a href="#d24">D24 · Confluence</a>
+    <a href="#d25">D25 · Regime & runners</a>
+    <h2>Phase 5 · Trader craft</h2>
+    <a href="#d26">D26 · Risk & sizing</a>
+    <a href="#d27">D27 · Exits</a>
+    <a href="#d28">D28 · Journaling</a>
+    <a href="#d29">D29 · Psychology</a>
+    <a href="#d30">D30 · Your playbook</a>
+    <h2>End</h2>
+    <a href="#principles">10 laws</a>
+    <a href="#disclaimer">Reality check</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <img src="assets/option_guide_hero.png" alt="Option buying field guide">
+      <div class="overlay">
+        <span class="kicker">30 days · one concept a day · built to be traded</span>
+        <h1>The Option Buyer's Field Guide</h1>
+        <p>A month-long, no-fluff path from "what is a call" to a written, tested intraday
+        option-buying playbook — with the exact filters that stop you from buying on the wrong day.</p>
+      </div>
+    </header>
+
+    <section id="intro">
+      <span class="kicker">How to use this</span>
+      <h2 class="section" style="margin-top:.3rem">Read one day. Do the drill. Don't skip.</h2>
+      <p class="lead">Each day is a <b>concept</b>, <b>why it matters specifically to a buyer</b> (long premium),
+      and a <b>drill</b> you can finish in 20–40 minutes. The first two weeks are paper only.
+      You are not allowed to risk real money until Day 20 — and only then in tiny size.</p>
+      <div class="grid2">
+        <div class="callout rule"><b>The rule of the month:</b> observe first, trade last.
+        Screen-time on live price + option chain beats any book. Log everything from Day 1.</div>
+        <div class="callout trap"><b>The trap this guide kills:</b> "I was right on direction but still lost money."
+        That sentence is the whole reason options buyers bleed. By Day 19 you'll know exactly why.</div>
+      </div>
+    </section>
+
+    <section id="mindset">
+      <h2 class="section">The buyer's edge — and its price</h2>
+      <p>When you <b>buy</b> an option you have <b>defined risk</b> (max loss = premium paid) and
+      <b>unlimited/​large upside</b>. That asymmetry is the attraction. The price you pay for it:</p>
+      <ul>
+        <li><b>Time decay (theta)</b> works against you every single day — you are renting the position.</li>
+        <li>You need <b>direction + speed + size of move</b> all correct, not just direction.</li>
+        <li>Most out-of-the-money options <b>expire worthless.</b> The seller collecting your premium knows this.</li>
+      </ul>
+      <p>So a buyer's whole job is to <b>only pay rent when the building is about to move</b> — enter when a
+      real move is likely and soon, and refuse to buy on quiet, choppy, decaying days. Everything below
+      builds toward being able to tell those two situations apart, mechanically.</p>
+      <figure>
+        <!-- asymmetry payoff -->
+        <svg viewBox="0 0 720 240" role="img" aria-label="Long call payoff">
+          <line x1="60" y1="30" x2="60" y2="200" class="svg-axis"/>
+          <line x1="60" y1="160" x2="690" y2="160" class="svg-axis"/>
+          <line x1="60" y1="160" x2="360" y2="160" stroke="var(--red)" stroke-width="3"/>
+          <line x1="360" y1="160" x2="640" y2="55" stroke="var(--green)" stroke-width="3"/>
+          <line x1="360" y1="30" x2="360" y2="200" class="svg-grid"/>
+          <circle cx="360" cy="160" r="4" fill="var(--amber)"/>
+          <text x="360" y="220" text-anchor="middle" class="svg-lbl">Strike + premium (break-even)</text>
+          <text x="150" y="150" class="svg-lbl" fill="#fca5a5">loss capped at premium paid</text>
+          <text x="470" y="90" class="svg-lbl" fill="#86efac">profit grows with the move →</text>
+          <text x="40" y="40" class="svg-lbl" transform="rotate(-90 40 40)">P&amp;L at expiry</text>
+          <text x="640" y="180" class="svg-lbl">underlying price →</text>
+        </svg>
+        <figcaption>Long call at expiry: your downside is a flat, known number; your upside is open-ended. That is the buyer's bargain.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ PHASE 1 ============ -->
+    <div class="phase-band" id="phase1">
+      <div class="num">1</div>
+      <div><h2>Foundations</h2><p>Days 1–6 · what you're actually buying and how it pays off</p></div>
+    </div>
+
+    <article class="day" id="d1">
+      <div class="day-head"><span class="d">DAY 01</span><h3>What an option really is</h3></div>
+      <h4>Concept</h4>
+      <p>An option is a <b>contract</b> giving the buyer the <b>right, not the obligation</b>, to buy (call)
+      or sell (put) an underlying at a fixed <b>strike</b> price before/at <b>expiry</b>. The buyer pays a
+      <b>premium</b>; the seller (writer) receives it and takes on the obligation. In India you trade index
+      options (NIFTY, BANKNIFTY, FINNIFTY, SENSEX) in fixed <b>lots</b>, with <b>weekly and monthly</b> expiries,
+      cash-settled.</p>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>You are not buying the index. You are buying a <b>time-limited, leveraged bet on movement</b>. Leverage
+      cuts both ways: a small premium controls a large notional, so percentage swings on the premium are violent.</p>
+      <h4 class="drill">Drill</h4>
+      <p>Open your broker's option chain for the nearest weekly NIFTY expiry. Note the lot size, the ATM strike,
+      and the premium of the ATM call and put. Write down: "If I buy 1 lot of the ATM call, my max loss in ₹ is ___."</p>
+      <div class="callout rule"><b>Rule:</b> before every trade you must be able to say your max loss in rupees. For a buyer it's always <code>premium × lot size × lots</code>.</div>
+    </article>
+
+    <article class="day" id="d2">
+      <div class="day-head"><span class="d">DAY 02</span><h3>Calls, puts & the payoff diagram</h3></div>
+      <h4>Concept</h4>
+      <p>A <b>call</b> gains when the underlying rises above strike; a <b>put</b> gains when it falls below strike.
+      At expiry the payoff is a "hockey stick": flat (you lose only premium) until the strike, then linear.</p>
+      <figure>
+        <div class="grid2">
+          <svg viewBox="0 0 340 200" aria-label="Long call">
+            <line x1="40" y1="20" x2="40" y2="170" class="svg-axis"/><line x1="40" y1="135" x2="320" y2="135" class="svg-axis"/>
+            <line x1="40" y1="135" x2="170" y2="135" stroke="var(--red)" stroke-width="3"/>
+            <line x1="170" y1="135" x2="310" y2="40" stroke="var(--green)" stroke-width="3"/>
+            <text x="175" y="190" text-anchor="middle" class="svg-lbl">Long CALL — bullish</text>
+          </svg>
+          <svg viewBox="0 0 340 200" aria-label="Long put">
+            <line x1="40" y1="20" x2="40" y2="170" class="svg-axis"/><line x1="40" y1="135" x2="320" y2="135" class="svg-axis"/>
+            <line x1="40" y1="40" x2="180" y2="135" stroke="var(--green)" stroke-width="3"/>
+            <line x1="180" y1="135" x2="310" y2="135" stroke="var(--red)" stroke-width="3"/>
+            <text x="175" y="190" text-anchor="middle" class="svg-lbl">Long PUT — bearish</text>
+          </svg>
+        </div>
+        <figcaption>Green = profit zone, red = the region where you only lose the premium you paid.</figcaption>
+      </figure>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>Your <b>break-even</b> is not the strike — it's <b>strike ± premium</b>. The market must move past your
+      break-even <em>before expiry</em> for you to make money. That gap is the seller's cushion.</p>
+      <h4 class="drill">Drill</h4>
+      <p>For today's ATM call, compute the break-even. Then check how many points the index must move (and by when)
+      to reach it. Ask: "Does the index normally move that much in the time I plan to hold?"</p>
+    </article>
+
+    <article class="day" id="d3">
+      <div class="day-head"><span class="d">DAY 03</span><h3>Moneyness: ITM, ATM, OTM</h3></div>
+      <h4>Concept</h4>
+      <p><b>ITM</b> (in-the-money) has real exercise value; <b>ATM</b> sits at the current price; <b>OTM</b> is
+      pure hope — all time value. Deep OTM options are cheap because they probably expire worthless.</p>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>Cheap ≠ good. OTM options have low delta (barely respond to the move) and decay fastest in % terms.
+      <b>Slightly ITM / ATM</b> options track the underlying better and are the workhorse for directional buyers.</p>
+      <div class="callout trap"><b>Trap:</b> the lure of "₹5 options that can become ₹50." They usually become ₹0.
+      Lottery tickets are a strategy only with tiny, pre-defined lottery money.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Line up three strikes (one ITM, ATM, one OTM). Watch them for 30 minutes live. Note how much each moves
+      for the same 20-point index move. You are watching <b>delta</b> before we name it.</p>
+    </article>
+
+    <article class="day" id="d4">
+      <div class="day-head"><span class="d">DAY 04</span><h3>Premium anatomy: intrinsic + time value</h3></div>
+      <h4>Concept</h4>
+      <p>Premium = <b>intrinsic value</b> (how deep ITM it is, ≥0) + <b>extrinsic / time value</b> (everything else:
+      time left × volatility). ATM options are almost entirely time value.</p>
+      <figure>
+        <svg viewBox="0 0 720 230" aria-label="Intrinsic vs extrinsic value">
+          <line x1="60" y1="20" x2="60" y2="185" class="svg-axis"/>
+          <line x1="60" y1="185" x2="690" y2="185" class="svg-axis"/>
+          <!-- intrinsic (call) -->
+          <polyline points="60,185 375,185 660,70" fill="none" stroke="var(--green)" stroke-width="2.5"/>
+          <!-- total premium curve above intrinsic -->
+          <path d="M60,150 Q375,120 375,150 Q450,120 660,55" fill="none" stroke="var(--blue)" stroke-width="2.5"/>
+          <line x1="375" y1="20" x2="375" y2="185" class="svg-grid"/>
+          <text x="375" y="205" text-anchor="middle" class="svg-lbl">ATM (strike = spot)</text>
+          <text x="120" y="140" class="svg-lbl">OTM</text><text x="120" y="170" class="svg-lbl" fill="#94a3b8">← all time value</text>
+          <text x="560" y="90" class="svg-lbl" fill="#86efac">intrinsic (ITM)</text>
+          <text x="470" y="70" class="svg-lbl" fill="#7dd3fc">market premium</text>
+          <text x="300" y="112" class="svg-lbl" fill="#94a3b8">time-value bump peaks ATM</text>
+        </svg>
+        <figcaption>The gap between the blue (what you pay) and green (intrinsic) line is time value — the part that melts to zero by expiry.</figcaption>
+      </figure>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>When you buy an OTM/ATM option you are buying a pile of <b>time value that decays to zero.</b> If the move
+      doesn't come, the melt is guaranteed. You are long time value and it is a wasting asset.</p>
+      <h4 class="drill">Drill</h4>
+      <p>For an ITM, ATM and OTM strike, split each premium into intrinsic + time value. See how ATM is ~100% time value.</p>
+    </article>
+
+    <article class="day" id="d5">
+      <div class="day-head"><span class="d">DAY 05</span><h3>Expiry mechanics & the settlement trap</h3></div>
+      <h4>Concept</h4>
+      <p>Weekly options expire fast — a Tuesday/Thursday-expiry weekly loses time value hour by hour, and on
+      <b>expiry day</b> the decay is near-vertical. Index options are cash-settled at the expiry-day average.</p>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>Expiry-day ATM buying is a pure <b>gamma-vs-theta</b> fight: huge, fast swings but brutal decay if price
+      stalls. It is the most seductive and most dangerous playground for a beginner.</p>
+      <div class="callout trap"><b>STT / holding-to-expiry trap:</b> letting an ITM option expire can trigger higher
+      settlement costs and slippage vs simply selling it before close. As a buyer, <b>square off; don't "let it settle."</b></div>
+      <h4 class="drill">Drill</h4>
+      <p>On the next expiry day, <b>paper trade only.</b> Track one ATM option's premium every 15 minutes from open to close.
+      Watch how it bleeds when the index goes sideways. Feel the theta.</p>
+    </article>
+
+    <article class="day" id="d6">
+      <div class="day-head"><span class="d">DAY 06</span><h3>The buyer's core problem</h3></div>
+      <h4>Concept</h4>
+      <p>To profit as a buyer you must be right on <b>direction</b>, <b>magnitude</b>, and <b>timing</b> — all three.
+      A seller only needs the move to <em>not</em> happen. That's why sellers win more often but buyers win bigger.</p>
+      <h4 class="why">Why it matters</h4>
+      <p>Your edge is not "predicting more often." It's <b>asymmetry + selectivity</b>: small, frequent, capped losses
+      punctuated by a few large wins on days you correctly identified as explosive. Skipping bad days <em>is</em> the strategy.</p>
+      <div class="callout rule"><b>Rule:</b> a great option buyer trades rarely and sizes the winners. If you're trading every hour, you're the seller's income.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Review your paper log so far. Mark each hypothetical trade as win/loss and write the single reason. Patterns start here.</p>
+    </article>
+
+    <!-- ============ PHASE 2 ============ -->
+    <div class="phase-band" id="phase2">
+      <div class="num">2</div>
+      <div><h2>The Greeks</h2><p>Days 7–13 · the four forces moving your premium</p></div>
+    </div>
+
+    <article class="day" id="d7">
+      <div class="day-head"><span class="d">DAY 07</span><h3>Delta — your directional exposure</h3></div>
+      <h4>Concept</h4>
+      <p><b>Delta</b> = how much the premium moves per 1-point move in the underlying (0→1 for calls, 0→−1 for puts).
+      ATM ≈ 0.5. It doubles as a rough <b>probability of expiring ITM</b>.</p>
+      <figure>
+        <svg viewBox="0 0 720 220" aria-label="Delta curve">
+          <line x1="60" y1="20" x2="60" y2="180" class="svg-axis"/><line x1="60" y1="180" x2="690" y2="180" class="svg-axis"/>
+          <path d="M60,170 C260,168 320,120 375,100 C430,80 500,32 690,30" fill="none" stroke="var(--blue)" stroke-width="3"/>
+          <line x1="375" y1="20" x2="375" y2="180" class="svg-grid"/>
+          <line x1="60" y1="100" x2="690" y2="100" class="svg-grid"/>
+          <text x="30" y="105" class="svg-lbl">0.5</text><text x="375" y="200" text-anchor="middle" class="svg-lbl">ATM</text>
+          <text x="120" y="165" class="svg-lbl">OTM ~0.1</text><text x="600" y="55" class="svg-lbl">ITM ~0.9</text>
+          <text x="40" y="35" class="svg-lbl" transform="rotate(-90 40 35)">delta</text>
+        </svg>
+        <figcaption>Delta is an S-curve: flat when far OTM/ITM, steepest right at the money.</figcaption>
+      </figure>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>Low-delta OTM options barely move on a real rally — you're "right" and still flat. For trend rides, buyers
+      often pick <b>delta 0.5–0.65</b> so the option actually participates.</p>
+      <h4 class="drill">Drill</h4>
+      <p>Find each strike's delta in your chain. Predict the premium change for a 30-point move, then watch and check.</p>
+    </article>
+
+    <article class="day" id="d8">
+      <div class="day-head"><span class="d">DAY 08</span><h3>Gamma — the accelerator</h3></div>
+      <h4>Concept</h4>
+      <p><b>Gamma</b> = how fast delta changes. It's highest <b>at-the-money</b> and <b>near expiry</b>. High gamma
+      means a small move can rocket a near-worthless option — and reverse just as fast.</p>
+      <figure>
+        <svg viewBox="0 0 720 200" aria-label="Gamma bell">
+          <line x1="60" y1="20" x2="60" y2="165" class="svg-axis"/><line x1="60" y1="165" x2="690" y2="165" class="svg-axis"/>
+          <path d="M60,163 C300,160 330,40 375,40 C420,40 450,160 690,163" fill="none" stroke="var(--violet)" stroke-width="3"/>
+          <line x1="375" y1="20" x2="375" y2="165" class="svg-grid"/>
+          <text x="375" y="185" text-anchor="middle" class="svg-lbl">ATM = peak gamma</text>
+          <text x="40" y="35" class="svg-lbl" transform="rotate(-90 40 35)">gamma</text>
+        </svg>
+        <figcaption>Gamma peaks ATM and explodes near expiry — the engine behind expiry-day "10x" moves (and blow-ups).</figcaption>
+      </figure>
+      <h4 class="why">Why it matters</h4>
+      <p>Gamma is the buyer's friend on a fast move and enemy in chop (whipsaws your delta). It's why expiry-day ATM
+      trades feel like a coin-flip on steroids.</p>
+      <h4 class="drill">Drill</h4>
+      <p>On expiry vs a far expiry, compare ATM gamma. Note how the near-expiry premium reacts far more violently to the same move.</p>
+    </article>
+
+    <article class="day" id="d9">
+      <div class="day-head"><span class="d">DAY 09</span><h3>Theta — the rent you pay</h3></div>
+      <h4>Concept</h4>
+      <p><b>Theta</b> = premium lost per day just from time passing. It is <b>negative for buyers</b> and
+      <b>accelerates</b> as expiry approaches, fastest for ATM options.</p>
+      <figure>
+        <svg viewBox="0 0 720 210" aria-label="Theta decay">
+          <line x1="60" y1="20" x2="60" y2="175" class="svg-axis"/><line x1="60" y1="175" x2="690" y2="175" class="svg-axis"/>
+          <path d="M60,45 C300,70 480,110 600,150 C640,165 660,172 680,174" fill="none" stroke="var(--red)" stroke-width="3"/>
+          <text x="90" y="40" class="svg-lbl">premium</text>
+          <text x="560" y="140" class="svg-lbl" fill="#fca5a5">decay accelerates →</text>
+          <text x="620" y="195" class="svg-lbl">expiry</text><text x="70" y="195" class="svg-lbl">many days left</text>
+        </svg>
+        <figcaption>Time value doesn't melt linearly — it falls off a cliff in the final days/hours. Holding and hoping is expensive.</figcaption>
+      </figure>
+      <h4 class="why">Why it matters</h4>
+      <p>Every minute a trade sits still, theta takes money. This is why buyers need the move to come <b>soon</b>, and
+      why a <b>time-stop</b> ("if it hasn't worked in N minutes, exit") is a core buyer tool.</p>
+      <div class="callout rule"><b>Rule:</b> direction can be right and theta still wins if you're early. Enter close to the trigger, not in anticipation.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Track an ATM option on a flat day for one hour. Quantify the ₹ lost to pure decay. That number is your daily rent.</p>
+    </article>
+
+    <article class="day" id="d10">
+      <div class="day-head"><span class="d">DAY 10</span><h3>Vega — your volatility exposure</h3></div>
+      <h4>Concept</h4>
+      <p><b>Vega</b> = premium change per 1% change in implied volatility (IV). <b>Buyers are long vega:</b> rising IV
+      inflates your option, falling IV deflates it — independent of direction.</p>
+      <h4 class="why">Why it matters</h4>
+      <p>You can be right on direction and lose because IV dropped (vega loss). The ideal buy is <b>low IV that then expands</b>.
+      The nightmare is buying <b>high IV that collapses</b> (next day's topic).</p>
+      <h4 class="drill">Drill</h4>
+      <p>Note the ATM IV now. After a sharp index move, note it again. See how IV (and your premium) jumps on fear/expansion.</p>
+    </article>
+
+    <article class="day" id="d11">
+      <div class="day-head"><span class="d">DAY 11</span><h3>When the Greeks gang up on you</h3></div>
+      <h4>Concept</h4>
+      <p>The Greeks act together. Expiry-day ATM: <b>huge gamma</b> (explosive) fights <b>huge theta</b> (brutal decay).
+      A pre-event OTM call: you might win on direction (delta) but lose on <b>IV crush</b> (vega) after the event.</p>
+      <table>
+        <tr><th>Situation</th><th>Helps buyer</th><th>Hurts buyer</th></tr>
+        <tr><td>Fast trend, low IV</td><td>Delta, Gamma, Vega↑</td><td>—</td></tr>
+        <tr><td>Choppy / flat day</td><td>—</td><td>Theta, whipsaw gamma</td></tr>
+        <tr><td>Buy into event (high IV)</td><td>Gamma if it moves</td><td>Vega (IV crush), Theta</td></tr>
+        <tr><td>Expiry-day ATM</td><td>Gamma</td><td>Theta (extreme)</td></tr>
+      </table>
+      <h4 class="drill">Drill</h4>
+      <p>For each of your paper trades, tag which Greek helped and which hurt. This single habit rewires how you pick trades.</p>
+    </article>
+
+    <article class="day" id="d12">
+      <div class="day-head"><span class="d">DAY 12</span><h3>Picking a strike, using the Greeks</h3></div>
+      <h4>Concept</h4>
+      <p>Match the strike to the plan: <b>trend ride</b> → slightly ITM (delta 0.55–0.65, less theta/IV dependence);
+      <b>fast scalp near a level</b> → ATM (max gamma); <b>defined lottery on a breakout</b> → 1 strike OTM, tiny size.</p>
+      <div class="callout"><b>Heuristic:</b> the further OTM you go, the more you need a big <em>and</em> fast move. Beginners systematically buy too far OTM because it's "cheap."</div>
+      <h4 class="drill">Drill</h4>
+      <p>Write a rule: "For an intraday trend trade I will buy the ___ strike (delta ~___), risking ₹___." Commit it to your plan.</p>
+    </article>
+
+    <article class="day" id="d13">
+      <div class="day-head"><span class="d">DAY 13</span><h3>Greeks review — the position checklist</h3></div>
+      <h4>Concept</h4>
+      <p>Before any buy, run the mental checklist: <b>Delta</b> (will it participate?), <b>Gamma</b> (how twitchy near expiry?),
+      <b>Theta</b> (what's my daily rent / time-stop?), <b>Vega</b> (is IV cheap or about to crush?).</p>
+      <h4 class="drill">Drill</h4>
+      <p>Build a one-line pre-trade card with the four Greeks. Use it on 5 paper trades today. If any Greek is clearly against you, skip.</p>
+      <div class="callout rule"><b>Milestone:</b> you now understand <em>why</em> "right on direction, still lost" happens. Phase 3 makes it precise.</div>
+    </article>
+
+    <!-- ============ PHASE 3 ============ -->
+    <div class="phase-band" id="phase3">
+      <div class="num">3</div>
+      <div><h2>Volatility</h2><p>Days 14–19 · the single biggest edge most buyers ignore</p></div>
+    </div>
+
+    <article class="day" id="d14">
+      <div class="day-head"><span class="d">DAY 14</span><h3>Implied Volatility (IV)</h3></div>
+      <h4>Concept</h4>
+      <p><b>IV</b> is the market's expected future volatility, baked into the premium. High IV = expensive options;
+      low IV = cheap. IV rises on fear/uncertainty and falls on calm/after events.</p>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>As a buyer, <b>IV is the price tag on your bet.</b> Buying high-IV options means you overpaid and need an even
+      bigger move just to break even. IV, not just direction, decides your win rate.</p>
+      <h4 class="drill">Drill</h4>
+      <p>Note ATM IV for NIFTY and BANKNIFTY. Compare — BANKNIFTY usually runs higher. Understand "high" is relative to each instrument.</p>
+    </article>
+
+    <article class="day" id="d15">
+      <div class="day-head"><span class="d">DAY 15</span><h3>IV Percentile / IV Rank — the context</h3></div>
+      <h4>Concept</h4>
+      <p>Raw IV is meaningless alone. <b>IV Percentile (IVP)</b> / <b>IV Rank (IVR)</b> tell you where today's IV sits
+      versus its own past year: is volatility cheap or rich <em>for this instrument</em>?</p>
+      <figure>
+        <svg viewBox="0 0 420 240" aria-label="IV percentile gauge">
+          <path d="M60,200 A150,150 0 0 1 360,200" fill="none" stroke="#1c2734" stroke-width="22"/>
+          <path d="M60,200 A150,150 0 0 1 150,72" fill="none" stroke="var(--green)" stroke-width="22"/>
+          <path d="M150,72 A150,150 0 0 1 270,72" fill="none" stroke="var(--amber)" stroke-width="22"/>
+          <path d="M270,72 A150,150 0 0 1 360,200" fill="none" stroke="var(--red)" stroke-width="22"/>
+          <text x="70" y="225" class="svg-lbl" fill="#86efac">Low IVP — buy zone</text>
+          <text x="300" y="225" class="svg-lbl" fill="#fca5a5">High IVP — caution</text>
+          <text x="210" y="150" text-anchor="middle" class="svg-lbl">IVP tells you: cheap or rich?</text>
+        </svg>
+        <figcaption>Rule of thumb for buyers: IVP under ~30–40 = volatility cheap (favorable). Over ~70 = rich (options expensive, IV-crush risk).</figcaption>
+      </figure>
+      <h4 class="drill">Drill</h4>
+      <p>If your platform shows IVP/IVR, record it daily for a week. If not, note this is exactly what a rolling IV history
+      (like the one your own dashboard can store) would compute.</p>
+    </article>
+
+    <article class="day" id="d16">
+      <div class="day-head"><span class="d">DAY 16</span><h3>IV crush — the silent killer</h3></div>
+      <h4>Concept</h4>
+      <p>Before known events (results, RBI policy, budget, big data) IV inflates. Once the event passes, IV
+      <b>collapses</b> and premiums deflate — often instantly. This is <b>IV crush</b>.</p>
+      <div class="callout trap"><b>Classic beginner loss:</b> buy a call before the event, event goes your way, and the
+      option still <em>loses</em> money because IV crushed harder than the move helped. Direction right, trade wrong.</div>
+      <h4 class="why">Why it matters</h4>
+      <p>Never buy elevated IV into an event unless your explicit thesis is a move <em>bigger</em> than the implied
+      expected move. Usually, the event is a reason <b>not</b> to be long premium.</p>
+      <h4 class="drill">Drill</h4>
+      <p>Find the next scheduled event. Track ATM IV before and right after. Watch the crush. Never forget it.</p>
+    </article>
+
+    <article class="day" id="d17">
+      <div class="day-head"><span class="d">DAY 17</span><h3>Expected move & the ATM straddle</h3></div>
+      <h4>Concept</h4>
+      <p>The <b>ATM straddle price</b> (ATM call + ATM put) ≈ the move the market is <b>pricing in</b> for the period.
+      That's your <b>expected move</b>. If your profit target is smaller than the expected move already priced, you're paying up front for a move you need to beat.</p>
+      <figure>
+        <svg viewBox="0 0 720 220" aria-label="Expected move cone">
+          <line x1="60" y1="110" x2="690" y2="110" class="svg-grid"/>
+          <path d="M60,110 L690,40 L690,180 Z" fill="rgba(56,189,248,.10)" stroke="none"/>
+          <line x1="60" y1="110" x2="690" y2="40" stroke="var(--blue)" stroke-width="1.5"/>
+          <line x1="60" y1="110" x2="690" y2="180" stroke="var(--blue)" stroke-width="1.5"/>
+          <circle cx="60" cy="110" r="4" fill="var(--amber)"/>
+          <text x="70" y="100" class="svg-lbl">now (spot)</text>
+          <text x="600" y="30" class="svg-lbl" fill="#7dd3fc">+expected move</text>
+          <text x="600" y="200" class="svg-lbl" fill="#7dd3fc">−expected move</text>
+          <text x="360" y="120" class="svg-lbl">straddle price ≈ the cone width the market already expects</text>
+        </svg>
+        <figcaption>If price stays inside the cone, buyers on both sides bleed. You need a move to the edge or beyond.</figcaption>
+      </figure>
+      <h4 class="drill">Drill</h4>
+      <p>Compute today's expected move from the ATM straddle. Compare with the index's typical daily range. Are your targets realistic?</p>
+    </article>
+
+    <article class="day" id="d18">
+      <div class="day-head"><span class="d">DAY 18</span><h3>Realized vs implied volatility</h3></div>
+      <h4>Concept</h4>
+      <p><b>Realized volatility</b> is how much the underlying <em>actually</em> moved. If realized keeps coming in
+      below implied, sellers are winning and <b>buyers are systematically overpaying</b>.</p>
+      <h4 class="why">Why it matters</h4>
+      <p>A simple, powerful gauge: track a <b>hypothetical long ATM straddle intraday.</b> If it's steadily bleeding,
+      realized &lt; implied — a theta day, hostile to buyers. (This is exactly the logic in your Buyer's Day Meter, Day 25.)</p>
+      <h4 class="drill">Drill</h4>
+      <p>For 3 days, log the ATM straddle at open and close. Note days it expanded (buyer's day) vs decayed (seller's day).</p>
+    </article>
+
+    <article class="day" id="d19">
+      <div class="day-head"><span class="d">DAY 19</span><h3>Volatility regime: expansion vs contraction</h3></div>
+      <h4>Concept</h4>
+      <p>Markets alternate between <b>contraction</b> (coiling, low range, chop) and <b>expansion</b> (trending, wide range).
+      Buyers make money in expansion; they donate it in contraction.</p>
+      <div class="callout rule"><b>Rule:</b> your job is to <b>buy at the start of expansion</b> (low IV, tight range breaking out), not in the middle of a calm range.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Mark the last 10 sessions as "expansion" or "contraction" from the daily chart. Notice they cluster — regimes persist.</p>
+      <div class="callout"><b>Milestone:</b> you can now judge whether options are cheap/rich and whether the day favors buyers <em>before</em> picking a direction.</div>
+    </article>
+
+    <!-- ============ PHASE 4 ============ -->
+    <div class="phase-band" id="phase4">
+      <div class="num">4</div>
+      <div><h2>Reading the tape</h2><p>Days 20–25 · turning price + option-chain flow into a decision</p></div>
+    </div>
+
+    <article class="day" id="d20">
+      <div class="day-head"><span class="d">DAY 20</span><h3>VWAP — intraday fair value</h3></div>
+      <p class="tag">First allowed live trade day — micro size only.</p>
+      <h4>Concept</h4>
+      <p><b>VWAP</b> (volume-weighted average price) is the intraday "fair value." Price <b>above &amp; holding</b> VWAP =
+      buyers in control (favor CE); <b>below</b> = sellers (favor PE). Price repeatedly crossing VWAP = chop.</p>
+      <figure>
+        <div class="grid2">
+          <svg viewBox="0 0 340 180" aria-label="Trend day">
+            <line x1="20" y1="150" x2="320" y2="60" stroke="#334155" stroke-width="1.2" stroke-dasharray="4 3"/>
+            <polyline points="20,150 60,140 100,120 140,125 180,100 220,90 260,70 300,45" fill="none" stroke="var(--green)" stroke-width="2.5"/>
+            <text x="170" y="175" text-anchor="middle" class="svg-lbl">Trend: price rides above VWAP — buyer's day</text>
+          </svg>
+          <svg viewBox="0 0 340 180" aria-label="Chop day">
+            <line x1="20" y1="100" x2="320" y2="100" stroke="#334155" stroke-width="1.2" stroke-dasharray="4 3"/>
+            <polyline points="20,100 60,70 100,120 140,85 180,120 220,80 260,118 300,95" fill="none" stroke="var(--red)" stroke-width="2.5"/>
+            <text x="170" y="175" text-anchor="middle" class="svg-lbl">Chop: price knifes through VWAP — skip</text>
+          </svg>
+        </div>
+        <figcaption>Counting VWAP crosses is a fast chop detector — one of the factors in the Buyer's Day Meter.</figcaption>
+      </figure>
+      <h4 class="drill">Drill</h4>
+      <p>Watch the index vs VWAP for a full session. Count the crosses. Few crosses + one side = tradeable. Many = stand aside.</p>
+    </article>
+
+    <article class="day" id="d21">
+      <div class="day-head"><span class="d">DAY 21</span><h3>OI + premium flow read together</h3></div>
+      <h4>Concept</h4>
+      <p>Open Interest alone lies. Read it <b>with premium</b>. The four combinations tell you what's real:</p>
+      <figure>
+        <svg viewBox="0 0 480 300" aria-label="OI and premium quadrant">
+          <line x1="240" y1="20" x2="240" y2="280" class="svg-axis"/>
+          <line x1="40" y1="150" x2="440" y2="150" class="svg-axis"/>
+          <text x="240" y="14" text-anchor="middle" class="svg-lbl">Premium ↑</text>
+          <text x="240" y="298" text-anchor="middle" class="svg-lbl">Premium ↓</text>
+          <text x="30" y="153" text-anchor="end" class="svg-lbl">OI ↓</text>
+          <text x="450" y="153" class="svg-lbl">OI ↑</text>
+          <text x="340" y="90" text-anchor="middle" fill="#86efac" font-size="13">Long buildup</text>
+          <text x="340" y="108" text-anchor="middle" class="svg-lbl">fresh buying (real)</text>
+          <text x="140" y="90" text-anchor="middle" fill="#7dd3fc" font-size="13">Short covering</text>
+          <text x="140" y="108" text-anchor="middle" class="svg-lbl">price up, positions closing</text>
+          <text x="340" y="210" text-anchor="middle" fill="#fca5a5" font-size="13">Short buildup</text>
+          <text x="340" y="228" text-anchor="middle" class="svg-lbl">fresh writing (real)</text>
+          <text x="140" y="210" text-anchor="middle" fill="#fcd34d" font-size="13">Long unwinding</text>
+          <text x="140" y="228" text-anchor="middle" class="svg-lbl">longs exiting</text>
+        </svg>
+        <figcaption>Rising premium + rising OI = fresh buying = the move has fuel. Rising premium + falling OI = just covering = fragile.</figcaption>
+      </figure>
+      <h4 class="why">Why it matters</h4>
+      <p>On a rally, <b>put writing</b> (PE OI up + PE premium down) is <b>bullish</b>, not bearish — a classic misread that flips beginners the wrong way. Always pair OI with premium.</p>
+      <h4 class="drill">Drill</h4>
+      <p>Classify the ATM CE and PE into one quadrant every 15 min for a session. Correlate with the index direction.</p>
+    </article>
+
+    <article class="day" id="d22">
+      <div class="day-head"><span class="d">DAY 22</span><h3>PCR & OI skew — positioning context</h3></div>
+      <h4>Concept</h4>
+      <p><b>PCR</b> (put/call ratio) and OI skew show where crowd positioning sits. Extremes can mark exhaustion.
+      Use as <b>context, not a trigger</b> — they're noisy intraday and easily misread.</p>
+      <div class="callout trap"><b>Trap:</b> trading PCR alone. "High PCR = bearish" fails constantly because heavy put OI can be
+      put <em>writing</em> (bullish). Context only.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Note PCR at open and midday. See how loosely it maps to direction. Demote it to a supporting actor.</p>
+    </article>
+
+    <article class="day" id="d23">
+      <div class="day-head"><span class="d">DAY 23</span><h3>Levels: support, resistance, hourly zones</h3></div>
+      <h4>Concept</h4>
+      <p>Enter <b>at levels, not in the middle of nowhere.</b> Prior-day high/low, opening range, and <b>hourly-timeframe</b>
+      support/resistance give you a tight stop and a clear invalidation.</p>
+      <h4 class="why">Why it matters to a buyer</h4>
+      <p>Buying at a level means a small adverse move invalidates you cheaply (small premium loss) while a hold gives a
+      large run. That's the asymmetry you need — good <b>reward:risk</b>.</p>
+      <h4 class="drill">Drill</h4>
+      <p>Mark hourly S/R before the open. Only allow yourself to buy CE near support (with reversal up) or on a resistance break; PE mirror.</p>
+    </article>
+
+    <article class="day" id="d24">
+      <div class="day-head"><span class="d">DAY 24</span><h3>Confluence — stacking the odds</h3></div>
+      <h4>Concept</h4>
+      <p>No single signal is enough. <b>Confluence</b> = multiple independent checks agreeing. Your own engine uses 10:
+      spot vs open+VWAP, futures vs spot, ATM premium, OI skew, call activity, put activity, skew direction, day bias,
+      at hourly support, at hourly resistance. <b>7+ aligned → a CE or PE direction.</b></p>
+      <div class="toolbox">
+        <h3>Your dashboard already does this</h3>
+        <p>The <b>Option Long Confluence</b> card scores CE vs PE across the 10 checks and only prints a direction when
+        7+ align and the spot-trend gate agrees. Treat &lt;7 as "no trade." <span class="pill ce">CE</span>
+        <span class="pill pe">PE</span></p>
+      </div>
+      <h4 class="drill">Drill</h4>
+      <p>For every potential trade, count how many checks agree. If under 7, you are forbidden to enter. Log the count vs outcome.</p>
+    </article>
+
+    <article class="day" id="d25">
+      <div class="day-head"><span class="d">DAY 25</span><h3>Regime filter + riding the runners</h3></div>
+      <h4>Concept</h4>
+      <p>Even perfect confluence loses on a <b>chop/theta day.</b> Filter the <em>day</em> first, then the trade.
+      Two tools you already have:</p>
+      <div class="toolbox">
+        <h3>Buyer's Day Meter</h3>
+        <p>Scores the session 0–100 from range, trend efficiency, VWAP crosses, ADX, and straddle decay/momentum.
+        <b>AVOID</b> = stand aside or scalp only; <b>BUYER-FRIENDLY</b> = movement is beating theta.</p>
+      </div>
+      <div class="toolbox">
+        <h3>Sector RS vs NIFTY</h3>
+        <p>Ranks sectors against the index and surfaces the strongest <b>runners</b> and weakest <b>laggards</b>.
+        On index-option days it tells you whether leadership is broad (trend fuel) or absent (chop).</p>
+      </div>
+      <div class="callout rule"><b>Rule:</b> Day filter → direction (confluence) → level → strike (Greeks) → size → exit plan. In that order, every time.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Before trading, read the Buyer's Day Meter. If AVOID, you may only paper trade today. Record how AVOID days would have treated you.</p>
+    </article>
+
+    <!-- ============ PHASE 5 ============ -->
+    <div class="phase-band" id="phase5">
+      <div class="num">5</div>
+      <div><h2>Trader craft</h2><p>Days 26–30 · the boring skills that actually keep the money</p></div>
+    </div>
+
+    <article class="day" id="d26">
+      <div class="day-head"><span class="d">DAY 26</span><h3>Risk per trade & position sizing</h3></div>
+      <h4>Concept</h4>
+      <p>Decide <b>risk first</b>, size second. Risk a fixed small % of capital per trade (e.g. 0.5–1%) and set a
+      <b>hard daily loss limit</b> (e.g. 2–3%). Since a bought option's max loss is the premium, sizing is simple and exact.</p>
+      <figure>
+        <svg viewBox="0 0 720 150" aria-label="Risk of ruin">
+          <rect x="60" y="40" width="120" height="30" fill="var(--green)"/><text x="120" y="90" text-anchor="middle" class="svg-lbl">1% risk: survives a long losing streak</text>
+          <rect x="220" y="40" width="360" height="30" fill="var(--red)"/><text x="400" y="90" text-anchor="middle" class="svg-lbl">10% risk: a few bad trades → account gone</text>
+          <text x="60" y="30" class="svg-lbl">Capital burned per losing trade →</text>
+        </svg>
+        <figcaption>Ruin isn't about being wrong — it's about being wrong <em>too big</em>. Small size is what lets your edge play out.</figcaption>
+      </figure>
+      <div class="callout trap"><b>Trap:</b> "high-conviction" oversizing. One oversized loss erases ten disciplined wins. The market punishes ego, not analysis.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Compute your per-trade ₹ risk and max lots for a 1% rule. Write your daily loss limit. Automate the stop mentally: hit it → done for the day.</p>
+    </article>
+
+    <article class="day" id="d27">
+      <div class="day-head"><span class="d">DAY 27</span><h3>Exits: the hard part</h3></div>
+      <h4>Concept</h4>
+      <p>Entries are glamorous; <b>exits pay you.</b> Have three exits ready: <b>target</b> (or trail a runner),
+      <b>stop</b> (level invalidated), and <b>time-stop</b> (theta-aware: if it hasn't worked in N minutes, leave).</p>
+      <div class="callout rule"><b>Rule:</b> never average down a losing long option. You're adding theta and vega risk to a thesis the market is rejecting.</div>
+      <h4 class="why">Why time-stops matter to buyers</h4>
+      <p>Unlike a seller, sitting in a stalled long bleeds you. If the expected move hasn't started promptly, the trade thesis (a <em>soon</em> move) is already wrong.</p>
+      <h4 class="drill">Drill</h4>
+      <p>Predefine all three exits <em>before</em> entry on every paper/live trade. Log which exit fired and whether you honored it.</p>
+    </article>
+
+    <article class="day" id="d28">
+      <div class="day-head"><span class="d">DAY 28</span><h3>The trading journal</h3></div>
+      <h4>Concept</h4>
+      <p>You can't improve what you don't measure. Log every trade: setup, confluence count, Buyer's Day score, strike/Greeks,
+      entry/exit, ₹ risked, result, and <b>one honest note</b> on execution vs plan.</p>
+      <table>
+        <tr><th>Date</th><th>Setup</th><th>Conf.</th><th>Day score</th><th>Strike</th><th>R:R</th><th>Result</th><th>Followed plan?</th></tr>
+        <tr><td>—</td><td>Res. break</td><td>8/10</td><td>72</td><td>ATM CE</td><td>1:2.5</td><td>+1.8R</td><td>Yes</td></tr>
+        <tr><td>—</td><td>Anticipation</td><td>5/10</td><td>34</td><td>OTM CE</td><td>—</td><td>−1R</td><td>No (early)</td></tr>
+      </table>
+      <h4 class="drill">Drill</h4>
+      <p>Set up this journal (sheet or Notion). Backfill your paper trades. Review weekly: which setups/day-scores actually made money?</p>
+    </article>
+
+    <article class="day" id="d29">
+      <div class="day-head"><span class="d">DAY 29</span><h3>Psychology & tilt control</h3></div>
+      <h4>Concept</h4>
+      <p>The edge lives or dies on behavior. The four horsemen: <b>FOMO</b> (chasing), <b>revenge</b> (after a loss),
+      <b>overtrading</b> (boredom), <b>oversizing</b> (greed). Rules exist to survive the moments emotion takes over.</p>
+      <div class="callout rule"><b>Rule set that survives emotion:</b> max N trades/day · hard daily loss limit · no trade under 7/10 confluence · no trade on AVOID days · walk away after the limit.</div>
+      <h4 class="drill">Drill</h4>
+      <p>Write your personal "tilt triggers" and the exact rule that neutralizes each. Put it where you'll see it while trading.</p>
+    </article>
+
+    <article class="day" id="d30">
+      <div class="day-head"><span class="d">DAY 30</span><h3>Your written playbook</h3></div>
+      <h4>Concept</h4>
+      <p>Graduation = a <b>one-page written plan</b> you actually follow. It removes decisions from the heat of the moment.</p>
+      <div class="toolbox">
+        <h3>The daily routine (put it on your wall)</h3>
+        <p><b>Pre-market:</b> mark hourly S/R, note events (IV-crush risk), check overnight bias.<br>
+        <b>Open:</b> read the <b>Buyer's Day Meter</b> → AVOID means paper/scalp only.<br>
+        <b>Setup:</b> wait for <b>7+ confluence</b> at a <b>level</b>; confirm sector/breadth (Sector RS).<br>
+        <b>Execute:</b> pick strike by <b>Greeks</b>, size by <b>1% risk</b>, set target + stop + time-stop.<br>
+        <b>Manage:</b> honor exits, never average down, stop at daily loss limit.<br>
+        <b>Post-market:</b> journal every trade + one improvement note.</p>
+      </div>
+      <div class="callout rule"><b>Milestone:</b> you now have a complete, filtered, risk-bounded process — and the tools in your own dashboard to run it daily.</div>
+      <h4 class="drill">Final drill</h4>
+      <p>Write your one-page playbook. Commit to 20 sessions following it with micro size, journaling every trade, before scaling up.</p>
+    </article>
+
+    <section id="principles">
+      <h2 class="section">The 10 laws of the option buyer</h2>
+      <ol>
+        <li><b>Filter the day before the trade.</b> Chop days are unwinnable; skipping them is the edge.</li>
+        <li><b>Right direction isn't enough</b> — IV, timing and size decide the outcome.</li>
+        <li><b>Buy cheap volatility, sell expensive</b> — respect IVP; fear IV crush.</li>
+        <li><b>Theta is rent.</b> Enter at the trigger, not in anticipation; use a time-stop.</li>
+        <li><b>Read OI with premium</b>, never alone. Put writing is bullish.</li>
+        <li><b>Enter at levels</b> for tight stops and big reward:risk.</li>
+        <li><b>7+ confluence or no trade.</b> Count, don't feel.</li>
+        <li><b>Risk 1%, cap the day.</b> Survival first; ruin is a sizing problem.</li>
+        <li><b>Exits pay.</b> Never average a losing long.</li>
+        <li><b>Journal or you're gambling.</b> Measured edge compounds; unmeasured hope doesn't.</li>
+      </ol>
+    </section>
+
+    <div class="disclaimer" id="disclaimer">
+      <b>Reality check (read this every week).</b> This is an educational study guide, not investment advice.
+      Index option buying is high-risk; SEBI studies show the large majority of individual F&amp;O traders lose money,
+      and buyers face the added drag of time decay and IV crush. Nothing here guarantees profit. Trade only risk
+      capital, start on paper, size tiny when live, and treat the survival rules (daily loss limit, 1% risk, no-trade
+      filters) as non-negotiable. The tools referenced (Buyer's Day Meter, Confluence, Sector RS) are decision aids,
+      not crystal balls — they exist to keep you out of bad trades, not to promise good ones.
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1561,6 +1561,13 @@ def scan_options_trading_signals(
 def save_options_trading_signals(data_dir: Path, payload: dict[str, Any]) -> Path:
     td = datetime.strptime(str(payload["trade_date"]), "%Y-%m-%d").date()
     u = normalize_underlying(str(payload.get("underlying") or "NIFTY"))
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage import db as db_store
+
+        db_store.save_json_artifact("options_trading_signals", td, payload, underlying=u)
+        return options_trading_signals_path(data_dir, td, u)
     path = options_trading_signals_path(data_dir, td, u)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
@@ -1569,6 +1576,24 @@ def save_options_trading_signals(data_dir: Path, payload: dict[str, Any]) -> Pat
 
 def load_options_trading_signals(data_dir: Path, trade_date: date, underlying: str) -> dict[str, Any] | None:
     u = normalize_underlying(underlying)
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage.data_cache import get_cached, set_cached
+        from intraday_engine.storage import db as db_store
+
+        cache_key = f"artifact:options_trading_signals:{trade_date.isoformat()}:{u}"
+        cached = get_cached(cache_key)
+        if cached is not None:
+            return cached
+        payload = db_store.load_json_artifact("options_trading_signals", trade_date, underlying=u)
+        if payload is None:
+            return None
+        if payload.get("underlying") != u:
+            return None
+        set_cached(cache_key, payload)
+        return payload
+
     path = options_trading_signals_path(data_dir, trade_date, u)
     if not path.exists():
         legacy = options_trading_signals_path(data_dir, trade_date)

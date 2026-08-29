@@ -35,7 +35,8 @@ from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.market_data import MarketDataFetcher
 from intraday_engine.fetch.nse_market_indices import build_nse_sector_stock_map
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
-from intraday_engine.storage import DataStore, load_signal_rows
+from intraday_engine.storage import DataStore, invalidate_storage_cache
+from intraday_engine.storage.backend import get_storage_backend, write_to_db
 from intraday_engine.storage.data_store import _flatten_for_csv
 from intraday_engine.analysis.summary_builder import build_analysis_summaries
 from intraday_engine.analysis.hourly_levels import fetch_hourly_spot_levels, hourly_levels_from_snapshots
@@ -65,6 +66,7 @@ from intraday_engine.research.silent_accumulation_scanner import (
     load_stored_silent_accumulation,
     run_silent_accumulation_scan,
 )
+from intraday_engine.fetch.nse_public_data import FII_DII_DEFAULT_TRADING_DAYS
 from intraday_engine.research.fii_dii_trends import (
     load_stored_fii_dii_trends,
     run_fii_dii_trends_scan,
@@ -187,6 +189,14 @@ async def _lifespan(app: FastAPI):
         ensure_config_file()
     except Exception as e:
         logger.warning("Could not ensure config.json: %s", e)
+    if write_to_db():
+        try:
+            from intraday_engine.storage.db import ensure_schema
+
+            ensure_schema()
+            logger.info("Dashboard reading from InterServer MySQL (%s).", get_storage_backend().value)
+        except Exception as e:
+            logger.warning("MySQL schema check failed: %s", e)
     data_dir = Settings.from_env().data_dir
     skip_jobs = frozenset({"option_chain_scraper"}) if _skip_dashboard_option_chain_job() else frozenset()
     if _read_only_dashboard():
@@ -224,6 +234,34 @@ async def api_dashboard_mode():
         "read_only": _read_only_dashboard(),
         "option_chain_job": not _skip_dashboard_option_chain_job(),
         "auto_trade_loop": not _skip_auto_trade_loop(),
+        "storage_backend": get_storage_backend().value,
+        "reads_from_db": write_to_db(),
+    }
+
+
+@app.post("/api/dashboard/reload-cache")
+async def api_dashboard_reload_cache():
+    """Clear in-memory DB read cache (hard reload pulls fresh rows from MySQL)."""
+    invalidate_storage_cache()
+    if write_to_db():
+        try:
+            from intraday_engine.storage.db import ensure_schema, mysql_host_label
+
+            tables = ensure_schema()
+            return {
+                "status": "ok",
+                "storage_backend": get_storage_backend().value,
+                "reads_from_db": True,
+                "mysql_host": mysql_host_label(),
+                "tables": tables,
+            }
+        except Exception as exc:
+            logger.error("MySQL reload-cache failed: %s", exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {
+        "status": "ok",
+        "storage_backend": get_storage_backend().value,
+        "reads_from_db": write_to_db(),
     }
 
 
@@ -605,7 +643,7 @@ async def api_fii_dii_trends_get(trade_date: str | None = None):
 
 
 @app.post("/api/stocks/fii-dii-trends/refresh")
-async def api_fii_dii_trends_refresh(trade_date: str | None = None, days: int = 30):
+async def api_fii_dii_trends_refresh(trade_date: str | None = None, days: int = FII_DII_DEFAULT_TRADING_DAYS):
     try:
         td = _parse_trade_date(trade_date)
         loop = asyncio.get_event_loop()

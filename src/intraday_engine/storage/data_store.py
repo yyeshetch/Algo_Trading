@@ -6,6 +6,8 @@ from typing import Dict
 
 import pandas as pd
 
+from intraday_engine.storage.backend import write_to_db
+from intraday_engine.storage.data_cache import get_cached, invalidate_data_cache, set_cached
 from intraday_engine.storage.layout import (
     analysis_day_path,
     asset_class_for_underlying,
@@ -15,7 +17,7 @@ from intraday_engine.storage.layout import (
 from intraday_engine.storage.signal_invalidation_store import load_invalidated_keys
 
 # FnO stock rows persisted to CSV (beyond plain BUY/SELL).
-_STOCK_SIGNALS_PERSISTED = frozenset({"BUY", "SELL", "OVERBROUGHT_LOOK_FOR_REVERSAL"})
+_STOCK_SIGNALS_PERSISTED = frozenset({"BUY", "SELL", "OVERBOUGHT_LOOK_FOR_REVERSAL"})
 
 
 class DataStore:
@@ -37,9 +39,19 @@ class DataStore:
         if df.empty:
             return df
         trade_date = _infer_trade_date_from_frame(df)
+        prepared = _prepare_snapshot_df(df, self.underlying, self.asset_class, trade_date)
+        if write_to_db():
+            from intraday_engine.storage import db as db_store
+
+            db_store.replace_snapshot_rows(
+                trade_date=trade_date,
+                asset_class=self.asset_class,
+                underlying=self.underlying,
+                rows=prepared,
+            )
+            return df
         path = analysis_day_path(self.root_data_dir, trade_date, self.asset_class)
         existing = _read_csv(path)
-        prepared = _prepare_snapshot_df(df, self.underlying, self.asset_class, trade_date)
         if not existing.empty:
             existing = existing[existing["underlying"].astype(str) != self.underlying]
         combined = pd.concat([existing, prepared], ignore_index=True)
@@ -96,9 +108,28 @@ class DataStore:
         if self.asset_class == "stock" and str(payload.get("signal") or "") not in _STOCK_SIGNALS_PERSISTED:
             return
         trade_date = _infer_trade_date_from_value(payload.get("timestamp"))
+        prepared = _prepare_signal_df([payload], self.underlying, self.asset_class, trade_date)
+        if write_to_db():
+            existing = load_signal_rows(
+                self.root_data_dir,
+                trade_date,
+                self.underlying,
+                self.asset_class,
+                use_cache=False,
+            )
+            combined = pd.concat([existing, prepared], ignore_index=True)
+            combined = _dedupe_signal_df(combined)
+            from intraday_engine.storage import db as db_store
+
+            db_store.replace_signals_rows(
+                trade_date=trade_date,
+                asset_class=self.asset_class,
+                underlying=self.underlying,
+                rows=combined,
+            )
+            return
         path = signals_day_path(self.root_data_dir, trade_date, self.asset_class)
         existing = _read_csv(path)
-        prepared = _prepare_signal_df([payload], self.underlying, self.asset_class, trade_date)
         combined = pd.concat([existing, prepared], ignore_index=True)
         _write_csv_or_delete(path, combined)
 
@@ -108,11 +139,21 @@ class DataStore:
             if self.asset_class == "stock"
             else payloads
         )
+        prepared = _prepare_signal_df(filtered_payloads, self.underlying, self.asset_class, trade_date)
+        if write_to_db():
+            from intraday_engine.storage import db as db_store
+
+            db_store.replace_signals_rows(
+                trade_date=trade_date,
+                asset_class=self.asset_class,
+                underlying=self.underlying,
+                rows=prepared,
+            )
+            return
         path = signals_day_path(self.root_data_dir, trade_date, self.asset_class)
         existing = _read_csv(path)
         if not existing.empty:
             existing = existing[existing["underlying"].astype(str) != self.underlying]
-        prepared = _prepare_signal_df(filtered_payloads, self.underlying, self.asset_class, trade_date)
         combined = pd.concat([existing, prepared], ignore_index=True)
         _write_csv_or_delete(path, combined)
 
@@ -122,7 +163,28 @@ def load_signal_rows(
     trade_date: date | None = None,
     underlying: str | None = None,
     asset_class: str | None = None,
+    *,
+    use_cache: bool = True,
 ) -> pd.DataFrame:
+    if write_to_db():
+        cache_key = f"signals:{trade_date}:{underlying}:{asset_class}"
+        if use_cache:
+            cached = get_cached(cache_key)
+            if cached is not None:
+                return _filter_rows(cached.copy(), underlying=underlying, asset_class=asset_class)
+        from intraday_engine.storage import db as db_store
+
+        df = db_store.load_table_rows(
+            "signals",
+            trade_date=trade_date,
+            underlying=underlying,
+            asset_class=asset_class,
+        )
+        df = _filter_rows(df, underlying=underlying, asset_class=asset_class)
+        if use_cache:
+            set_cached(cache_key, df)
+        return df
+
     filenames = [f for f in ["FnO_Signals.csv", "Index_Signals.csv"] if asset_class is None or f.startswith("Index" if asset_class == "index" else "FnO")]
     frames = [
         _read_csv(path)
@@ -138,8 +200,29 @@ def load_market_data(
     trade_date: date | None = None,
     asset_class: str | None = None,
     underlying: str | None = None,
+    *,
+    use_cache: bool = True,
 ) -> pd.DataFrame:
     cls = asset_class or asset_class_for_underlying(underlying)
+    if write_to_db():
+        cache_key = f"market_snapshots:{trade_date}:{underlying}:{cls}"
+        if use_cache:
+            cached = get_cached(cache_key)
+            if cached is not None:
+                return _filter_rows(cached.copy(), underlying=underlying, asset_class=cls)
+        from intraday_engine.storage import db as db_store
+
+        df = db_store.load_table_rows(
+            "market_snapshots",
+            trade_date=trade_date,
+            underlying=underlying,
+            asset_class=cls,
+        )
+        df = _filter_rows(df, underlying=underlying, asset_class=cls)
+        if use_cache:
+            set_cached(cache_key, df)
+        return df
+
     frames = [
         _read_csv(path)
         for path in _partition_paths(
@@ -150,6 +233,10 @@ def load_market_data(
     ]
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     return _filter_rows(df, underlying=underlying, asset_class=cls)
+
+
+def invalidate_storage_cache() -> None:
+    invalidate_data_cache()
 
 
 def _partition_paths(root: Path, filename: str, trade_date: date | None) -> list[Path]:
@@ -172,6 +259,7 @@ def _write_csv_or_delete(path: Path, df: pd.DataFrame) -> None:
     if df.empty:
         path.unlink(missing_ok=True)
         return
+    path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
 
 

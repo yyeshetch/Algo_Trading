@@ -36,6 +36,18 @@ def option_chain_data_available(
     min_snapshots: int = 1,
 ) -> bool:
     """Return True when stored option-chain CSV has data for the underlying on trade_date."""
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage import db as db_store
+
+        df = db_store.load_option_chain_rows(trade_date, underlying)
+        if df.empty:
+            return False
+        if "timestamp" not in df.columns:
+            return len(df) >= min_snapshots
+        return df["timestamp"].nunique() >= min_snapshots
+
     path = option_chain_day_path(data_dir, trade_date)
     if not path.exists():
         return False
@@ -61,6 +73,26 @@ def option_chain_status(
     underlying: str,
 ) -> dict:
     """Summary of stored option-chain data for one underlying."""
+    from intraday_engine.storage.backend import write_to_db
+
+    u = normalize_underlying(underlying)
+    if write_to_db():
+        from intraday_engine.storage import db as db_store
+
+        df = db_store.load_option_chain_rows(trade_date, u)
+        snapshots = int(df["timestamp"].nunique()) if not df.empty and "timestamp" in df.columns else 0
+        last_ts = None
+        if not df.empty and "timestamp" in df.columns:
+            last_ts = str(sorted(df["timestamp"].unique())[-1])
+        return {
+            "available": snapshots > 0,
+            "underlying": u,
+            "trade_date": trade_date.isoformat(),
+            "path": "mysql://option_chain_rows",
+            "snapshots": snapshots,
+            "last_timestamp": last_ts,
+        }
+
     path = option_chain_day_path(data_dir, trade_date)
     u = normalize_underlying(underlying)
     if not path.exists():

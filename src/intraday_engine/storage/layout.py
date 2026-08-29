@@ -45,7 +45,9 @@ def signal_outcomes_day_path(data_dir: Path, trade_date: date) -> Path:
 
 
 def watchlist_csv_path(data_dir: Path) -> Path:
-    return data_dir / "reference" / "fno_watchlist.csv"
+    from intraday_engine.core.underlyings import FNO_LIQUID_SYMBOLS_CSV
+
+    return data_dir / "reference" / FNO_LIQUID_SYMBOLS_CSV
 
 
 def accumulation_base_dir(data_dir: Path) -> Path:

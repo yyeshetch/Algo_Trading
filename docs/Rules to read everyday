@@ -1,0 +1,23 @@
+You are not here to be the greatest winner / win everything, you are to take profit.
+    Once you are in profits, stop trading for the day.
+Respect every trade
+Losses are part of the game. Learn to book a loss.
+Cutting a finger is better than losing a hand.
+Look at PnL after every 20 trades
+More trades doesn't mean more money
+
+If you are in profit, then stop the trading for the day. Greed kills you.
+    - Don't expect profit from the market, don't calculate the charges, don't look at the PnL. If you look at them,
+        your first motto will be to recover that money, due to which you will end up taking irrelevant trades / irrational
+        trades with no proper SL / trade plan
+    - When you made some money and next trade makes some losses, stop trading for sometime.
+    - If you are in net loss after initial profit and 2/3 trades then stop trading for the day. as you might end up in
+        revenge trading
+Market gives 2 opportunities in a day to exit in profits after making Losses
+
+python src/update_credentials/update_access_token.py
+
+PYTHONPATH=src python -m intraday_engine.cli.main \
+  --dashboard --read-only --host 0.0.0.0 --port 8000
+
+PYTHONPATH=src caffeinate -dims python -m intraday_engine.cli.main --session-scheduler --storage write_to_files

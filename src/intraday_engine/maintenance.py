@@ -6,20 +6,11 @@ from datetime import date, datetime
 from pathlib import Path
 
 from intraday_engine.analysis.eod_signal_analysis import analyze_signal_outcomes
-from intraday_engine.core.underlyings import (
-    default_fno_watchlist_csv_path,
-    write_liquid_fno_watchlist_csv,
-)
 from intraday_engine.storage.legacy_migration import migrate_legacy_data, rewrite_partitioned_storage_layout
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="One-time maintenance utilities.")
-    parser.add_argument(
-        "--refresh-fno-watchlist",
-        action="store_true",
-        help="Fetch the latest liquid FnO symbols from Chartink and write data/reference/fno_watchlist.csv.",
-    )
     parser.add_argument(
         "--analyze-signals-eod",
         action="store_true",
@@ -52,10 +43,6 @@ def main() -> None:
     trade_date = _parse_date(args.date) if args.date else date.today()
     data_dir = _resolve_data_dir(args.data_dir)
 
-    if args.refresh_fno_watchlist:
-        path = write_liquid_fno_watchlist_csv(data_dir / "reference" / "fno_watchlist.csv")
-        print(f"FnO watchlist written: {path}")
-
     if args.analyze_signals_eod:
         df, path = analyze_signal_outcomes(data_dir, trade_date)
         print(f"EOD analysis rows: {len(df)}")
@@ -76,7 +63,7 @@ def main() -> None:
         print(f"Deleted files: {report.deleted_files}")
         print(f"Deleted dirs: {report.deleted_dirs}")
 
-    if not args.refresh_fno_watchlist and not args.analyze_signals_eod and not args.migrate_legacy_data and not args.rewrite_partitioned_layout:
+    if not args.analyze_signals_eod and not args.migrate_legacy_data and not args.rewrite_partitioned_layout:
         parser.print_help()
 
 

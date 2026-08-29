@@ -745,17 +745,41 @@ def run_market_overview_scan(
 
     payload["nifty_plan"] = _build_nifty_plan(settings, td)
 
-    out_path = market_overview_path(settings.data_dir, td)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        out_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-    except Exception as e:
-        logger.warning("market_overview save failed: %s", e)
-    logger.info("Market overview built (%s).", out_path)
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage import db as db_store
+
+        db_store.save_json_artifact("market_overview", td, payload)
+    else:
+        out_path = market_overview_path(settings.data_dir, td)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            out_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+        except Exception as e:
+            logger.warning("market_overview save failed: %s", e)
+        logger.info("Market overview built (%s).", out_path)
     return payload
 
 
 def load_stored_market_overview(data_dir: Path, trade_date: date) -> dict[str, Any] | None:
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage.data_cache import get_cached, set_cached
+        from intraday_engine.storage import db as db_store
+
+        cache_key = f"artifact:market_overview:{trade_date.isoformat()}:"
+        cached = get_cached(cache_key)
+        if cached is not None:
+            return cached
+        payload = db_store.load_json_artifact("market_overview", trade_date)
+        if payload is None:
+            payload = db_store.load_latest_json_artifact("market_overview")
+        if payload is not None:
+            set_cached(cache_key, payload)
+        return payload
+
     p = market_overview_path(data_dir, trade_date)
     if p.exists():
         try:

@@ -260,6 +260,82 @@ def _compute_strength_score(row: RelativeStrengthRow) -> float:
     )
 
 
+def _stock_daily_cached(data_dir: Path, symbol: str) -> pd.DataFrame:
+    return read_nifty500_symbol_ohlcv(data_dir, symbol, "1D")
+
+
+def _collect_rs_rows(
+    symbols: list[str],
+    *,
+    client: ZerodhaClient,
+    token_map: dict[str, int],
+    data_dir: Path,
+    nifty_df: pd.DataFrame,
+    max_workers: int = 8,
+) -> tuple[list[RelativeStrengthRow], int]:
+    """
+    Build RS rows cache-first, then backfill missing symbols sequentially.
+
+    Parallel Kite historical pulls on a cold cache often all fail (rate limits /
+    non-thread-safe session). Sequential backfill after a cache-only pass fixes
+    the “empty on first refresh, OK on second click” behaviour.
+    """
+    scored: list[RelativeStrengthRow] = []
+    scored_syms: set[str] = set()
+    skipped = 0
+    needs_fetch: list[str] = []
+
+    def _try_row(sym: str, df: pd.DataFrame) -> RelativeStrengthRow | None:
+        if df.empty or len(df) < 65:
+            return None
+        return _compute_rs_row(sym, df, nifty_df)
+
+    def cache_job(sym: str) -> tuple[str, RelativeStrengthRow | None, bool]:
+        df = _stock_daily_cached(data_dir, sym)
+        row = _try_row(sym, df)
+        if row is not None:
+            return sym, row, False
+        return sym, None, len(df) < 65
+
+    with ThreadPoolExecutor(max_workers=max(1, max_workers)) as ex:
+        futs = {ex.submit(cache_job, sym): sym for sym in symbols}
+        for fut in as_completed(futs):
+            try:
+                sym, row, fetch_needed = fut.result()
+            except Exception:
+                skipped += 1
+                continue
+            if row is not None:
+                scored.append(row)
+                scored_syms.add(sym)
+            elif fetch_needed:
+                needs_fetch.append(sym)
+            else:
+                skipped += 1
+
+    for sym in needs_fetch:
+        if sym in scored_syms:
+            continue
+        try:
+            tok = token_map.get(sym)
+            if tok is not None:
+                df = _ensure_stock_daily(client, sym, int(tok), data_dir)
+            else:
+                df = _stock_daily_cached(data_dir, sym)
+            row = _try_row(sym, df)
+            if row is None:
+                skipped += 1
+            else:
+                scored.append(row)
+                scored_syms.add(sym)
+        except Exception as e:
+            logger.debug("RS fetch %s err: %s", sym, e)
+            skipped += 1
+        time.sleep(0.35)
+
+    return scored, skipped
+
+
 def run_relative_strength_scan(
     *,
     settings: Settings | None = None,
@@ -293,34 +369,26 @@ def run_relative_strength_scan(
     client = ZerodhaClient(settings)
     token_map = client.nse_eq_token_map()
 
-    scored: list[RelativeStrengthRow] = []
-    skipped = 0
+    scored, skipped = _collect_rs_rows(
+        symbols,
+        client=client,
+        token_map=token_map,
+        data_dir=settings.data_dir,
+        nifty_df=nifty_df,
+        max_workers=max_workers,
+    )
 
-    def job(sym: str) -> RelativeStrengthRow | None:
-        try:
-            tok = token_map.get(sym)
-            if tok is not None:
-                df = _ensure_stock_daily(client, sym, int(tok), settings.data_dir)
-            else:
-                df = read_nifty500_symbol_ohlcv(settings.data_dir, sym, "1D")
-            if df.empty:
-                return None
-            return _compute_rs_row(sym, df, nifty_df)
-        except Exception as e:
-            logger.debug("RS %s err: %s", sym, e)
-            return None
-
-    with ThreadPoolExecutor(max_workers=max(1, max_workers)) as ex:
-        futs = {ex.submit(job, s): s for s in symbols}
-        for fut in as_completed(futs):
-            try:
-                row = fut.result()
-            except Exception:
-                row = None
-            if row is None:
-                skipped += 1
-                continue
-            scored.append(row)
+    if not scored:
+        logger.info("RS scan empty after cache+fetch pass; retrying once after brief pause.")
+        time.sleep(2.0)
+        scored, skipped = _collect_rs_rows(
+            symbols,
+            client=client,
+            token_map=token_map,
+            data_dir=settings.data_dir,
+            nifty_df=nifty_df,
+            max_workers=min(max_workers, 2),
+        )
 
     if not scored:
         return {
@@ -378,6 +446,20 @@ def run_relative_strength_scan(
             "Relative strength: %d outperformers of %d scanned -> %s",
             len(final),
             len(symbols),
+            out_path,
+        )
+    elif scored:
+        # Save unfiltered rows so GET / relative-strength works after refresh
+        # even when the outperformer filter yields zero matches.
+        payload["rows"] = [asdict(r) for r in sorted(scored, key=lambda r: r.strength_score, reverse=True)[:top_n]]
+        payload["passed"] = len(scored)
+        payload["only_outperformers"] = False
+        out_path = relative_strength_path(settings.data_dir, td)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        logger.info(
+            "Relative strength: saved %d computed rows (0 passed filter) -> %s",
+            len(scored),
             out_path,
         )
     else:

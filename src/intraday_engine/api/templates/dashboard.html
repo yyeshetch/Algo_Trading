@@ -2090,6 +2090,7 @@
     }
 
     let dashboardReadOnly = false;
+    let dashboardReadsFromDb = false;
     let dashboardPollTimer = null;
 
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -2209,6 +2210,9 @@
           const td = getTradeDate();
           if (inSession && isIstNseSessionActive() && td === istTodayIso()) {
             try {
+              if (dashboardReadsFromDb) {
+                await fetch('/api/dashboard/reload-cache', { method: 'POST' });
+              }
               await refreshAllDashboard();
             } catch (_) { /* ignore */ }
           }
@@ -2268,6 +2272,7 @@
         const r = await fetch('/api/dashboard/mode');
         const mode = await r.json();
         dashboardReadOnly = !!mode.read_only;
+        dashboardReadsFromDb = !!mode.reads_from_db;
         const banner = document.getElementById('readOnlyBanner');
         if (banner) banner.style.display = dashboardReadOnly ? 'block' : 'none';
         const refreshBtn = document.getElementById('btnRefresh');
@@ -2275,7 +2280,9 @@
           refreshBtn.textContent = dashboardReadOnly ? 'Reload dashboard' : 'Refresh dashboard';
           refreshBtn.disabled = false;
           refreshBtn.title = dashboardReadOnly
-            ? 'Reload all tabs from stored session-scheduler output'
+            ? (dashboardReadsFromDb
+              ? 'Reload all tabs from InterServer MySQL (cached in memory)'
+              : 'Reload all tabs from stored session-scheduler output')
             : 'Fetch latest data and reload all dashboard tabs';
           refreshBtn.style.opacity = '';
         }
@@ -3183,6 +3190,11 @@
       const today = new Date().toISOString().slice(0, 10);
       setStatus(dashboardReadOnly ? 'Reloading dashboard…' : (td !== today ? `Refreshing for ${td}…` : 'Refreshing dashboard…'), null);
       try {
+        if (dashboardReadOnly && dashboardReadsFromDb) {
+          const cacheR = await fetch('/api/dashboard/reload-cache', { method: 'POST' });
+          const cacheData = await cacheR.json().catch(() => ({}));
+          if (!cacheR.ok) throw new Error(cacheData.detail || 'Database reload failed');
+        }
         if (!dashboardReadOnly) {
           const r = await fetch('/api/refresh', {
             method: 'POST',
@@ -3197,7 +3209,12 @@
         if (!dashboardReadOnly && moRefreshFiiDii && moRefreshFiiDii.checked) {
           await refreshMarketOverviewData(true);
         }
-        setStatus(dashboardReadOnly ? 'Dashboard reloaded from disk.' : 'Dashboard refreshed.', true);
+        setStatus(
+          dashboardReadOnly
+            ? (dashboardReadsFromDb ? 'Dashboard reloaded from database.' : 'Dashboard reloaded from disk.')
+            : 'Dashboard refreshed.',
+          true
+        );
       } catch (e) {
         setStatus('Error: ' + e.message, false);
       } finally {

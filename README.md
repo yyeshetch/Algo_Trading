@@ -140,8 +140,6 @@ python -m intraday_engine --trail --underlying NIFTY
 
 
 # Maintenance
-PYTHONPATH=src .venv/bin/python -m intraday_engine.maintenance --refresh-fno-watchlist
-
 PYTHONPATH=src .venv/bin/python -m intraday_engine.maintenance --migrate-legacy-data
 
 PYTHONPATH=src .venv/bin/python -m intraday_engine.maintenance --rewrite-partitioned-layout
@@ -208,6 +206,19 @@ PYTHONPATH=src python -m intraday_engine.cli.main --session-once
 # Low-level (usually not needed — use --session-scheduler instead):
 # PYTHONPATH=src python -m intraday_engine.cli.main --option-chain-scheduler
 # PYTHONPATH=src python -m intraday_engine.cli.main --capture-option-chain
+
+# Write to local files (default)
+PYTHONPATH=src caffeinate -dims python -m intraday_engine.cli.main --session-scheduler --storage write_to_files
+
+# SSH into VPS and run
+source .venv/bin/activate
+PYTHONPATH=src python -m intraday_engine.cli.main --init-db
+
+# Run scheduler from your Mac
+PYTHONPATH=src python -m intraday_engine.cli.main --init-db
+
+# Write to Interserver MySQL
+PYTHONPATH=src caffeinate -dims python -m intraday_engine.cli.main --session-scheduler --storage write_to_db
 
 
 # Running dashboard only

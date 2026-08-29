@@ -3,13 +3,7 @@
 from __future__ import annotations
 
 import csv
-import html
-import http.cookiejar
-import json
 import logging
-import re
-import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -69,9 +63,9 @@ INDEX_UNDERLYINGS: dict[str, UnderlyingConfig] = {
 }
 
 
-CHARTINK_FNO_SCREENER_URL = "https://chartink.com/screener/fno-liquid-stocks-2"
+FNO_LIQUID_SYMBOLS_CSV = "fno_liquid_symbols_sensibull.csv"
 
-# Fallback snapshot synced from the Chartink "FnO Liquid Stocks" screener.
+# Fallback snapshot when the Sensibull CSV is missing or unreadable.
 LIQUID_FNO_STOCKS: tuple[str, ...] = (
     "HAL",
     "LT",
@@ -157,7 +151,8 @@ def _project_root() -> Path:
 
 
 def default_fno_watchlist_csv_path() -> Path:
-    return _project_root() / "data" / "reference" / "fno_watchlist.csv"
+    """Path to data/reference/fno_liquid_symbols_sensibull.csv (symbol column only)."""
+    return _project_root() / "data" / "reference" / FNO_LIQUID_SYMBOLS_CSV
 
 
 def get_underlying_config(underlying: str) -> UnderlyingConfig:
@@ -202,7 +197,7 @@ def filter_liquid_fno_stocks(symbols: Iterable[str]) -> list[str]:
 
 
 def load_liquid_fno_stocks(path: Path | None = None) -> tuple[str, ...]:
-    """Load the FnO watchlist from CSV, falling back to the bundled snapshot."""
+    """Load liquid FnO symbols from fno_liquid_symbols_sensibull.csv (symbol column)."""
     csv_path = path or default_fno_watchlist_csv_path()
     if not csv_path.exists():
         return LIQUID_FNO_STOCKS
@@ -210,77 +205,15 @@ def load_liquid_fno_stocks(path: Path | None = None) -> tuple[str, ...]:
     try:
         with csv_path.open(newline="", encoding="utf-8") as fp:
             reader = csv.DictReader(fp)
+            if not reader.fieldnames or "symbol" not in reader.fieldnames:
+                raise ValueError("CSV must have a 'symbol' column header.")
             symbols = tuple(
-                str(row.get("symbol", "")).strip().upper()
+                str(row["symbol"]).strip().upper()
                 for row in reader
                 if str(row.get("symbol", "")).strip()
             )
         return symbols or LIQUID_FNO_STOCKS
     except Exception as exc:
-        logger.warning("Using bundled FnO stock list because watchlist CSV could not be read: %s", exc)
+        logger.warning("Using bundled FnO stock list because Sensibull CSV could not be read: %s", exc)
         return LIQUID_FNO_STOCKS
-
-
-def fetch_liquid_fno_stocks_from_chartink() -> tuple[str, ...]:
-    """Fetch the current liquid FnO stock universe from the Chartink screener."""
-
-    try:
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-        base_headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-        page = opener.open(
-            urllib.request.Request(CHARTINK_FNO_SCREENER_URL, headers=base_headers),
-            timeout=15,
-        ).read().decode("utf-8", "ignore")
-        csrf = re.search(r'csrf-token" content="([^"]+)"', page)
-        scan_json = re.search(r':scan-json="([^"]+)"', page)
-        if not csrf or not scan_json:
-            raise RuntimeError("Chartink screener page did not expose the expected tokens.")
-
-        payload = html.unescape(scan_json.group(1))
-        scan_clause = json.loads(payload)["atlas_query"]
-        post_headers = {
-            **base_headers,
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Origin": "https://chartink.com",
-            "Referer": CHARTINK_FNO_SCREENER_URL,
-            "X-CSRF-TOKEN": csrf.group(1),
-            "X-Requested-With": "XMLHttpRequest",
-        }
-        response = opener.open(
-            urllib.request.Request(
-                "https://chartink.com/screener/process",
-                data=urllib.parse.urlencode({"scan_clause": scan_clause}).encode(),
-                headers=post_headers,
-            ),
-            timeout=15,
-        ).read().decode("utf-8", "ignore")
-        data = json.loads(response).get("data", [])
-        symbols = tuple(
-            str(row.get("nsecode", "")).strip().upper()
-            for row in data
-            if isinstance(row, dict) and row.get("nsecode")
-        )
-        if not symbols:
-            raise RuntimeError("Chartink screener returned an empty symbol list.")
-        return symbols
-    except Exception as exc:
-        logger.warning("Using fallback Chartink FnO stock list: %s", exc)
-        return LIQUID_FNO_STOCKS
-
-
-def write_liquid_fno_watchlist_csv(path: Path | None = None) -> Path:
-    """Refresh the watchlist CSV from Chartink."""
-    csv_path = path or default_fno_watchlist_csv_path()
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    symbols = fetch_liquid_fno_stocks_from_chartink()
-    with csv_path.open("w", newline="", encoding="utf-8") as fp:
-        writer = csv.DictWriter(fp, fieldnames=["symbol", "rank", "source"])
-        writer.writeheader()
-        for idx, symbol in enumerate(symbols, start=1):
-            writer.writerow({"symbol": symbol, "rank": idx, "source": CHARTINK_FNO_SCREENER_URL})
-    return csv_path
 

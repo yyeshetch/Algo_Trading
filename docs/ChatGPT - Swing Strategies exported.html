@@ -1,0 +1,1466 @@
+I can format the full material as a standalone HTML document. Since you asked to export the above, here is a complete HTML file you can save as swing-trading-playbook.html.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Professional Swing Trading Playbook</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #121a2d;
+      --card2: #182238;
+      --text: #e8edf7;
+      --muted: #aab5ca;
+      --accent: #55d6be;
+      --accent2: #6ea8fe;
+      --warning: #ffcc66;
+      --danger: #ff6b6b;
+      --border: #293650;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    a {
+      color: var(--accent2);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    header {
+      padding: 70px 20px 55px;
+      background:
+        radial-gradient(circle at top right, #18345b 0, transparent 40%),
+        radial-gradient(circle at top left, #12352f 0, transparent 35%),
+        var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .container {
+      width: min(1120px, calc(100% - 40px));
+      margin: auto;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 4rem);
+      line-height: 1.05;
+      margin: 0 0 20px;
+      letter-spacing: -0.04em;
+    }
+
+    h2 {
+      margin-top: 60px;
+      font-size: 2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    h3 {
+      margin-top: 32px;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      color: var(--muted);
+      max-width: 850px;
+      font-size: 1.15rem;
+    }
+
+    .warning {
+      margin-top: 28px;
+      padding: 18px 20px;
+      border-left: 4px solid var(--warning);
+      background: rgba(255, 204, 102, 0.08);
+      border-radius: 6px;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(11, 16, 32, 0.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav .container {
+      overflow-x: auto;
+      white-space: nowrap;
+      padding: 12px 0;
+    }
+
+    nav a {
+      margin-right: 20px;
+      font-size: 0.9rem;
+    }
+
+    section {
+      padding-top: 1px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 25px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--card2);
+      color: var(--accent);
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      margin: 22px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 18px;
+    }
+
+    .metric {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-bottom: 6px;
+    }
+
+    code,
+    pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono",
+                   monospace;
+    }
+
+    pre {
+      background: #080d19;
+      border: 1px solid var(--border);
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      color: #dce6f7;
+      line-height: 1.55;
+    }
+
+    .score {
+      background: linear-gradient(135deg, #102f2a, #12253d);
+      border: 1px solid #24584e;
+    }
+
+    .danger {
+      border-left: 4px solid var(--danger);
+    }
+
+    .flow {
+      text-align: center;
+      background: #080d19;
+      padding: 28px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+
+    footer {
+      margin-top: 70px;
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 650px) {
+      .container {
+        width: min(100% - 24px, 1120px);
+      }
+
+      header {
+        padding-top: 45px;
+      }
+
+      h2 {
+        font-size: 1.65rem;
+      }
+
+      th,
+      td {
+        min-width: 150px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <div class="container">
+    <h1>Professional Swing Trading Playbook</h1>
+
+    <p class="subtitle">
+      A systematic framework for finding market leaders using momentum,
+      relative strength, trend following, earnings acceleration,
+      institutional participation, volatility contraction, breakouts,
+      pullbacks and disciplined risk management.
+    </p>
+
+    <div class="warning">
+      <strong>Important:</strong>
+      No trading strategy guarantees profits. Historical evidence supports
+      certain factors and methodologies, but future performance is uncertain.
+      Momentum and trend strategies can experience severe drawdowns and
+      execution can be materially different from backtests.
+    </div>
+  </div>
+</header>
+
+<nav>
+  <div class="container">
+    <a href="#strategies">Strategies</a>
+    <a href="#framework">Framework</a>
+    <a href="#screeners">Screeners</a>
+    <a href="#entry">Entries</a>
+    <a href="#risk">Risk</a>
+    <a href="#exit">Exits</a>
+    <a href="#research">Research</a>
+    <a href="#workflow">Workflow</a>
+    <a href="#tools">Tools</a>
+  </div>
+</nav>
+
+<main class="container">
+
+<section id="strategies">
+  <h2>1. Strategies Worth Taking Seriously</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Strategy</th>
+          <th>Professional lineage / evidence</th>
+          <th>Core edge</th>
+          <th>Best use</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Momentum / Relative Strength</td>
+          <td>Academic momentum research; William O'Neil</td>
+          <td>Winners tend to keep winning</td>
+          <td>Finding leaders</td>
+        </tr>
+        <tr>
+          <td>Trend Following / Breakout</td>
+          <td>Turtle Traders, CTAs, AQR</td>
+          <td>Persistent trends</td>
+          <td>Breakouts and continuation</td>
+        </tr>
+        <tr>
+          <td>CAN SLIM / Growth Momentum</td>
+          <td>William O'Neil / IBD</td>
+          <td>Earnings + price leadership</td>
+          <td>Growth stocks</td>
+        </tr>
+        <tr>
+          <td>SEPA / VCP</td>
+          <td>Mark Minervini</td>
+          <td>Tightening supply + leadership</td>
+          <td>High-quality swing entries</td>
+        </tr>
+        <tr>
+          <td>Wyckoff Accumulation</td>
+          <td>Richard Wyckoff</td>
+          <td>Supply/demand and accumulation</td>
+          <td>Accumulation and reaccumulation</td>
+        </tr>
+        <tr>
+          <td>Stage Analysis</td>
+          <td>Stan Weinstein</td>
+          <td>Buy stocks in advancing stages</td>
+          <td>Trend filtering</td>
+        </tr>
+        <tr>
+          <td>Dual Momentum</td>
+          <td>Academic momentum research</td>
+          <td>Relative + absolute momentum</td>
+          <td>Market and sector selection</td>
+        </tr>
+        <tr>
+          <td>Mean Reversion</td>
+          <td>Academic research / systematic traders</td>
+          <td>Short-term oversold rebounds</td>
+          <td>Counter-trend trades</td>
+        </tr>
+        <tr>
+          <td>Volatility Breakout</td>
+          <td>Turtle / CTA tradition</td>
+          <td>Expansion after compression</td>
+          <td>Breakout swings</td>
+        </tr>
+        <tr>
+          <td>Post-Earnings Momentum</td>
+          <td>Academic earnings/price momentum</td>
+          <td>Information gets incorporated gradually</td>
+          <td>1–8 week trades</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <p>
+      The strongest evidence is not for a particular candlestick pattern.
+      It is primarily for <strong>momentum and trend persistence</strong>.
+    </p>
+
+    <p>
+      AQR's research on trend following examined evidence across multiple
+      asset classes over very long historical periods. Momentum research
+      also documents persistent effects in individual stocks.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>2. Relative-Strength Momentum</h2>
+
+  <p>
+    The core question is not:
+    <em>"Is this stock cheap?"</em>
+  </p>
+
+  <p>
+    Instead:
+    <strong>"Is this stock materially stronger than most of the stocks I
+    could buy?"</strong>
+  </p>
+
+  <h3>Example Screening Criteria</h3>
+
+  <ul>
+    <li>Price above ₹100</li>
+    <li>Average daily traded value above ₹5–10 crore</li>
+    <li>20-day return positive</li>
+    <li>3-month return in the top 20–30%</li>
+    <li>6-month return in the top 20–30%</li>
+    <li>12-month return in the top 20–30%</li>
+    <li>Price above 50 DMA</li>
+    <li>Price above 200 DMA</li>
+    <li>50 DMA above 200 DMA</li>
+    <li>Relative strength versus Nifty improving</li>
+    <li>Relative strength versus sector improving</li>
+    <li>Volume increasing on advances</li>
+  </ul>
+
+  <p>
+    The purpose is to create a <strong>leader universe</strong>, not to
+    blindly buy every stock that passes.
+  </p>
+</section>
+
+<section>
+  <h2>3. Breakout From a Proper Base</h2>
+
+  <p>
+    A high-quality breakout often follows:
+  </p>
+
+  <pre>Strong Trend
+     ↓
+Consolidation
+     ↓
+Volatility Contracts
+     ↓
+Supply Dries Up
+     ↓
+Breakout
+     ↓
+Volume / Price Expansion</pre>
+
+  <p>Examples include:</p>
+
+  <ul>
+    <li>Cup and handle</li>
+    <li>Flat base</li>
+    <li>Volatility contraction pattern</li>
+    <li>Tight flag</li>
+    <li>Rectangle</li>
+    <li>Ascending base</li>
+    <li>Reaccumulation</li>
+    <li>IPO base</li>
+  </ul>
+
+  <h3>Ideal Setup</h3>
+
+  <ol>
+    <li>Strong prior uptrend.</li>
+    <li>Stock consolidates rather than collapses.</li>
+    <li>Corrections become smaller.</li>
+    <li>Volume dries up during contraction.</li>
+    <li>Price remains above major moving averages.</li>
+    <li>Relative strength remains strong.</li>
+    <li>Sector is healthy.</li>
+    <li>Price approaches resistance.</li>
+    <li>Breakout occurs with meaningful volume.</li>
+    <li>Price closes strongly.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>4. Earnings + Momentum</h2>
+
+  <p>
+    One of the strongest combinations is:
+  </p>
+
+  <div class="card score">
+    <h3>Fundamental Acceleration + Price Acceleration</h3>
+
+    <ul>
+      <li>EPS growth accelerating</li>
+      <li>Revenue growth accelerating</li>
+      <li>Margin expansion</li>
+      <li>Positive earnings surprise</li>
+      <li>Positive guidance</li>
+      <li>Increasing institutional interest</li>
+      <li>Strong relative strength</li>
+      <li>Breakout following earnings</li>
+    </ul>
+  </div>
+
+  <p>
+    A good company alone isn't necessarily a good swing trade.
+    The preferred combination is:
+  </p>
+
+  <p>
+    <strong>
+      Improving fundamentals + market recognition + technical confirmation
+    </strong>
+  </p>
+</section>
+
+<section>
+  <h2>5. Post-Earnings Momentum</h2>
+
+  <p>
+    Instead of automatically chasing a large earnings gap, let the market
+    digest the information.
+  </p>
+
+  <pre>Earnings Shock
+      ↓
+Large Price Move
+      ↓
+Gap Holds
+      ↓
+Short Consolidation
+      ↓
+Volume Contracts
+      ↓
+Relative Strength Remains High
+      ↓
+Range Breakout
+      ↓
+Continuation</pre>
+</section>
+
+<section>
+  <h2>6. Wyckoff Accumulation / Reaccumulation</h2>
+
+  <p>
+    Wyckoff provides a framework for interpreting price and volume through
+    supply and demand.
+  </p>
+
+  <ul>
+    <li>Accumulation</li>
+    <li>Distribution</li>
+    <li>Springs</li>
+    <li>Tests</li>
+    <li>Signs of strength</li>
+    <li>Last points of support</li>
+    <li>Breakouts</li>
+  </ul>
+
+  <pre>Decline
+   ↓
+Selling Climax
+   ↓
+Automatic Rally
+   ↓
+Test
+   ↓
+Accumulation
+   ↓
+Higher Lows
+   ↓
+Breakout
+   ↓
+Markup</pre>
+
+  <p>
+    The objective is to identify a transition from:
+    <strong>Supply &gt; Demand</strong>
+    to
+    <strong>Demand &gt; Supply</strong>.
+  </p>
+</section>
+
+<section>
+  <h2>7. Stage Analysis</h2>
+
+  <div class="grid">
+    <div class="metric">
+      <strong>Stage 1</strong>
+      Base / accumulation
+    </div>
+
+    <div class="metric">
+      <strong>Stage 2</strong>
+      Advancing trend
+    </div>
+
+    <div class="metric">
+      <strong>Stage 3</strong>
+      Distribution / maturity
+    </div>
+
+    <div class="metric">
+      <strong>Stage 4</strong>
+      Decline
+    </div>
+  </div>
+
+  <p>
+    Swing traders should generally concentrate on stocks entering or already
+    in <strong>Stage 2</strong>, rather than attempting to turn a Stage 4
+    stock into a Stage 2 stock because it looks cheap.
+  </p>
+</section>
+
+<section>
+  <h2>8. Trend Following / Turtle Breakout</h2>
+
+  <p>
+    The core concept associated with the Turtle experiment is:
+  </p>
+
+  <div class="card score">
+    <strong>Buy Strength. Sell Weakness. Let Winners Run. Cut Losers.</strong>
+  </div>
+
+  <h3>Generic System</h3>
+
+  <pre>Entry:
+Close > Highest Close of Previous N Sessions
+
+Exit:
+Close < Lowest Close of Previous M Sessions
+
+Position:
+Volatility-adjusted sizing</pre>
+
+  <p>
+    The precise parameters should be tested rather than treated as magical
+    constants.
+  </p>
+</section>
+
+<section>
+  <h2>9. Volatility Contraction → Expansion</h2>
+
+  <p>Useful measures include:</p>
+
+  <ul>
+    <li>ATR</li>
+    <li>Bollinger Band width</li>
+    <li>Historical volatility</li>
+    <li>True range</li>
+    <li>Candle ranges</li>
+    <li>Volume</li>
+  </ul>
+
+  <pre>Large Range
+    ↓
+Smaller Range
+    ↓
+Smaller Range
+    ↓
+Tiny Range
+    ↓
+Breakout
+    ↓
+Expansion</pre>
+
+  <p>
+    Compression alone isn't bullish. The stronger setup is:
+  </p>
+
+  <p>
+    <strong>
+      Compression + strong trend + relative strength + support + demand
+    </strong>
+  </p>
+</section>
+
+<section>
+  <h2>10. Pullback in a Strong Trend</h2>
+
+  <pre>Strong Trend
+     ↓
+Controlled Pullback
+     ↓
+Support
+     ↓
+Lower Volume
+     ↓
+Reversal
+     ↓
+Continuation</pre>
+
+  <p>Potential support areas include:</p>
+
+  <ul>
+    <li>10 EMA</li>
+    <li>20/21 EMA</li>
+    <li>50 DMA</li>
+    <li>Previous breakout level</li>
+    <li>Prior resistance turned support</li>
+    <li>Anchored VWAP</li>
+    <li>Fibonacci retracement</li>
+  </ul>
+
+  <p>
+    The exact indicator is less important than the behavior:
+    <strong>strong stocks should generally pull back constructively.</strong>
+  </p>
+</section>
+
+<section>
+  <h2>11. Relative-Strength Sector Rotation</h2>
+
+  <pre>Market
+  ↓
+Sector
+  ↓
+Industry
+  ↓
+Stock</pre>
+
+  <p>
+    If the market is strong, a sector is stronger than the market, and a stock
+    is stronger than its sector, that stock deserves significantly more
+    attention than an equally shaped chart in a weak industry.
+  </p>
+</section>
+
+<section>
+  <h2>12. Dual Momentum</h2>
+
+  <p>
+    Combine:
+  </p>
+
+  <ul>
+    <li><strong>Absolute momentum:</strong> Is the stock itself trending upward?</li>
+    <li><strong>Relative momentum:</strong> Is it outperforming alternatives?</li>
+  </ul>
+
+  <pre>Stock Return > 0
+        AND
+Stock Return > Nifty
+        AND
+Stock Return > Sector</pre>
+</section>
+
+<section>
+  <h2>13. Mean Reversion</h2>
+
+  <p>
+    Mean reversion can work, but I would place it below momentum/trend
+    strategies for a growth-stock swing framework.
+  </p>
+
+  <h3>Higher-Quality Mean Reversion</h3>
+
+  <ul>
+    <li>Strong longer-term trend</li>
+    <li>Short-term sharp selloff</li>
+    <li>Oversold conditions</li>
+    <li>Support nearby</li>
+    <li>Selling-volume exhaustion</li>
+    <li>Market/sector not collapsing</li>
+    <li>Reversal trigger</li>
+  </ul>
+
+  <div class="card danger">
+    <strong>Do not confuse cheapness with mean reversion.</strong>
+    A stock falling 70% does not automatically become a good mean-reversion
+    trade.
+  </div>
+</section>
+
+<section id="framework">
+  <h2>14. The Institutional Momentum Swing Framework</h2>
+
+  <h3>Layer 1 — Market Regime</h3>
+
+  <ul>
+    <li>Nifty trend</li>
+    <li>S&amp;P 500 trend</li>
+    <li>Nasdaq trend</li>
+    <li>Market breadth</li>
+    <li>Volatility</li>
+    <li>Sector leadership</li>
+    <li>Stocks above 50/200 DMA</li>
+  </ul>
+
+  <p>
+    Classify the environment as <strong>Bull / Neutral / Bear</strong>.
+    Reduce risk and trade frequency during adverse regimes.
+  </p>
+
+  <h3>Layer 2 — Sector Leadership</h3>
+
+  <ul>
+    <li>1-month performance</li>
+    <li>3-month performance</li>
+    <li>6-month performance</li>
+    <li>Relative strength versus Nifty</li>
+    <li>Breadth</li>
+    <li>Volume</li>
+    <li>New highs</li>
+  </ul>
+
+  <h3>Layer 3 — Stock Universe</h3>
+
+  <ul>
+    <li>Liquidity</li>
+    <li>Trend</li>
+    <li>Momentum</li>
+    <li>Fundamentals</li>
+    <li>Institutional participation</li>
+    <li>Technical setup</li>
+  </ul>
+</section>
+
+<section>
+  <h2>15. 100-Point Ranking Model</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Points</th>
+          <th>Components</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Market</td>
+          <td>15</td>
+          <td>Market trend, breadth, risk regime</td>
+        </tr>
+        <tr>
+          <td>Sector</td>
+          <td>15</td>
+          <td>Relative strength, momentum, breadth</td>
+        </tr>
+        <tr>
+          <td>Stock Trend</td>
+          <td>20</td>
+          <td>50/200 DMA, rising averages, relative strength</td>
+        </tr>
+        <tr>
+          <td>Fundamentals</td>
+          <td>20</td>
+          <td>EPS, sales, earnings acceleration, ROE/ROIC/margins</td>
+        </tr>
+        <tr>
+          <td>Setup</td>
+          <td>20</td>
+          <td>Base, contraction, volume, breakout/pullback quality</td>
+        </tr>
+        <tr>
+          <td>Risk</td>
+          <td>10</td>
+          <td>Liquidity, volatility, stop distance, event risk</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card score">
+    <strong>Trading threshold: 80+/100</strong>
+
+    <p>
+      The score is intended as a ranking framework, not a prediction engine.
+      The actual thresholds should be validated with historical testing.
+    </p>
+  </div>
+</section>
+
+<section id="screeners">
+  <h2>16. Stock Discovery Workflow</h2>
+
+  <pre>5,000+ Stocks
+      ↓
+Liquidity Filter
+      ↓
+Market Regime
+      ↓
+Sector Leaders
+      ↓
+Relative Strength
+      ↓
+Fundamental Acceleration
+      ↓
+Institutional Participation
+      ↓
+Technical Setup
+      ↓
+50 Candidates
+      ↓
+15 Candidates
+      ↓
+5 High-Conviction Setups</pre>
+
+  <h2>17. Scanner A — Momentum Leaders</h2>
+
+  <pre>Price > 200 DMA
+50 DMA > 200 DMA
+20 DMA > 50 DMA
+3M Return > Nifty 3M Return
+6M Return > Nifty 6M Return
+Relative Strength Improving
+Average Traded Value > Minimum</pre>
+
+  <h2>18. Scanner B — Breakout</h2>
+
+  <pre>Price near 20/50-day High
+Price near 52-week High
+Volume > 1.5–2x Average
+Close near High of Day
+Above 50 DMA
+Above 200 DMA
+Sector Relative Strength Positive</pre>
+
+  <h2>19. Scanner C — VCP / Contraction</h2>
+
+  <pre>Strong Prior Trend
+ATR Declining
+Range Contraction
+Volume Declining
+Price Near Resistance
+Above Major Moving Averages
+Relative Strength High</pre>
+
+  <h2>20. Scanner D — Pullback</h2>
+
+  <pre>Long-term Trend Bullish
+Price Above 200 DMA
+Price Retraces Toward 20/50 DMA
+Short-term Momentum Weak
+Long-term Momentum Strong
+Volume Contracts During Pullback
+Reversal / Reclaim Trigger</pre>
+
+  <h2>21. Scanner E — Earnings Acceleration</h2>
+
+  <pre>EPS Growth Accelerating
+Revenue Growth Accelerating
+Latest Earnings Surprise Positive
+Price > 50 DMA
+Price > 200 DMA
+Relative Strength High
+Volume Expansion</pre>
+</section>
+
+<section id="entry">
+  <h2>22. Entry Framework</h2>
+
+  <p>
+    Use:
+  </p>
+
+  <pre>Candidate
+   ↓
+Setup
+   ↓
+Trigger
+   ↓
+Entry</pre>
+
+  <h3>Example</h3>
+
+  <ul>
+    <li>Stock score: 88/100</li>
+    <li>Setup: VCP</li>
+    <li>Trend: Strong</li>
+    <li>Consolidation: 5 weeks</li>
+    <li>Resistance: ₹1,250</li>
+    <li>Trigger: Breakout above ₹1,250</li>
+    <li>Entry: ₹1,255</li>
+    <li>Stop: Structural invalidation</li>
+  </ul>
+</section>
+
+<section id="risk">
+  <h2>23. Position Sizing</h2>
+
+  <p>
+    Position size should be determined by the amount you're willing to lose,
+    not by how much capital you have available.
+  </p>
+
+  <div class="card">
+    <h3>Example</h3>
+
+    <p>Account = ₹10,00,000</p>
+    <p>Risk per trade = 0.5% = ₹5,000</p>
+    <p>Entry = ₹1,000</p>
+    <p>Stop = ₹950</p>
+    <p>Risk/share = ₹50</p>
+    <p>Position size = ₹5,000 / ₹50 = <strong>100 shares</strong></p>
+    <p>Position value = ₹1,00,000</p>
+  </div>
+
+  <p>
+    You're therefore risking approximately <strong>0.5% of the account</strong>,
+    rather than simply risking the entire ₹1 lakh position.
+  </p>
+
+  <div class="card danger">
+    <strong>Account for slippage and gap risk.</strong>
+    A stop price does not necessarily guarantee execution at that exact price,
+    particularly in fast-moving or illiquid markets.
+  </div>
+</section>
+
+<section id="exit">
+  <h2>24. Exit System</h2>
+
+  <h3>Exit 1 — Thesis Failure</h3>
+  <p>
+    Price breaks the level that invalidates the setup.
+  </p>
+
+  <h3>Exit 2 — Failed Breakout</h3>
+  <p>
+    Large volume reversal and close back into the base can indicate failure.
+  </p>
+
+  <h3>Exit 3 — Relative-Strength Deterioration</h3>
+  <p>
+    If the market remains strong while the stock becomes materially weaker,
+    treat it as a warning.
+  </p>
+
+  <h3>Exit 4 — Trend Violation</h3>
+  <p>
+    Repeated closes below important structural support may justify reducing
+    or exiting the position.
+  </p>
+
+  <h3>Exit 5 — Trailing Stop</h3>
+
+  <ul>
+    <li>Swing lows</li>
+    <li>ATR</li>
+    <li>Moving averages</li>
+    <li>Previous breakout levels</li>
+  </ul>
+
+  <h3>Exit 6 — Climactic Move</h3>
+  <p>
+    Parabolic acceleration combined with extreme volume and extension can be
+    a reason to begin taking profits or tightening the trailing mechanism.
+  </p>
+</section>
+
+<section>
+  <h2>25. Expectancy</h2>
+
+  <p>
+    Don't judge a strategy solely by its win rate.
+  </p>
+
+  <pre>Expectancy =
+(Win Rate × Average Win)
+−
+(Loss Rate × Average Loss)</pre>
+
+  <div class="card score">
+    <p>Example:</p>
+    <p>Win rate = 45%</p>
+    <p>Average winner = +4R</p>
+    <p>Loss rate = 55%</p>
+    <p>Average loser = −1R</p>
+
+    <h3>Expectancy = +1.25R</h3>
+  </div>
+
+  <p>
+    A strategy can therefore be profitable even if it loses more trades than
+    it wins, provided its winners are sufficiently larger than its losers.
+  </p>
+</section>
+
+<section>
+  <h2>26. Trading Journal</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Record</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Symbol</td><td>XYZ</td></tr>
+        <tr><td>Sector</td><td>IT</td></tr>
+        <tr><td>Setup</td><td>VCP</td></tr>
+        <tr><td>Market regime</td><td>Bull</td></tr>
+        <tr><td>Sector RS</td><td>94</td></tr>
+        <tr><td>Stock RS</td><td>97</td></tr>
+        <tr><td>Entry</td><td>₹X</td></tr>
+        <tr><td>Stop</td><td>₹Y</td></tr>
+        <tr><td>Risk</td><td>0.5%</td></tr>
+        <tr><td>Position size</td><td>X</td></tr>
+        <tr><td>Volume</td><td>X× average</td></tr>
+        <tr><td>Earnings date</td><td>X</td></tr>
+        <tr><td>Reason</td><td>Breakout</td></tr>
+        <tr><td>Exit</td><td>X</td></tr>
+        <tr><td>R multiple</td><td>+X</td></tr>
+        <tr><td>Mistake?</td><td>Yes / No</td></tr>
+        <tr><td>Screenshot</td><td>Before / After</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>After 50–100 Trades</h3>
+
+  <ul>
+    <li>Which setups make money?</li>
+    <li>Which sectors perform best?</li>
+    <li>Which market regimes work?</li>
+    <li>Which holding periods work?</li>
+    <li>Which entry types work?</li>
+    <li>Average R</li>
+    <li>Maximum drawdown</li>
+    <li>Win rate</li>
+    <li>Profit factor</li>
+    <li>Expectancy</li>
+    <li>Slippage</li>
+    <li>Early exits</li>
+    <li>Failed breakouts</li>
+  </ul>
+</section>
+
+<section id="tools">
+  <h2>27. Research and Screening Tools</h2>
+
+  <div class="grid">
+
+    <div class="metric">
+      <strong>TradingView</strong>
+      Charts, screeners, relative performance and alerts.
+      <br><br>
+      <a href="https://www.tradingview.com/stock-screener/">
+        TradingView Stock Screener
+      </a>
+    </div>
+
+    <div class="metric">
+      <strong>Chartink</strong>
+      Rule-based technical scanning for Indian markets.
+      <br><br>
+      <a href="https://chartink.com/">
+        Chartink
+      </a>
+    </div>
+
+    <div class="metric">
+      <strong>Screener.in</strong>
+      Fundamental screening and financial analysis.
+      <br><br>
+      <a href="https://www.screener.in/">
+        Screener.in
+      </a>
+    </div>
+
+    <div class="metric">
+      <strong>Trendlyne</strong>
+      Technical, fundamental, ownership and market analytics.
+      <br><br>
+      <a href="https://trendlyne.com/">
+        Trendlyne
+      </a>
+    </div>
+
+    <div class="metric">
+      <strong>StockEdge</strong>
+      Indian-market scans and market activity.
+      <br><br>
+      <a href="https://stockedge.com/">
+        StockEdge
+      </a>
+    </div>
+
+    <div class="metric">
+      <strong>MarketSmith / IBD</strong>
+      O'Neil-style growth and technical analysis.
+      <br><br>
+      <a href="https://marketsmith.in/">
+        MarketSmith India
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <h2>28. Books and Practitioners</h2>
+
+  <div class="card">
+    <h3>William O'Neil</h3>
+    <p><em>How to Make Money in Stocks</em></p>
+    <ul>
+      <li>CAN SLIM</li>
+      <li>Relative strength</li>
+      <li>Earnings</li>
+      <li>Bases</li>
+      <li>Breakouts</li>
+      <li>Institutional accumulation</li>
+      <li>Sell rules</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Mark Minervini</h3>
+    <p><em>Trade Like a Stock Market Wizard</em></p>
+    <ul>
+      <li>SEPA</li>
+      <li>VCP</li>
+      <li>Trend Template</li>
+      <li>Entries</li>
+      <li>Risk</li>
+      <li>Position sizing</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Stan Weinstein</h3>
+    <p><em>Secrets for Profiting in Bull and Bear Markets</em></p>
+    <ul>
+      <li>Stage analysis</li>
+      <li>Moving averages</li>
+      <li>Relative strength</li>
+      <li>Market timing</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Curtis Faith</h3>
+    <p><em>Way of the Turtle</em></p>
+    <ul>
+      <li>Breakouts</li>
+      <li>Position sizing</li>
+      <li>Systematic exits</li>
+      <li>Trend following</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Richard Wyckoff</h3>
+    <ul>
+      <li>Accumulation</li>
+      <li>Distribution</li>
+      <li>Supply and demand</li>
+      <li>Composite Operator</li>
+    </ul>
+  </div>
+</section>
+
+<section id="research">
+  <h2>29. Academic / Institutional Research</h2>
+
+  <div class="card">
+    <h3>AQR — Trend Following</h3>
+
+    <p>
+      <a href="https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing">
+        A Century of Evidence on Trend-Following Investing
+      </a>
+    </p>
+
+    <p>
+      Long-horizon evidence for trend following across multiple asset classes.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>AQR — Factor Premia</h3>
+
+    <p>
+      <a href="https://www.aqr.com/Insights/Research/Journal-Article/How-Do-Factor-Premia-Vary-Over-Time-A-Century-of-Evidence">
+        A Century of Evidence on Factor Premia
+      </a>
+    </p>
+
+    <p>
+      Research covering momentum, value, carry and defensive factors.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>Baltas & Kosowski</h3>
+
+    <p>
+      <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1968996">
+        Momentum Strategies in Futures Markets and Trend-Following Funds
+      </a>
+    </p>
+
+    <p>
+      Useful for understanding the relationship between systematic momentum
+      and managed-futures / CTA strategies.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>Momentum Crashes</h3>
+
+    <p>
+      <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2516796">
+        Momentum Trading, Return Chasing, and Predictable Crashes
+      </a>
+    </p>
+
+    <p>
+      Important counterweight to momentum enthusiasm: momentum strategies
+      can experience severe reversals.
+    </p>
+  </div>
+</section>
+
+<section id="workflow">
+  <h2>30. Weekly Trading Workflow</h2>
+
+  <h3>Saturday / Sunday</h3>
+
+  <ol>
+    <li>Determine market regime.</li>
+    <li>Rank sectors.</li>
+    <li>Run stock scans.</li>
+    <li>Check fundamental acceleration.</li>
+    <li>Check institutional participation.</li>
+    <li>Manually review charts.</li>
+    <li>Reduce the universe to 5–15 candidates.</li>
+    <li>Prepare entry/stop/position-size plans.</li>
+    <li>Set alerts.</li>
+  </ol>
+
+  <h3>During the Week</h3>
+
+  <ol>
+    <li>Do not chase extended moves.</li>
+    <li>Wait for the predefined trigger.</li>
+    <li>Calculate position size before entering.</li>
+    <li>Place risk controls.</li>
+    <li>Track relative strength.</li>
+    <li>Manage winners according to predefined rules.</li>
+    <li>Record every trade.</li>
+  </ol>
+
+  <h3>End of Week</h3>
+
+  <ul>
+    <li>Review every trade.</li>
+    <li>Review missed setups.</li>
+    <li>Measure expectancy.</li>
+    <li>Measure slippage.</li>
+    <li>Identify rule violations.</li>
+    <li>Update the research database.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>31. The Winner-Finding Machine</h2>
+
+  <div class="flow">
+ALL NSE/BSE STOCKS
+        │
+        ▼
+LIQUIDITY FILTER
+        │
+        ▼
+MARKET REGIME
+        │
+        ▼
+SECTOR LEADERSHIP
+        │
+        ▼
+RELATIVE-STRENGTH RANK
+        │
+        ▼
+FUNDAMENTAL ACCELERATION
+        │
+        ▼
+INSTITUTIONAL ACCUMULATION
+        │
+        ▼
+TECHNICAL SETUP
+        │
+   ┌────┼────┐
+   ▼    ▼    ▼
+  VCP  BREAKOUT  PULLBACK
+   │    │    │
+   └────┼────┘
+        ▼
+ENTRY TRIGGER
+        │
+        ▼
+POSITION SIZE
+        │
+        ▼
+RISK CONTROL
+        │
+        ▼
+TRAIL / EXIT / REVIEW
+  </div>
+</section>
+
+<section>
+  <h2>32. The Core Principle</h2>
+
+  <div class="card score">
+    <p>
+      Don't search for stocks that merely <em>might</em> go up.
+    </p>
+
+    <p>
+      Search for stocks that are:
+    </p>
+
+    <p>
+      <strong>
+        Already demonstrating unusual strength, in strong industries,
+        with improving fundamentals, under constructive supply/demand
+        conditions, approaching a technically favorable point where
+        downside can be defined tightly.
+      </strong>
+    </p>
+  </div>
+
+  <p>
+    The scanner finds candidates.
+    The chart finds the setup.
+    The risk model determines whether you can survive.
+    The journal determines whether you actually have an edge.
+  </p>
+</section>
+
+<section>
+  <h2>33. Four-Week Implementation Plan</h2>
+
+  <div class="grid">
+
+    <div class="metric">
+      <strong>Week 1</strong>
+      Build the market, sector and relative-strength framework.
+    </div>
+
+    <div class="metric">
+      <strong>Week 2</strong>
+      Build the five scanners.
+    </div>
+
+    <div class="metric">
+      <strong>Week 3</strong>
+      Backtest/replay 100–200 historical setups.
+    </div>
+
+    <div class="metric">
+      <strong>Week 4</strong>
+      Paper trade the exact rules.
+    </div>
+
+  </div>
+
+  <p>
+    After that, use very small live size, collect at least 50–100 trades,
+    measure the actual expectancy, and only then consider scaling.
+  </p>
+</section>
+
+<footer>
+  <div class="container">
+    <p>
+      <strong>Professional Swing Trading Playbook</strong>
+    </p>
+
+    <p>
+      Educational material only. This document is not financial advice or a
+      recommendation to buy or sell any security. Trading involves substantial
+      risk, including the possibility of losing capital.
+    </p>
+  </div>
+</footer>
+
+</main>
+
+</body>
+</html>

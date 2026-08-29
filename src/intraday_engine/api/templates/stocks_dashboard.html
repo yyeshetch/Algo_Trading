@@ -463,7 +463,7 @@
         <span class="status" id="fiidiiStatus">Use Refresh dashboard in the header.</span>
       </div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 1100px;">
-        Last 30 days. <strong>Top:</strong> Cash-segment net FII vs DII (₹ crore). <strong>Bottom:</strong> Participant-wise net F&amp;O Open Interest (Index Future longs minus shorts) for Client / FII / Pro / DII. Data from NSE public reports — may be empty if NSE rate-limited the download.
+        Last 45 days. <strong>Top:</strong> Cash-segment net FII vs DII (₹ crore). <strong>Bottom:</strong> Participant-wise net F&amp;O Open Interest (Index Future longs minus shorts) for Client / FII / Pro / DII. Refresh backfills missing sessions (last 45 trading days).
       </p>
       <div id="fiidiiLoading" class="loading" style="display:none;">Loading…</div>
       <div id="fiidiiEmpty" class="empty" style="display:none;">No FII/DII data yet. Run Refresh dashboard.</div>
@@ -577,7 +577,7 @@
 
         <!-- Detail table -->
         <details class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem;">
-          <summary style="cursor:pointer; font-size: 0.9rem; font-weight: 600;">Daily detail table (last 30 sessions)</summary>
+          <summary style="cursor:pointer; font-size: 0.9rem; font-weight: 600;">Daily detail table (last 45 sessions)</summary>
           <div style="overflow-x: auto; margin-top: 0.6rem;">
             <table id="fiidiiTable" style="font-size: 0.8rem;">
               <thead>
@@ -2431,7 +2431,7 @@
       document.getElementById('heroDiiTrend').innerHTML = trendLabel(dii);
       document.getElementById('heroNetTrend').innerHTML = trendLabel(net);
 
-      // descending order for table (newest first) — all 30 sessions, gaps show em dash
+      // descending order for table (newest first) — all 45 sessions, gaps show em dash
       const tableRows = rows.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
       fiidiiTbody.innerHTML = tableRows.map(r => {
         const cls = (v) => deltaCls(v);
@@ -2460,7 +2460,7 @@
       let status = `${tableRows.length} sessions · ${dataRows.length} with FII/DII · chart last ${chartDays} sessions · ${(d.participant_oi || []).length} OI rows · cache ${oiHave}/${tgt} OI, ${fiiHave}/${tgt} FII/DII`;
       if (cov.participant_oi_fetched > 0) status += ` · fetched ${cov.participant_oi_fetched} OI file(s)`;
       if (cov.fii_dii_missing && cov.fii_dii_missing.length) {
-        status += ` · FII/DII gaps: ${cov.fii_dii_missing.length} (NSE publishes live day only)`;
+        status += ` · FII/DII gaps: ${cov.fii_dii_missing.length} (could not backfill)`;
       }
       fiidiiStatus.textContent = status;
       fiidiiStatus.className = 'status ok';
@@ -2668,7 +2668,8 @@
           'Relative strength'
         );
         renderRsPayload(d);
-        _rsLoadedKey = rsOnlyOuter?.checked ? 'outer' : 'all';
+        if ((d.rows || []).length) _rsLoadedKey = rsOnlyOuter?.checked ? 'outer' : 'all';
+        else _rsLoadedKey = null;
         return d;
       } catch (e) {
         rsLoading.style.display = 'none';

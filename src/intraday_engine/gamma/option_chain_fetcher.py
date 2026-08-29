@@ -505,8 +505,16 @@ def save_option_chain_snapshot(
             for s in snapshot.strikes
         ]
     )
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage import db as db_store
+
+        db_store.append_option_chain_rows(rows)
+        return path
     existing = pd.read_csv(path) if path.exists() else pd.DataFrame()
     combined = pd.concat([existing, rows], ignore_index=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(path, index=False)
     return path
 
@@ -520,6 +528,19 @@ def remove_option_chain_snapshots(
     capture_prefixes: list[str] | None = None,
 ) -> int:
     """Drop CSV rows for exact timestamps or ISO prefixes (e.g. 2026-07-30T11:17)."""
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage import db as db_store
+
+        ts_set = {str(t) for t in raw_timestamps} if raw_timestamps else None
+        return db_store.delete_option_chain_rows(
+            trade_date,
+            underlying,
+            timestamps=ts_set,
+            timestamp_prefixes=capture_prefixes,
+        )
+
     path = option_chain_day_path(data_dir, trade_date)
     if not path.exists():
         return 0
@@ -1493,22 +1514,12 @@ def _index_analysis_snapshots(
     return [by_bar[k] for k in sorted(by_bar)]
 
 
-def load_option_chain_snapshots(
-    data_dir: Path,
-    trade_date: date,
-    underlying: str = "NIFTY",
-) -> List[dict]:
-    """Load all option chain snapshots for a date from the flattened CSV."""
-    path = option_chain_day_path(data_dir, trade_date)
-    if not path.exists():
-        return []
-    df = pd.read_csv(path)
+def _option_chain_records_from_df(df: pd.DataFrame, trade_date: date, underlying: str) -> list[dict]:
     underlying_name = normalize_underlying(underlying)
     if "underlying" in df.columns:
         df = df[df["underlying"].astype(str) == underlying_name]
     if df.empty:
         return []
-
     records: list[dict] = []
     for ts, group in df.groupby("timestamp", sort=True):
         first = group.iloc[0]
@@ -1525,6 +1536,36 @@ def load_option_chain_snapshots(
             }
         )
     return records
+
+
+def load_option_chain_snapshots(
+    data_dir: Path,
+    trade_date: date,
+    underlying: str = "NIFTY",
+) -> List[dict]:
+    """Load all option chain snapshots for a date from the flattened CSV."""
+    from intraday_engine.storage.backend import write_to_db
+
+    if write_to_db():
+        from intraday_engine.storage.data_cache import get_cached, set_cached
+        from intraday_engine.storage import db as db_store
+
+        cache_key = f"option_chain:{trade_date.isoformat()}:{underlying}"
+        cached = get_cached(cache_key)
+        if cached is not None:
+            return cached
+        df = db_store.load_option_chain_rows(trade_date, underlying)
+        if df.empty:
+            return []
+        records = _option_chain_records_from_df(df, trade_date, underlying)
+        set_cached(cache_key, records)
+        return records
+
+    path = option_chain_day_path(data_dir, trade_date)
+    if not path.exists():
+        return []
+    df = pd.read_csv(path)
+    return _option_chain_records_from_df(df, trade_date, underlying)
 
 
 def load_session_option_chain_snapshots(

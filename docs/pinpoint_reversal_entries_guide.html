@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinpoint Reversal Entries — The Institutional Playbook</title>
+<style>
+  :root{
+    --bg:#0a0e13; --panel:#111823; --panel2:#0e141d; --line:#1e2733;
+    --txt:#e6edf3; --muted:#94a3b8; --dim:#64748b;
+    --green:#22c55e; --red:#ef4444; --amber:#f59e0b; --blue:#38bdf8; --violet:#a78bfa;
+    --shadow:0 8px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.65;font-size:16px}
+  a{color:var(--blue);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .layout{display:grid;grid-template-columns:280px 1fr;max-width:1550px;margin:0 auto}
+  nav.side{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    padding:1.4rem 1rem;border-right:1px solid var(--line);background:var(--panel2)}
+  nav.side h2{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:1.2rem .4rem .4rem}
+  nav.side a{display:block;color:var(--muted);padding:.28rem .5rem;border-radius:7px;font-size:.85rem}
+  nav.side a:hover{background:#182130;color:var(--txt);text-decoration:none}
+  nav.side .brand{font-weight:800;font-size:1.05rem;color:var(--txt);padding:.2rem .4rem .6rem}
+  nav.side .brand span{color:var(--green)}
+  main{padding:0 clamp(1rem,4vw,3rem) 6rem;min-width:0}
+
+  header.hero{position:relative;margin:0 0 2rem;padding:3rem clamp(1.2rem,4vw,3rem) 2.4rem;
+    background:radial-gradient(1200px 400px at 20% 0%, rgba(56,189,248,.15), transparent 60%),
+               radial-gradient(1000px 400px at 90% 20%, rgba(167,139,250,.13), transparent 60%),
+               linear-gradient(180deg,#0e141d,#0a0e13);
+    border-bottom:1px solid var(--line)}
+  header.hero .kicker{display:inline-block;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--green);font-weight:700;margin-bottom:.6rem}
+  header.hero h1{font-size:clamp(1.7rem,3.6vw,2.6rem);margin:0 0 .6rem;font-weight:800;letter-spacing:-.02em}
+  header.hero p{margin:0;color:var(--muted);max-width:820px;font-size:1.05rem}
+
+  h2.section{font-size:1.6rem;margin:3.2rem 0 .6rem;letter-spacing:-.01em;scroll-margin-top:1rem}
+  .lead{color:var(--muted);font-size:1.02rem;max-width:820px;margin:.2rem 0 1.6rem}
+  .phase-band{display:flex;align-items:center;gap:1rem;margin:3.4rem 0 1rem;padding:1rem 1.2rem;
+    border-radius:14px;border:1px solid var(--line);background:linear-gradient(90deg,var(--panel),transparent)}
+  .phase-band .num{font-size:2rem;font-weight:800;color:var(--green);line-height:1;min-width:2.5rem}
+  .phase-band h2{margin:0;font-size:1.35rem;scroll-margin-top:1rem}
+  .phase-band p{margin:.15rem 0 0;color:var(--muted);font-size:.92rem}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.5rem;
+    margin:1.1rem 0;box-shadow:var(--shadow);scroll-margin-top:1rem}
+  .card h3{margin:0 0 .3rem;font-size:1.14rem;display:flex;align-items:center;gap:.6rem}
+  .card h3 .idx{font-size:.7rem;font-weight:700;letter-spacing:.1em;color:var(--bg);
+    background:var(--blue);padding:.18rem .55rem;border-radius:20px}
+  .card h4{margin:1rem 0 .3rem;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+  .card h4.why{color:var(--amber)}
+  .card h4.how{color:var(--green)}
+  .card h4.trap{color:var(--red)}
+  .card p{margin:.35rem 0}
+  .card ul{margin:.35rem 0 .35rem 1.2rem;padding:0}
+  .card ul li{margin:.15rem 0}
+
+  .callout{border-left:3px solid var(--amber);background:#171307;border-radius:0 10px 10px 0;
+    padding:.7rem .9rem;margin:.9rem 0;font-size:.93rem;color:#f1e5c7}
+  .callout.rule{border-color:var(--green);background:#0c1710;color:#c8f0d4}
+  .callout.trap{border-color:var(--red);background:#1a0d0d;color:#f6c9c9}
+  .callout.tip{border-color:var(--blue);background:#0b1620;color:#c9e2f3}
+  .callout b{color:var(--txt)}
+
+  figure{margin:1.2rem 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem}
+  figure svg{width:100%;height:auto;display:block}
+  figcaption{color:var(--muted);font-size:.83rem;margin-top:.6rem;text-align:center}
+  code{background:#0c1119;border:1px solid var(--line);border-radius:5px;padding:.05rem .35rem;font-size:.9em;color:#e2e8f0}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;padding:.14rem .5rem;border-radius:20px;margin-right:.3rem}
+  .pill.long{background:rgba(34,197,94,.15);color:#86efac}
+  .pill.short{background:rgba(239,68,68,.15);color:#fca5a5}
+  .pill.neutral{background:rgba(148,163,184,.15);color:#cbd5e1}
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.92rem}
+  th,td{text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;background:#0c1119}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  @media (max-width:900px){.grid2{grid-template-columns:1fr}.layout{grid-template-columns:1fr}nav.side{position:relative;height:auto;border-right:none;border-bottom:1px solid var(--line)}}
+
+  .checklist{background:linear-gradient(135deg,#0c1a12,#0e141d);border:1px solid #1c3327;border-radius:14px;padding:1.3rem 1.5rem;margin:1.5rem 0}
+  .checklist h3{margin:.1rem 0 .6rem;color:var(--green)}
+  .checklist label{display:flex;align-items:flex-start;gap:.6rem;padding:.35rem .2rem;color:var(--txt);cursor:pointer}
+  .checklist label:hover{background:#0a1510;border-radius:6px}
+  .checklist input{margin-top:.35rem;accent-color:var(--green)}
+
+  .svg-lbl{fill:var(--muted);font-size:12px;font-family:inherit}
+  .svg-lbl-w{fill:#e6edf3;font-size:12px;font-weight:700;font-family:inherit}
+  .svg-axis{stroke:#334155;stroke-width:1}
+  .cndl-up{fill:#22c55e;stroke:#22c55e}
+  .cndl-dn{fill:#ef4444;stroke:#ef4444}
+  .wick{stroke:#94a3b8;stroke-width:1}
+  .zone-buy{fill:rgba(34,197,94,.15);stroke:rgba(34,197,94,.55);stroke-dasharray:4 3}
+  .zone-sell{fill:rgba(239,68,68,.15);stroke:rgba(239,68,68,.55);stroke-dasharray:4 3}
+  .line-key{stroke:var(--amber);stroke-width:1.4;stroke-dasharray:5 4;fill:none}
+  .line-vwap{stroke:var(--violet);stroke-width:1.6;fill:none}
+  .arrow{stroke:#f59e0b;stroke-width:1.8;fill:none;marker-end:url(#arr)}
+
+  .disclaimer{margin:3rem 0 0;padding:1.2rem 1.4rem;border:1px dashed var(--red);border-radius:12px;
+    background:#150c0c;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+  <div class="brand">Reversal <span>Playbook</span></div>
+  <h2>Framework</h2>
+  <a href="#framework">The Reversal Formula</a>
+  <a href="#footprints">Institutional Footprints</a>
+
+  <h2>Part 1 — Location</h2>
+  <a href="#t1">1. Volume Profile</a>
+  <a href="#t2">2. Market Profile / TPO</a>
+  <a href="#t3">3. VWAP & Anchored VWAP</a>
+  <a href="#t4">4. Prior Day / Week Levels</a>
+  <a href="#t5">5. Opening Range</a>
+  <a href="#t6">6. Order Blocks</a>
+  <a href="#t7">7. Fair Value Gaps</a>
+  <a href="#t8">8. Supply / Demand Zones</a>
+  <a href="#t9">9. Fibonacci Confluence</a>
+  <a href="#t10">10. Round Numbers</a>
+
+  <h2>Part 2 — Confirmation</h2>
+  <a href="#t11">11. Wyckoff Spring / UTAD</a>
+  <a href="#t12">12. Liquidity Sweep + Reclaim</a>
+  <a href="#t13">13. BOS &amp; CHoCH</a>
+  <a href="#t14">14. Absorption Candles</a>
+  <a href="#t15">15. Cumulative Delta Divergence</a>
+  <a href="#t16">16. Footprint Imbalance</a>
+  <a href="#t17">17. Bollinger Squeeze Break</a>
+  <a href="#t18">18. RSI / MACD Divergence</a>
+  <a href="#t19">19. Volume Climax</a>
+  <a href="#t20">20. Candle Triggers at Level</a>
+
+  <h2>Part 3 — Options Flow</h2>
+  <a href="#t21">21. Max Pain</a>
+  <a href="#t22">22. Gamma Exposure (GEX)</a>
+  <a href="#t23">23. OI Buildup / Unwinding</a>
+  <a href="#t24">24. PCR Extremes</a>
+  <a href="#t25">25. IV Crush / Expansion</a>
+  <a href="#t26">26. OI Walls (Strikes)</a>
+  <a href="#t27">27. Unusual Options Activity</a>
+
+  <h2>Part 4 — Internals</h2>
+  <a href="#t28">28. TICK / TRIN / A-D</a>
+  <a href="#t29">29. Sector Rotation</a>
+  <a href="#t30">30. FII / DII Flow</a>
+  <a href="#t31">31. India VIX Behavior</a>
+  <a href="#t32">32. USDINR / DXY / Yields</a>
+
+  <h2>Playbooks</h2>
+  <a href="#pb1">Setup A — Spring at VPOC</a>
+  <a href="#pb2">Setup B — AVWAP Reclaim</a>
+  <a href="#pb3">Setup C — Sweep + FVG Fill</a>
+  <a href="#pb4">Setup D — OB Retest</a>
+
+  <h2>Execution</h2>
+  <a href="#entry">Entry Precision</a>
+  <a href="#risk">Risk &amp; Position Sizing</a>
+  <a href="#checklist">Pre-Trade Checklist</a>
+  <a href="#disclaimer">Disclaimer</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <span class="kicker">Reversal Trading · Institutional Edge</span>
+  <h1>Pinpoint Reversal Entries — How to Catch Huge Institutional Moves</h1>
+  <p>Every explosive reversal is the collision of <b>location</b>, <b>signal</b>, and <b>confirmation</b>. This guide walks through every technical framework a professional trader uses to identify where smart money defends price, how their footprints show up on the tape, and how to build a repeatable entry with tight risk and asymmetric reward.</p>
+</header>
+
+<!-- FRAMEWORK ================================================= -->
+<h2 id="framework" class="section">The Universal Reversal Formula</h2>
+<p class="lead">Random reversal calls fail. High-probability reversals are always the same three-part equation. Never enter unless <b>all three</b> are present.</p>
+
+<div class="card">
+  <h3>Location + Signal + Confirmation = Entry</h3>
+  <div class="grid2">
+    <div>
+      <h4>1. Location</h4>
+      <p>A pre-mapped level where institutions defended price before — VPOC, VWAP, order block, prior day high/low, gamma wall. Price alone means nothing; <b>price at a magnet</b> is where risk is defined.</p>
+    </div>
+    <div>
+      <h4 class="why">2. Signal</h4>
+      <p>Evidence that institutions are absorbing the opposite side — liquidity sweep, delta divergence, absorption candle, unusual OI shift, VIX spike-and-fade.</p>
+    </div>
+  </div>
+  <h4 class="how">3. Confirmation</h4>
+  <p>A structural shift — Break of Structure (BOS) / Change of Character (CHoCH), reclaim of a key level, or a strong close through VWAP. This is your trigger. Without confirmation you are guessing.</p>
+  <div class="callout rule"><b>Golden Rule:</b> Level alone is a bet. Level + Signal is a lean. Level + Signal + Confirmation is a trade.</div>
+</div>
+
+<h2 id="footprints" class="section">What Institutional Footprints Actually Look Like</h2>
+<figure>
+  <svg viewBox="0 0 780 260" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/></marker></defs>
+    <line class="svg-axis" x1="40" y1="230" x2="760" y2="230"/>
+    <line class="svg-axis" x1="40" y1="20" x2="40" y2="230"/>
+    <!-- descending trend then absorption then reversal -->
+    <g>
+      <line class="wick" x1="80" y1="60" x2="80" y2="110"/><rect class="cndl-dn" x="72" y="70" width="16" height="30"/>
+      <line class="wick" x1="110" y1="80" x2="110" y2="130"/><rect class="cndl-dn" x="102" y="90" width="16" height="30"/>
+      <line class="wick" x1="140" y1="100" x2="140" y2="150"/><rect class="cndl-dn" x="132" y="110" width="16" height="30"/>
+      <line class="wick" x1="170" y1="120" x2="170" y2="180"/><rect class="cndl-dn" x="162" y="130" width="16" height="35"/>
+      <!-- capitulation wick -->
+      <line class="wick" x1="200" y1="140" x2="200" y2="215"/><rect class="cndl-dn" x="192" y="150" width="16" height="20"/>
+      <!-- absorption -->
+      <line class="wick" x1="230" y1="150" x2="230" y2="215"/><rect class="cndl-up" x="222" y="155" width="16" height="35"/>
+      <!-- BOS -->
+      <line class="wick" x1="260" y1="120" x2="260" y2="175"/><rect class="cndl-up" x="252" y="125" width="16" height="45"/>
+      <line class="wick" x1="290" y1="100" x2="290" y2="140"/><rect class="cndl-up" x="282" y="105" width="16" height="30"/>
+      <line class="wick" x1="320" y1="80" x2="320" y2="115"/><rect class="cndl-up" x="312" y="85" width="16" height="25"/>
+      <line class="wick" x1="350" y1="60" x2="350" y2="95"/><rect class="cndl-up" x="342" y="65" width="16" height="25"/>
+    </g>
+    <!-- key level -->
+    <line class="line-key" x1="40" y1="205" x2="760" y2="205"/>
+    <text class="svg-lbl-w" x="500" y="200">Key level (VPOC / OB / PDL)</text>
+    <!-- sweep annotation -->
+    <path class="arrow" d="M420 220 L215 215"/>
+    <text class="svg-lbl-w" x="430" y="225">1. Liquidity sweep (stops taken)</text>
+    <!-- absorption -->
+    <path class="arrow" d="M420 160 L245 165"/>
+    <text class="svg-lbl-w" x="430" y="165">2. Absorption / delta flip</text>
+    <!-- BOS -->
+    <path class="arrow" d="M480 105 L295 115"/>
+    <text class="svg-lbl-w" x="490" y="110">3. Break of Structure (entry trigger)</text>
+    <text class="svg-lbl" x="40" y="15">Price</text>
+    <text class="svg-lbl" x="720" y="245">Time</text>
+  </svg>
+  <figcaption>The three-phase institutional reversal signature: <b>Sweep → Absorb → Break</b>. Almost every explosive move begins with this exact fingerprint.</figcaption>
+</figure>
+
+<!-- ============ PART 1 : LOCATION ============ -->
+<div class="phase-band"><div class="num">01</div><div><h2>Part 1 — Location: Where Reversals Happen</h2><p>These are the maps. Print them before the session. Price without a level is noise.</p></div></div>
+
+<!-- 1. VOLUME PROFILE -->
+<div class="card" id="t1">
+  <h3><span class="idx">01</span> Volume Profile — VPOC, HVN, LVN, Value Area</h3>
+  <p>A horizontal histogram of volume traded at each price. Institutions leave <b>fingerprints in the profile</b>: heavy volume nodes (HVN) are magnets; low volume nodes (LVN) are voids that price races through.</p>
+  <figure>
+    <svg viewBox="0 0 700 240" xmlns="http://www.w3.org/2000/svg">
+      <!-- volume profile bars on left -->
+      <g>
+        <rect x="40" y="30"  width="30"  height="18" fill="#38bdf8" opacity=".55"/>
+        <rect x="40" y="52"  width="70"  height="18" fill="#38bdf8" opacity=".55"/>
+        <rect x="40" y="74"  width="120" height="18" fill="#a78bfa" opacity=".7"/>
+        <rect x="40" y="96"  width="180" height="18" fill="#22c55e" opacity=".85"/>
+        <rect x="40" y="118" width="220" height="18" fill="#22c55e"/>
+        <rect x="40" y="140" width="150" height="18" fill="#a78bfa" opacity=".7"/>
+        <rect x="40" y="162" width="40"  height="18" fill="#ef4444" opacity=".55"/>
+        <rect x="40" y="184" width="90"  height="18" fill="#38bdf8" opacity=".55"/>
+        <rect x="40" y="206" width="130" height="18" fill="#38bdf8" opacity=".55"/>
+      </g>
+      <text class="svg-lbl-w" x="270" y="128">POC (Point of Control)</text>
+      <text class="svg-lbl" x="145" y="86">HVN</text>
+      <text class="svg-lbl" x="55" y="176">LVN (fast-move zone)</text>
+      <!-- price line on right -->
+      <path d="M300 45 L340 60 L380 90 L410 120 L440 150 L470 175 L500 130 L540 100 L580 80 L620 60 L660 40"
+        stroke="#e6edf3" stroke-width="1.6" fill="none"/>
+      <line class="line-key" x1="300" y1="127" x2="680" y2="127"/>
+      <text class="svg-lbl" x="620" y="122">POC magnet</text>
+      <text class="svg-lbl" x="300" y="20">Price rejected at LVN edge, returns to POC</text>
+    </svg>
+    <figcaption>Reversals cluster at <b>Value Area High/Low</b> edges and at <b>HVN</b> price shelves. LVNs act like escalators — price rarely stalls inside.</figcaption>
+  </figure>
+  <h4 class="how">How to trade it</h4>
+  <ul>
+    <li><b>Fade the extremes:</b> When price pokes outside Value Area (VAH/VAL) with declining volume and rotates back inside, target POC. Highest-probability intraday setup on index futures.</li>
+    <li><b>POC bounce:</b> Anchor a session volume profile from the open. First test of developing POC often produces a clean bounce.</li>
+    <li><b>LVN break-and-retest:</b> If price breaks out of an HVN through an LVN, the LVN becomes support/resistance on retest — enter reversal from that shelf.</li>
+  </ul>
+  <div class="callout tip"><b>Example (NIFTY intraday):</b> Yesterday's VPOC = 24,850. Today NIFTY gaps down to 24,780, forms a doji, reclaims 24,800 with rising volume. Long → target 24,850 POC → 1:3 R:R with SL below 24,780 wick.</div>
+</div>
+
+<!-- 2. MARKET PROFILE -->
+<div class="card" id="t2">
+  <h3><span class="idx">02</span> Market Profile / TPO — Initial Balance &amp; Single Prints</h3>
+  <p>Market Profile turns time into structure. Each 30-minute period is a letter (TPO). The shape of the day reveals whether institutions are <b>rotating</b> (balanced) or <b>trending</b> (imbalanced) — reversals happen at profile extremes.</p>
+  <ul>
+    <li><b>Initial Balance (IB):</b> High &amp; low of the first hour. A break of IB that fails to extend and retraces back inside is a classic <b>failed auction</b> reversal.</li>
+    <li><b>Single Prints:</b> Vertical strips with only one TPO — evidence of a fast, unfilled move. Price often returns to fill them.</li>
+    <li><b>Poor High / Poor Low:</b> Flat, un-tested extreme — invites revisit and sweep before real reversal.</li>
+    <li><b>Open types:</b> Open-Drive vs Open-Rejection-Reverse. ORR at prior day VAH/VAL is a A+ reversal.</li>
+  </ul>
+  <div class="callout rule"><b>Rule of thumb:</b> Two-day-in-balance → third day breakout has 70%+ probability. Fade only when the breakout <i>fails</i> at day-3 IB extreme.</div>
+</div>
+
+<!-- 3. VWAP -->
+<div class="card" id="t3">
+  <h3><span class="idx">03</span> VWAP &amp; Anchored VWAP + Standard Deviation Bands</h3>
+  <p>VWAP is the average price weighted by volume — the price at which most institutional orders are actually filled. It is the single most watched intraday benchmark. Anchored VWAP (from a swing high/low, earnings, or event) becomes a defended level for weeks.</p>
+  <figure>
+    <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+      <line class="svg-axis" x1="40" y1="200" x2="700" y2="200"/>
+      <line class="svg-axis" x1="40" y1="20" x2="40" y2="200"/>
+      <!-- price path -->
+      <path d="M50 70 L90 90 L130 65 L170 100 L210 140 L250 155 L290 130 L330 100 L370 80 L410 100 L450 120 L490 150 L530 175 L560 165 L600 130 L640 90 L680 60"
+        stroke="#e6edf3" stroke-width="1.6" fill="none"/>
+      <!-- vwap -->
+      <path class="line-vwap" d="M50 115 L680 105"/>
+      <!-- +2sd -->
+      <path d="M50 70 L680 55" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 4" fill="none"/>
+      <!-- -2sd -->
+      <path d="M50 165 L680 160" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 4" fill="none"/>
+      <text class="svg-lbl-w" x="600" y="100">VWAP</text>
+      <text class="svg-lbl" x="600" y="52">+2σ band</text>
+      <text class="svg-lbl" x="600" y="158">-2σ band</text>
+      <circle cx="530" cy="175" r="7" fill="none" stroke="#22c55e" stroke-width="2"/>
+      <text class="svg-lbl-w" x="435" y="185">Tag of -2σ → reclaim VWAP = long</text>
+    </svg>
+    <figcaption>The classic <b>VWAP mean-reversion</b>: price extends to ±2σ, exhausts, and pulls back to VWAP. Anchor VWAP to the swing origin for multi-day trades.</figcaption>
+  </figure>
+  <h4 class="how">Key setups</h4>
+  <ul>
+    <li><b>VWAP reject &amp; reclaim:</b> Price under VWAP all morning, sweeps a low, reclaims VWAP on strong close = intraday long.</li>
+    <li><b>Anchored VWAP from earnings/IPO/breakout day</b> often acts as the institutional cost basis — first test almost always defended.</li>
+    <li><b>Multi-timeframe VWAP confluence:</b> Session VWAP + weekly AVWAP + prior day POC in same 0.3% band = A+ level.</li>
+  </ul>
+</div>
+
+<!-- 4. Prior Day / Week -->
+<div class="card" id="t4">
+  <h3><span class="idx">04</span> Prior Day / Week / Month Highs &amp; Lows (PDH/PDL, PWH/PWL)</h3>
+  <p>Stops cluster in obvious places. PDH, PDL, PWH, PWL are the most obvious. A move that <b>sweeps</b> the level (takes stops) and immediately reverses is a <b>liquidity grab</b> reversal.</p>
+  <ul>
+    <li>Enter on the <b>reclaim close</b>, not on the sweep itself.</li>
+    <li>Stop just beyond the sweep wick — usually 0.15–0.3% for index, 0.5–1% for stocks.</li>
+    <li>Target next opposite liquidity pool (opposite day's low/high).</li>
+  </ul>
+</div>
+
+<!-- 5. Opening Range -->
+<div class="card" id="t5">
+  <h3><span class="idx">05</span> Opening Range (ORB, ORL)</h3>
+  <p>First 5, 15, or 30-minute range. Institutions use it as reference. A <b>failed breakout</b> of OR (price pokes above OR-high then closes back inside) is a high-probability short — and vice versa.</p>
+  <div class="callout tip"><b>ORB Failure setup:</b> Wait for OR break, watch for pullback that <b>fails to make a new extreme</b>, then reversal candle → enter with stop above/below the OR extreme.</div>
+</div>
+
+<!-- 6. Order Blocks -->
+<div class="card" id="t6">
+  <h3><span class="idx">06</span> Order Blocks — The Last Institutional Candle</h3>
+  <p>An order block is the <b>last opposite-color candle before a strong impulsive move</b>. That candle marks where institutions accumulated (bullish OB) or distributed (bearish OB). When price returns to that OB, unfilled orders often re-activate → reversal.</p>
+  <figure>
+    <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+      <!-- ranging then bullish OB -->
+      <g>
+        <line class="wick" x1="70" y1="80" x2="70" y2="120"/><rect class="cndl-up" x="62" y="85" width="16" height="30"/>
+        <line class="wick" x1="100" y1="90" x2="100" y2="130"/><rect class="cndl-dn" x="92" y="95" width="16" height="30"/>
+        <line class="wick" x1="130" y1="85" x2="130" y2="125"/><rect class="cndl-up" x="122" y="90" width="16" height="30"/>
+        <!-- OB (last red before rally) -->
+        <line class="wick" x1="160" y1="100" x2="160" y2="150"/><rect class="cndl-dn" x="152" y="105" width="16" height="40"/>
+        <!-- rally -->
+        <line class="wick" x1="190" y1="60" x2="190" y2="140"/><rect class="cndl-up" x="182" y="65" width="16" height="70"/>
+        <line class="wick" x1="220" y1="30" x2="220" y2="70"/><rect class="cndl-up" x="212" y="35" width="16" height="30"/>
+        <line class="wick" x1="250" y1="25" x2="250" y2="55"/><rect class="cndl-up" x="242" y="30" width="16" height="20"/>
+        <!-- pullback -->
+        <line class="wick" x1="280" y1="30" x2="280" y2="80"/><rect class="cndl-dn" x="272" y="35" width="16" height="40"/>
+        <line class="wick" x1="310" y1="60" x2="310" y2="110"/><rect class="cndl-dn" x="302" y="65" width="16" height="40"/>
+        <!-- retest OB -->
+        <line class="wick" x1="340" y1="85" x2="340" y2="145"/><rect class="cndl-dn" x="332" y="90" width="16" height="40"/>
+        <!-- bounce -->
+        <line class="wick" x1="370" y1="55" x2="370" y2="130"/><rect class="cndl-up" x="362" y="60" width="16" height="60"/>
+        <line class="wick" x1="400" y1="25" x2="400" y2="65"/><rect class="cndl-up" x="392" y="30" width="16" height="30"/>
+      </g>
+      <rect x="150" y="105" width="200" height="45" fill="rgba(34,197,94,.13)" stroke="#22c55e" stroke-dasharray="4 3"/>
+      <text class="svg-lbl-w" x="360" y="132">Bullish Order Block</text>
+      <text class="svg-lbl" x="150" y="180">last down-candle before impulse</text>
+      <text class="svg-lbl" x="360" y="180">first retest → high-prob long</text>
+    </svg>
+    <figcaption>An OB is a <b>demand shelf</b>. Enter on the first tap; SL below the OB low; target the swing high or next liquidity pool.</figcaption>
+  </figure>
+  <h4 class="trap">Trap to avoid</h4>
+  <p>Not every last opposite candle is an OB. Require: (a) the impulse that follows takes out a prior swing (BOS), (b) the OB is unfilled, i.e., untested since creation.</p>
+</div>
+
+<!-- 7. FVG -->
+<div class="card" id="t7">
+  <h3><span class="idx">07</span> Fair Value Gaps (FVG) / Imbalances</h3>
+  <p>When three consecutive candles leave a <b>gap between candle-1 wick and candle-3 wick</b>, that's an FVG — an inefficient move where price traveled too fast. Institutions often return to fill that inefficiency before continuation, giving you a precise reversal/continuation entry.</p>
+  <ul>
+    <li>Bullish FVG below current price → look for long as price fills back into it and rejects.</li>
+    <li>Bearish FVG above current price → look for short as price rallies into it.</li>
+    <li>Confluence with OB or VWAP makes it far more reliable.</li>
+  </ul>
+</div>
+
+<!-- 8. Supply/Demand -->
+<div class="card" id="t8">
+  <h3><span class="idx">08</span> Supply &amp; Demand Zones (Base Breakouts)</h3>
+  <p>Different from OBs: a supply/demand zone is a <b>tight consolidation base</b> that immediately produced a strong breakout. That base is where big players filled — return to it often produces reversal.</p>
+  <p><b>Rally-Base-Drop</b> = supply. <b>Drop-Base-Rally</b> = demand. Prefer <b>fresh</b> (untested) zones. Freshness &gt; strength.</p>
+</div>
+
+<!-- 9. Fibonacci Confluence -->
+<div class="card" id="t9">
+  <h3><span class="idx">09</span> Fibonacci Confluence (Deep Pullback + Extension)</h3>
+  <p>Alone, Fib is weak. In <b>confluence</b> with VWAP or an OB, it's powerful. Institutions accumulate at <b>61.8% and 78.6%</b> retracements — the "optimal trade entry" (OTE) window.</p>
+  <ul>
+    <li>Draw Fib from the origin of the impulse to its end.</li>
+    <li>Look for a reversal signal inside the 0.618–0.786 zone with confluence of another level.</li>
+    <li>Target the -0.272 and -0.618 extensions.</li>
+  </ul>
+</div>
+
+<!-- 10. Round Numbers -->
+<div class="card" id="t10">
+  <h3><span class="idx">10</span> Round Numbers / Psychological Levels</h3>
+  <p>25,000 NIFTY. 55,000 BANKNIFTY. ₹1,000 stock strikes. These are magnets and rejection points because algos and retail orders both cluster here. Combine with sweep + reclaim for entry.</p>
+</div>
+
+<!-- ============ PART 2 : CONFIRMATION ============ -->
+<div class="phase-band"><div class="num">02</div><div><h2>Part 2 — Confirmation Signals: How to Know Institutions Are Acting Now</h2><p>Location tells you where. These signals tell you when. Never enter without at least one of them.</p></div></div>
+
+<!-- 11. Wyckoff Spring -->
+<div class="card" id="t11">
+  <h3><span class="idx">11</span> Wyckoff Spring &amp; UTAD — The Ultimate Reversal Pattern</h3>
+  <p>The 100-year-old Wyckoff method decoded institutional accumulation/distribution. The <b>Spring</b> (accumulation) and <b>UTAD</b> (Upthrust After Distribution) are its highest-conviction reversal signals.</p>
+  <figure>
+    <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg">
+      <!-- range with spring -->
+      <line class="line-key" x1="60" y1="70" x2="680" y2="70"/>
+      <line class="line-key" x1="60" y1="170" x2="680" y2="170"/>
+      <text class="svg-lbl-w" x="620" y="65">Resistance (Creek)</text>
+      <text class="svg-lbl-w" x="620" y="188">Support (Ice)</text>
+      <!-- price path -->
+      <path d="M60 100 L100 80 L140 130 L180 90 L220 150 L260 100 L300 160 L340 130 L380 195 L420 130 L460 80 L500 60 L540 55 L580 50 L620 45"
+        stroke="#e6edf3" stroke-width="1.6" fill="none"/>
+      <circle cx="380" cy="195" r="8" fill="none" stroke="#22c55e" stroke-width="2.5"/>
+      <text class="svg-lbl-w" x="330" y="220">SPRING — sweep of support, reclaim</text>
+      <path class="arrow" d="M470 145 L410 190"/>
+    </svg>
+    <figcaption>The Spring: after a long range, price briefly pierces support, absorbs stops, and closes back inside — the last low before markup.</figcaption>
+  </figure>
+  <h4 class="how">Spring checklist (for longs)</h4>
+  <ul>
+    <li>Multi-week/day range visible</li>
+    <li>Sweep of range low on <b>elevated volume but small body</b> (absorption)</li>
+    <li>Immediate reclaim inside the range</li>
+    <li>Sign of Strength (SOS) rally that breaks above prior lower highs (BOS)</li>
+    <li>Higher-low pullback → LPS (Last Point of Support) → entry</li>
+  </ul>
+  <div class="callout tip"><b>UTAD</b> is the mirror image at range highs for shorts — sweep of resistance, immediate rejection, break of range lows.</div>
+</div>
+
+<!-- 12. Liquidity Sweep -->
+<div class="card" id="t12">
+  <h3><span class="idx">12</span> Liquidity Sweep + Reclaim (Stop Hunt)</h3>
+  <p>The most reliable single-bar reversal signal. A "sweep" is a wick that pierces a well-known level (PDH, PDL, swing high/low, ORH/ORL) and closes back inside. It confirms institutions <b>engineered liquidity</b> to fill their opposing orders.</p>
+  <ul>
+    <li>Enter on <b>close</b> back inside — not on the wick itself.</li>
+    <li>SL just outside the sweep wick.</li>
+    <li>Look for delta divergence at the sweep for extra conviction.</li>
+  </ul>
+</div>
+
+<!-- 13. BOS / CHoCH -->
+<div class="card" id="t13">
+  <h3><span class="idx">13</span> Break of Structure (BOS) &amp; Change of Character (CHoCH)</h3>
+  <p>Structure is the sequence of Higher-Highs/Higher-Lows (uptrend) or Lower-Lows/Lower-Highs (downtrend). A trend continues until structure breaks.</p>
+  <ul>
+    <li><b>BOS:</b> Break of the most recent swing in the direction of the trend — continuation confirmation.</li>
+    <li><b>CHoCH:</b> Break of the most recent swing <i>against</i> the trend — the <b>first crack</b> of a reversal.</li>
+  </ul>
+  <div class="callout rule"><b>Reversal sequence:</b> Sweep → CHoCH → Retrace to OB/FVG → Enter with structural stop below/above the recent swing.</div>
+</div>
+
+<!-- 14. Absorption -->
+<div class="card" id="t14">
+  <h3><span class="idx">14</span> Absorption Candles — The Hidden Buyer/Seller</h3>
+  <p>A candle with <b>huge volume but a small range</b> at a key level. It means: aggressive sellers hit into strong resting bids (or vice versa), and the bids didn't budge. That's institutional absorption. The next candle in the opposite direction is your trigger.</p>
+</div>
+
+<!-- 15. Cumulative Delta -->
+<div class="card" id="t15">
+  <h3><span class="idx">15</span> Cumulative Volume Delta (CVD) Divergence</h3>
+  <p>Delta = buy market orders minus sell market orders. Cumulative delta plots the running total. When price makes a <b>new low but CVD makes a higher low</b>, aggressive sellers are exhausting — bullish divergence. Mirror for tops.</p>
+  <figure>
+    <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+      <!-- price double bottom, cvd higher low -->
+      <path d="M60 60 L140 120 L220 80 L300 150 L380 100 L460 180 L540 90 L620 60"
+        stroke="#e6edf3" stroke-width="1.8" fill="none"/>
+      <text class="svg-lbl-w" x="30" y="60">Price</text>
+      <circle cx="300" cy="150" r="6" fill="none" stroke="#ef4444" stroke-width="2"/>
+      <circle cx="460" cy="180" r="6" fill="none" stroke="#ef4444" stroke-width="2"/>
+      <text class="svg-lbl" x="300" y="170">Low 1</text>
+      <text class="svg-lbl" x="450" y="200">Lower low</text>
+      <!-- CVD line -->
+      <path d="M60 195 L140 200 L220 195 L300 200 L380 190 L460 185 L540 165 L620 140"
+        stroke="#38bdf8" stroke-width="1.8" fill="none" stroke-dasharray="0"/>
+      <text class="svg-lbl-w" x="640" y="140">CVD</text>
+      <text class="svg-lbl-w" x="300" y="212">← Bullish CVD divergence</text>
+    </svg>
+    <figcaption>Price makes a lower low but CVD doesn't — sellers are hitting bids that <b>aren't giving way</b>. Look for reversal trigger.</figcaption>
+  </figure>
+</div>
+
+<!-- 16. Footprint -->
+<div class="card" id="t16">
+  <h3><span class="idx">16</span> Footprint / Order Flow Imbalance</h3>
+  <p>Bid × Ask volume printed inside each candle. Stacked <b>3+ imbalances</b> on one side (e.g., 300% more buys than sells at 3 consecutive prices) marks the exact price of aggressive activity. Reversal signature: <b>heavy bids stack at the low</b>, but the low doesn't extend.</p>
+  <p class="tag">Available on order-flow platforms — Bookmap, Sierra Chart, Quantower, ATAS. On NSE/Kite, the closest proxy is tick-by-tick trade data + OI change.</p>
+</div>
+
+<!-- 17. Bollinger Squeeze -->
+<div class="card" id="t17">
+  <h3><span class="idx">17</span> Bollinger Squeeze → Expansion</h3>
+  <p>When Bollinger Bands contract inside Keltner Channels (the "TTM Squeeze"), volatility is coiling. The <b>direction of the release</b> is often institutional. Combine with a level break for entry, expect large ATR expansion in trade direction.</p>
+</div>
+
+<!-- 18. RSI/MACD Divergence -->
+<div class="card" id="t18">
+  <h3><span class="idx">18</span> RSI &amp; MACD Divergence — Regular vs Hidden</h3>
+  <ul>
+    <li><b>Regular bullish divergence:</b> Price lower low, RSI higher low → potential reversal up.</li>
+    <li><b>Regular bearish divergence:</b> Price higher high, RSI lower high → potential reversal down.</li>
+    <li><b>Hidden divergence:</b> Price higher low, RSI lower low → trend continuation entry (great for pullback re-entries).</li>
+    <li>Divergence at a <b>level</b> is a signal. Divergence in the middle of nowhere is noise.</li>
+  </ul>
+</div>
+
+<!-- 19. Volume Climax -->
+<div class="card" id="t19">
+  <h3><span class="idx">19</span> Volume Climax (Capitulation)</h3>
+  <p>Blow-off volume &gt; 3× average with a long wick against the trend = capitulation. The <b>selling climax</b> at bottoms and <b>buying climax</b> at tops usually mark short-term reversals of 3–5 days minimum. Combine with divergence.</p>
+</div>
+
+<!-- 20. Candle triggers -->
+<div class="card" id="t20">
+  <h3><span class="idx">20</span> Candle Triggers at Level — Pin Bar, Engulfing, Inside Bar</h3>
+  <p>Not the pattern by itself — the <b>pattern at a key level</b> — is the trigger.</p>
+  <ul>
+    <li><b>Pin bar / Rejection:</b> Long wick into level, small body closing away. Rejection of price zone.</li>
+    <li><b>Bullish/Bearish engulfing:</b> Second candle body swallows prior body. Strongest at HTF S/R.</li>
+    <li><b>Inside bar break:</b> Compression at level → break in reversal direction. Low risk entry, SL is tight (inside-bar low/high).</li>
+    <li><b>Tweezer top/bottom:</b> Two candles rejecting the same wick price — double liquidity grab.</li>
+  </ul>
+</div>
+
+<!-- ============ PART 3 : OPTIONS ============ -->
+<div class="phase-band"><div class="num">03</div><div><h2>Part 3 — Options Flow: The Institutional X-Ray</h2><p>Options data reveals what dealers, market makers and big funds are positioned for — before the move happens.</p></div></div>
+
+<!-- 21. Max Pain -->
+<div class="card" id="t21">
+  <h3><span class="idx">21</span> Max Pain — The Gravity of Expiry</h3>
+  <p>The strike price where the total value of all in-the-money options is minimized on expiry — i.e., where option buyers lose the most. Institutions (option writers) push toward it into weekly/monthly expiry.</p>
+  <ul>
+    <li>Compute daily. If price is &gt;1% above Max Pain and near expiry, expect drift down; below → drift up.</li>
+    <li>Reversal setup: price at extreme distance from Max Pain + weakening momentum + PCR extreme = mean-reversion trade.</li>
+  </ul>
+</div>
+
+<!-- 22. GEX -->
+<div class="card" id="t22">
+  <h3><span class="idx">22</span> Gamma Exposure (GEX) &amp; Dealer Positioning</h3>
+  <p>Dealers hedge their gamma. When <b>positive gamma</b> dominates, dealers sell rallies and buy dips → suppressed volatility, mean-reversion regime. When <b>negative gamma</b> dominates (usually after crashes), dealers sell dips and buy rallies → amplified moves, trending regime.</p>
+  <ul>
+    <li><b>Gamma flip level</b> = the price at which net dealer gamma flips from + to −. Powerful reversal magnet.</li>
+    <li>Above zero-gamma → fade extremes toward VWAP/POC.</li>
+    <li>Below zero-gamma → don't fade; ride momentum until dealers rebalance.</li>
+  </ul>
+  <div class="callout tip"><b>Practical proxy in India:</b> Sum (call OI × gamma) − (put OI × gamma) across strikes. Where it flips = key reversal level for NIFTY/BANKNIFTY.</div>
+</div>
+
+<!-- 23. OI Buildup -->
+<div class="card" id="t23">
+  <h3><span class="idx">23</span> Open Interest (OI) Buildup &amp; Unwinding</h3>
+  <table>
+    <tr><th>Price</th><th>OI</th><th>Interpretation</th></tr>
+    <tr><td>↑ Up</td><td>↑ Up</td><td><b>Long buildup</b> — bullish, fresh longs entering</td></tr>
+    <tr><td>↓ Down</td><td>↑ Up</td><td><b>Short buildup</b> — bearish, fresh shorts entering</td></tr>
+    <tr><td>↑ Up</td><td>↓ Down</td><td><b>Short covering</b> — shorts closing, weak up move / rally exhaustion</td></tr>
+    <tr><td>↓ Down</td><td>↓ Down</td><td><b>Long unwinding</b> — longs closing, weak down move / fall exhaustion</td></tr>
+  </table>
+  <p>Reversal signal: price makes a new extreme but OI change shifts from buildup → unwinding — the fuel is gone.</p>
+</div>
+
+<!-- 24. PCR -->
+<div class="card" id="t24">
+  <h3><span class="idx">24</span> Put/Call Ratio (PCR) — Sentiment Extremes</h3>
+  <p>PCR = Total Put OI ÷ Total Call OI. Contrarian indicator at extremes.</p>
+  <ul>
+    <li>PCR &gt; 1.5 → over-bearish, likely reversal <b>up</b> soon.</li>
+    <li>PCR &lt; 0.6 → over-bullish, likely reversal <b>down</b> soon.</li>
+    <li>Watch <b>rate of change</b>: PCR jumping from 0.7 → 1.2 mid-day = intraday short interest flooding in → potential squeeze up.</li>
+  </ul>
+</div>
+
+<!-- 25. IV -->
+<div class="card" id="t25">
+  <h3><span class="idx">25</span> IV Crush / IV Expansion (India VIX + IV Rank)</h3>
+  <ul>
+    <li><b>IV crush</b> post-event (results, budget, RBI) removes the "fear premium." Sudden IV drop with price rallying = confirmed bullish resolution.</li>
+    <li><b>IV expansion</b> at range highs while price refuses to break = warning of downside reversal (institutions buying puts).</li>
+    <li>IV Rank &gt; 80 with declining price = capitulation zone → mean-reversion bounce likely.</li>
+  </ul>
+</div>
+
+<!-- 26. OI Walls -->
+<div class="card" id="t26">
+  <h3><span class="idx">26</span> OI Walls — Strike-Level Support &amp; Resistance</h3>
+  <p>The strike with the <b>highest call OI</b> acts as resistance (writers defend). Highest put OI = support. Break of these strikes with volume = trend continuation. Reversal off the wall + OI unwinding = reversal trade.</p>
+  <div class="callout tip"><b>Practical:</b> For NIFTY, mark the top-3 CE OI and top-3 PE OI strikes each morning. These are your intraday S/R map.</div>
+</div>
+
+<!-- 27. UOA -->
+<div class="card" id="t27">
+  <h3><span class="idx">27</span> Unusual Options Activity (UOA)</h3>
+  <p>Block trades, sweep orders, or a single strike's volume &gt; 3× its OI = someone with information is positioning. Track it on stock options via bhavcopy or broker terminals — when heavy call sweeps hit right at a support level, retail rarely knows but the tape reveals it.</p>
+</div>
+
+<!-- ============ PART 4 : INTERNALS ============ -->
+<div class="phase-band"><div class="num">04</div><div><h2>Part 4 — Market Internals &amp; Cross-Asset</h2><p>Index reversals rarely happen in isolation. Confirm with breadth and correlated markets.</p></div></div>
+
+<div class="card" id="t28">
+  <h3><span class="idx">28</span> Breadth Indicators — Advance/Decline, TICK, TRIN</h3>
+  <ul>
+    <li><b>A/D line:</b> If NIFTY makes a new low but the number of advancing stocks improves → breadth divergence → reversal setup.</li>
+    <li><b>TICK (last-trade uptick count):</b> Extreme -1000 or +1000 readings often mark short-term exhaustion.</li>
+    <li><b>TRIN (Arms Index):</b> &gt; 2 = oversold panic; &lt; 0.5 = overbought euphoria.</li>
+  </ul>
+</div>
+
+<div class="card" id="t29">
+  <h3><span class="idx">29</span> Sector Rotation — Where's the Money Going?</h3>
+  <p>Defensives (FMCG, Pharma, IT) leading = risk-off, index likely toppy. Cyclicals (Banks, Metals, Realty) leading = risk-on, dips get bought. When leadership <b>flips</b> mid-session, expect index reversal to follow within days.</p>
+</div>
+
+<div class="card" id="t30">
+  <h3><span class="idx">30</span> FII / DII Flow &amp; F&amp;O Positioning</h3>
+  <ul>
+    <li>Daily FII cash + F&amp;O index long/short ratio. Extreme FII short in index futures + DII buying at supports = squeeze setup.</li>
+    <li>Watch <b>FII long/short ratio in index futures</b>. Below 20% is extreme bearish positioning — reversal fuel.</li>
+    <li>FII stock futures OI build-up in specific names signals institutional accumulation/distribution.</li>
+  </ul>
+</div>
+
+<div class="card" id="t31">
+  <h3><span class="idx">31</span> India VIX Behavior at Extremes</h3>
+  <p>VIX &gt; 20 with 3-day rate-of-change &gt; 40% = panic → oversold bounce probable. VIX &lt; 11 with complacency = tops. Watch <b>VIX up + NIFTY up together</b> — signals institutions buying protection into rallies = distribution.</p>
+</div>
+
+<div class="card" id="t32">
+  <h3><span class="idx">32</span> USDINR / DXY / US10Y &amp; Bond Yields</h3>
+  <ul>
+    <li><b>DXY down + USDINR down</b> → risk-on for Indian equities.</li>
+    <li><b>US10Y yield spike</b> → banks &amp; NBFCs weakness; often marks growth-stock tops.</li>
+    <li>India 10Y G-Sec: falling yields boost banks (NIM proxy improves via bond MTM) — leading indicator for BANKNIFTY reversals.</li>
+    <li>Crude spike + rupee weakness → OMC / paint / airline reversal signals.</li>
+  </ul>
+</div>
+
+<!-- ============ PLAYBOOKS ============ -->
+<div class="phase-band"><div class="num">05</div><div><h2>Part 5 — Playbooks: Putting It All Together</h2><p>Four repeatable setups that combine multiple techniques. Trade only these — mastery beats variety.</p></div></div>
+
+<div class="card" id="pb1">
+  <h3>Setup A — Wyckoff Spring at VPOC <span class="pill long">LONG</span></h3>
+  <table>
+    <tr><th>Step</th><th>Condition</th></tr>
+    <tr><td>1</td><td>2-3 day range in balance, prior day POC clearly visible</td></tr>
+    <tr><td>2</td><td>Price sweeps range low into prior day VAL / POC on rising volume</td></tr>
+    <tr><td>3</td><td>Sweep candle body small, closes back inside range (absorption)</td></tr>
+    <tr><td>4</td><td>CVD makes higher low despite price lower low</td></tr>
+    <tr><td>5</td><td>Next 3–5 min candle closes above sweep wick high → CHoCH</td></tr>
+    <tr><td>6</td><td><b>Entry</b> on close of trigger candle. SL below sweep wick.</td></tr>
+    <tr><td>7</td><td>Target: prior day POC → prior day high → 2R min, 5R possible</td></tr>
+  </table>
+</div>
+
+<div class="card" id="pb2">
+  <h3>Setup B — Anchored VWAP Reclaim <span class="pill long">LONG</span></h3>
+  <p>Anchor VWAP from the recent swing low (breakout day). Wait for price to pull back to it. Look for delta divergence, absorption, and a reclaim close above AVWAP. Entry above the reclaim candle, SL below AVWAP + 1 ATR, target the recent swing high.</p>
+</div>
+
+<div class="card" id="pb3">
+  <h3>Setup C — Liquidity Sweep + FVG Fill <span class="pill short">SHORT</span></h3>
+  <p>Uptrend approaches PDH + high-call-OI strike. Price sweeps PDH on declining momentum. Rejects and drops. Look for a bearish FVG left behind on the way down. Wait for pullback into FVG, watch for OI: if fresh short buildup accelerates during pullback → short entry on rejection. Target the day's VWAP → OB support below.</p>
+</div>
+
+<div class="card" id="pb4">
+  <h3>Setup D — Fresh Order Block Retest <span class="pill long">LONG</span> / <span class="pill short">SHORT</span></h3>
+  <p>After a strong impulsive breakout (BOS), price pulls back to the OB (last opposite candle before the impulse). Confluence with a 61.8% Fib or unfilled FVG. On the first tap: (a) wick rejection, (b) delta shift, (c) hidden divergence on 5m RSI → enter in direction of the impulse. SL past the OB extreme, target the recent extension high/low.</p>
+</div>
+
+<!-- ============ ENTRY & RISK ============ -->
+<div class="phase-band"><div class="num">06</div><div><h2>Part 6 — Execution: Precision Entry &amp; Risk</h2><p>The edge is 30% analysis, 70% execution. This is where amateurs bleed.</p></div></div>
+
+<div class="card" id="entry">
+  <h3>Entry Precision — Three Valid Techniques</h3>
+  <ul>
+    <li><b>Trigger-candle close entry:</b> Wait for the confirmation candle to close through the level. Enter on next candle open. Safest.</li>
+    <li><b>Limit at OB / FVG midpoint:</b> Place a resting limit at the 50% of the order block or FVG. You get filled on the retrace. Best risk/reward but you can miss the trade.</li>
+    <li><b>Break-and-retest:</b> Wait for break, then wait for pullback to the broken level. Enter on rejection with tight stop.</li>
+  </ul>
+  <div class="callout trap"><b>Never chase.</b> If entry has already extended more than 1R from your ideal level, skip. The next setup is always coming.</div>
+</div>
+
+<div class="card" id="risk">
+  <h3>Risk Framework — 1R Sizing &amp; Asymmetric R:R</h3>
+  <ul>
+    <li>Risk fixed <b>0.5% – 1% of capital per trade</b>. Never scale up on losses.</li>
+    <li>Position size = (Account × Risk %) ÷ (Entry − Stop distance).</li>
+    <li>Take partials at 1.5R or 2R, move stop to breakeven, ride the rest for the meat of the move.</li>
+    <li>Only take trades with pre-defined R:R ≥ 1:2. Prefer 1:3+.</li>
+    <li>Track expectancy: (WinRate × Avg Win) − (LossRate × Avg Loss). Anything &gt; 0.2R positive means the setup works.</li>
+  </ul>
+</div>
+
+<!-- ============ CHECKLIST ============ -->
+<h2 id="checklist" class="section">Pre-Trade Checklist</h2>
+<div class="checklist">
+  <h3>Only pull the trigger if 6+ items are checked</h3>
+  <label><input type="checkbox"> Price is at a <b>pre-mapped level</b> (VPOC / VWAP / OB / PDH-PDL / OI wall)</label>
+  <label><input type="checkbox"> A <b>liquidity sweep</b> or absorption has occurred at that level</label>
+  <label><input type="checkbox"> There is a <b>CHoCH or BOS</b> against the prior micro-trend</label>
+  <label><input type="checkbox"> <b>Delta / CVD divergence</b> or volume climax confirms exhaustion</label>
+  <label><input type="checkbox"> <b>OI</b> shows the trapped-side unwinding (short-covering / long-unwinding)</label>
+  <label><input type="checkbox"> <b>Options data</b> aligns (PCR extreme, gamma flip, IV behavior)</label>
+  <label><input type="checkbox"> Market <b>breadth &amp; sector</b> confirms — no fighting the tape</label>
+  <label><input type="checkbox"> <b>Trigger candle</b> has closed (pin, engulfing, reclaim)</label>
+  <label><input type="checkbox"> <b>R:R ≥ 1:2</b> to a logical opposite-side target</label>
+  <label><input type="checkbox"> No high-impact <b>event risk</b> in the next 30 minutes</label>
+</div>
+
+<h2 id="disclaimer" class="section">Disclaimer</h2>
+<div class="disclaimer">
+Educational content. No entry technique produces a 100% win rate. Every setup fails part of the time — your edge is running the process consistently, sizing correctly, and cutting losses fast. Backtest each setup on your own instrument, timeframe, and slippage assumptions before trading real capital. Options and leveraged instruments can lose more than deposited margin.
+</div>
+
+</main>
+</div>
+</body>
+</html>

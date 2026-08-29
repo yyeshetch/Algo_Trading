@@ -20,6 +20,8 @@ import json
 import logging
 import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -397,6 +399,10 @@ def _filter_deals_by_days(rows: list[dict[str, Any]], days: int) -> list[dict[st
 
 _FII_DII_URL = "https://www.nseindia.com/api/fiidiiTradeReact"
 _FIIDII_TRADE_PREFIX = "fiidii_trade_"
+_FII_DII_ARCHIVE_URL = (
+    "https://raw.githubusercontent.com/chirag127/fii-dii-activity-api/main/data/{date}.json"
+)
+FII_DII_DEFAULT_TRADING_DAYS = 45
 
 
 def _fiidii_trade_cache_name(trade_date: date) -> str:
@@ -500,6 +506,91 @@ def fetch_fii_dii_today(data_dir: Path) -> list[dict[str, Any]]:
         except Exception:
             return []
     return []
+
+
+def _fii_dii_items_from_archive_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    equity = payload.get("equity")
+    if not isinstance(equity, dict):
+        return []
+    d_iso = _normalize_iso_date(payload.get("date"))
+    if not d_iso:
+        return []
+    items: list[dict[str, Any]] = []
+    for prefix, label in (("fii", "FII/FPI"), ("dii", "DII")):
+        buy = equity.get(f"{prefix}_buy")
+        sell = equity.get(f"{prefix}_sell")
+        net = equity.get(f"{prefix}_net")
+        if buy is None and sell is None and net is None:
+            continue
+        items.append(
+            {
+                "category": label,
+                "date": d_iso,
+                "buyValue": buy,
+                "sellValue": sell,
+                "netValue": net,
+            }
+        )
+    return items
+
+
+def fetch_fii_dii_archive_day(data_dir: Path, trade_date: date) -> bool:
+    """Backfill one session from the public FII/DII archive (Groww-sourced JSON)."""
+    if _load_cache_text(data_dir, _fiidii_trade_cache_name(trade_date)) is not None:
+        return True
+    url = _FII_DII_ARCHIVE_URL.format(date=trade_date.isoformat())
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        if not isinstance(payload, dict):
+            return False
+        items = _fii_dii_items_from_archive_payload(payload)
+        if not items:
+            return False
+        _save_fiidii_trade_day(data_dir, trade_date.isoformat(), items)
+        return True
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            logger.debug("FII/DII archive %s HTTP %s", trade_date.isoformat(), exc.code)
+    except Exception as exc:
+        logger.debug("FII/DII archive %s: %s", trade_date.isoformat(), exc)
+    return False
+
+
+def backfill_missing_fii_dii(
+    data_dir: Path,
+    trading_days: int = FII_DII_DEFAULT_TRADING_DAYS,
+    *,
+    as_of: date | None = None,
+) -> dict[str, Any]:
+    """Refresh live NSE snapshot, then fill per-day cache gaps over the last N sessions."""
+    _reindex_legacy_fiidii_caches(data_dir)
+    fetch_fii_dii_today(data_dir)
+
+    end = as_of or date.today()
+    holidays = load_nse_holidays(data_dir)
+    targets = recent_trading_days(trading_days, end, data_dir, holidays=holidays)
+    target_isos = [d.isoformat() for d in targets]
+
+    cached_before = _cached_fiidii_trade_dates(data_dir)
+    missing = [td for td in targets if td.isoformat() not in cached_before]
+
+    backfilled = 0
+    for td in missing:
+        if fetch_fii_dii_archive_day(data_dir, td):
+            backfilled += 1
+        time.sleep(0.25)
+
+    fii_cached = _cached_fiidii_trade_dates(data_dir)
+    still_missing = [iso for iso in target_isos if iso not in fii_cached]
+    return {
+        "trading_days_requested": trading_days,
+        "fii_dii_backfilled": backfilled,
+        "fii_dii_missing_before": [d.isoformat() for d in missing],
+        "fii_dii_missing_after": still_missing,
+        "fii_dii_have": sum(1 for iso in target_isos if iso in fii_cached),
+    }
 
 
 def _fiidii_rows_from_trade_cache(data_dir: Path, trade_days: list[date]) -> list[dict[str, Any]]:
@@ -609,17 +700,23 @@ def fii_dii_cache_coverage(data_dir: Path, trading_days: int = 30) -> dict[str, 
     }
 
 
-def ensure_fii_dii_oi_history(data_dir: Path, trading_days: int = 30) -> dict[str, Any]:
+def ensure_fii_dii_oi_history(
+    data_dir: Path,
+    trading_days: int = FII_DII_DEFAULT_TRADING_DAYS,
+    *,
+    as_of: date | None = None,
+) -> dict[str, Any]:
     """
     Ensure last ``trading_days`` NSE sessions are cached (weekends/holidays skipped).
-    Fetches missing participant-OI archives; refreshes today's FII/DII snapshot.
+    Backfills missing FII/DII per-day files (live NSE + public archive), then participant OI.
     """
+    end = as_of or date.today()
     holidays = refresh_nse_holidays(data_dir)
-    targets = recent_trading_days(trading_days, date.today(), data_dir, holidays=holidays)
+    targets = recent_trading_days(trading_days, end, data_dir, holidays=holidays)
     target_isos = [d.isoformat() for d in targets]
 
     reindexed = _reindex_legacy_fiidii_caches(data_dir)
-    fetch_fii_dii_today(data_dir)
+    fii_backfill = backfill_missing_fii_dii(data_dir, trading_days, as_of=end)
 
     oi_fetched = 0
     oi_missing: list[str] = []
@@ -650,6 +747,8 @@ def ensure_fii_dii_oi_history(data_dir: Path, trading_days: int = 30) -> dict[st
         "trading_days_targets": target_isos,
         "holidays_cached": len(holidays),
         "fiidii_reindexed": reindexed,
+        "fii_dii_backfilled": fii_backfill.get("fii_dii_backfilled", 0),
+        "fii_dii_missing_before": fii_backfill.get("fii_dii_missing_before", []),
         "participant_oi_fetched": oi_fetched,
         "participant_oi_have": oi_have,
         "participant_oi_missing": oi_missing,

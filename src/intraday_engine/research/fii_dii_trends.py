@@ -20,6 +20,7 @@ from typing import Any
 
 from intraday_engine.core.config import Settings
 from intraday_engine.fetch.nse_public_data import (
+    FII_DII_DEFAULT_TRADING_DAYS,
     ensure_fii_dii_oi_history,
     fii_dii_cache_coverage,
     get_fii_dii_30d_history,
@@ -32,6 +33,7 @@ from intraday_engine.storage.layout import fii_dii_trends_path
 logger = logging.getLogger(__name__)
 
 FII_DII_CHART_TRADING_DAYS = 6
+FII_DII_HISTORY_TRADING_DAYS = FII_DII_DEFAULT_TRADING_DAYS
 
 
 def _net_sum(rows: list[dict[str, Any]], key: str, n: int) -> float:
@@ -82,9 +84,11 @@ def _fii_dii_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "fii_net_5d": _net_sum(rows, "fii_net", 5),
         "fii_net_10d": _net_sum(rows, "fii_net", 10),
         "fii_net_30d": _net_sum(rows, "fii_net", 30),
+        "fii_net_45d": _net_sum(rows, "fii_net", 45),
         "dii_net_5d": _net_sum(rows, "dii_net", 5),
         "dii_net_10d": _net_sum(rows, "dii_net", 10),
         "dii_net_30d": _net_sum(rows, "dii_net", 30),
+        "dii_net_45d": _net_sum(rows, "dii_net", 45),
     }
 
 
@@ -92,7 +96,7 @@ def hydrate_fii_dii_from_cache(
     data_dir: Path,
     payload: dict[str, Any],
     *,
-    days: int = 30,
+    days: int = FII_DII_HISTORY_TRADING_DAYS,
     chart_trading_days: int = FII_DII_CHART_TRADING_DAYS,
     as_of: date | None = None,
 ) -> dict[str, Any]:
@@ -122,7 +126,7 @@ def hydrate_fii_dii_from_cache(
 def run_fii_dii_trends_scan(
     *,
     settings: Settings | None = None,
-    days: int = 30,
+    days: int = FII_DII_HISTORY_TRADING_DAYS,
     trade_date: date | None = None,
 ) -> dict[str, Any]:
     settings = settings or Settings.from_env(underlying="NIFTY")
@@ -172,7 +176,7 @@ def load_stored_fii_dii_trends(
     trade_date: date,
     *,
     hydrate_cache: bool = True,
-    days: int = 30,
+    days: int = FII_DII_HISTORY_TRADING_DAYS,
 ) -> dict[str, Any] | None:
     p = fii_dii_trends_path(data_dir, trade_date)
     payload: dict[str, Any] | None = None

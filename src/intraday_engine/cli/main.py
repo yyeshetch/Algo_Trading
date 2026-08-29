@@ -126,6 +126,23 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--storage",
+        choices=["write_to_files", "write_to_db"],
+        default=None,
+        help=(
+            "Where session pipeline persists data. Default: write_to_files, or STORAGE_BACKEND env. "
+            "Use write_to_db for InterServer MySQL."
+        ),
+    )
+    parser.add_argument(
+        "--init-db",
+        action="store_true",
+        help=(
+            "Create MySQL tables (signals, market_snapshots, option_chain_rows, json_artifacts). "
+            "Use MYSQL_HOST=localhost on InterServer VPS, or run scripts/init_mysql_schema.sql in phpMyAdmin."
+        ),
+    )
+    parser.add_argument(
         "--session-once",
         action="store_true",
         help="Run one full session cycle (option chain + index pipeline) and exit.",
@@ -421,6 +438,15 @@ def main() -> None:
     args = parser.parse_args()
     selected_date = _parse_date(args.date) if args.date else None
     underlying = args.underlying or None
+
+    if args.storage:
+        from intraday_engine.storage.backend import set_storage_backend
+
+        set_storage_backend(args.storage)
+
+    if args.init_db:
+        _run_init_db()
+        return
 
     if args.btst:
         setup_logging(Settings.from_env(underlying=underlying).log_level, Settings.from_env().data_dir)
@@ -767,11 +793,52 @@ def _run_gamma_blast_scan(trade_date: date | None, underlying: str | None = None
     logger.info("Suggested strike: %d | %s", signal.suggested_strike, signal.reason)
 
 
+def _run_init_db() -> None:
+    from intraday_engine.storage.db import ensure_schema, mysql_host_label, test_connection
+
+    settings = Settings.from_env()
+    setup_logging(settings.log_level, settings.data_dir)
+    logger = logging.getLogger(__name__)
+    logger.info("Connecting to MySQL at %s …", mysql_host_label())
+    try:
+        info = test_connection()
+        logger.info("Connected. Existing tables before init: %s", ", ".join(info["tables"]) or "(none)")
+        tables = ensure_schema(force=True)
+        logger.info("Done. Tables: %s", ", ".join(tables))
+    except Exception as exc:
+        logger.error("MySQL init failed: %s", exc)
+        raise SystemExit(1) from exc
+
+
+def _ensure_mysql_schema_or_exit() -> None:
+    from intraday_engine.storage.backend import get_storage_backend, write_to_db
+    from intraday_engine.storage.db import ensure_schema, mysql_host_label
+
+    if not write_to_db():
+        return
+    logger = logging.getLogger(__name__)
+    try:
+        tables = ensure_schema()
+        logger.info(
+            "Storage backend: %s → MySQL %s (%s)",
+            get_storage_backend().value,
+            mysql_host_label(),
+            ", ".join(tables),
+        )
+    except ConnectionError as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1) from exc
+    except Exception as exc:
+        logger.error("MySQL schema init failed: %s", exc)
+        raise SystemExit(1) from exc
+
+
 def _run_session_scheduler(*, underlying: str | None) -> None:
     from intraday_engine.jobs.session_pipeline import run_session_scheduler_loop
 
     settings = Settings.from_env(underlying=underlying or "NIFTY")
     setup_logging(settings.log_level, settings.data_dir)
+    _ensure_mysql_schema_or_exit()
     run_session_scheduler_loop(settings.data_dir)
 
 
@@ -780,6 +847,7 @@ def _run_session_once(*, underlying: str | None, trade_date: date | None) -> Non
 
     settings = Settings.from_env(underlying=underlying or "NIFTY")
     setup_logging(settings.log_level, settings.data_dir)
+    _ensure_mysql_schema_or_exit()
     summary = run_session_cycle(settings.data_dir, trade_date=trade_date)
     logging.getLogger(__name__).info("Session pipeline once: %s", summary)
 
