@@ -380,6 +380,11 @@
         "value": 0.05,
         "type": "float",
         "help": "Weight: structure / mid-range penalty bucket."
+      },
+      "money_flow": {
+        "value": 0.08,
+        "type": "float",
+        "help": "Weight: MFI + CMF aligned money flow."
       }
     },
     "penalties": {
@@ -407,6 +412,16 @@
         "value": 0.15,
         "type": "float",
         "help": "Penalty: stop too wide."
+      },
+      "mfi_overbought": {
+        "value": 0.05,
+        "type": "float",
+        "help": "Penalty: MFI overbought while scoring long."
+      },
+      "mfi_oversold": {
+        "value": 0.05,
+        "type": "float",
+        "help": "Penalty: MFI oversold while scoring short."
       }
     },
     "thresholds": {
@@ -543,6 +558,33 @@
       "value": 14,
       "type": "int",
       "help": "Default RSI period (Wilder)."
+    }
+  },
+  "money_flow": {
+    "MFI_PERIOD": {
+      "value": 14,
+      "type": "int",
+      "help": "Money Flow Index lookback."
+    },
+    "CMF_PERIOD": {
+      "value": 20,
+      "type": "int",
+      "help": "Chaikin Money Flow lookback."
+    },
+    "MFI_OVERBOUGHT": {
+      "value": 80,
+      "type": "float",
+      "help": "MFI at or above this level is overbought."
+    },
+    "MFI_OVERSOLD": {
+      "value": 20,
+      "type": "float",
+      "help": "MFI at or below this level is oversold."
+    },
+    "INDEX_OBV_LOOKBACK": {
+      "value": 10,
+      "type": "int",
+      "help": "5-min index OBV slope lookback (bars)."
     }
   }
 }

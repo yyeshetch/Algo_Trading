@@ -12,6 +12,12 @@ def print_signal(payload: Dict[str, object]) -> None:
         f"Bias: {payload['bias']} | Momentum: {payload['momentum']} | "
         f"Support: {payload['support']} | Resistance: {payload['resistance']}"
     )
+    mf = payload.get("money_flow") or {}
+    if mf.get("mfi") is not None or mf.get("cmf") is not None:
+        print(
+            f"Money flow: MFI={mf.get('mfi')} CMF={mf.get('cmf')} "
+            f"bias={mf.get('bias')} OBV+{mf.get('obv_slope_pct')}%"
+        )
     print(
         f"Entry: {payload.get('entry')} | Target: {payload.get('target')} | "
         f"Stop: {payload.get('stop_loss')} | RR: {payload.get('rr')}"

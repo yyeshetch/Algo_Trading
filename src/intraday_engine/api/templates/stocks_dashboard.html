@@ -220,6 +220,73 @@
     .analysis-table .num { text-align: right; font-variant-numeric: tabular-nums; }
     .pnl-positive { color: var(--buy); }
     .pnl-negative { color: var(--sell); }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      box-shadow: var(--shadow);
+    }
+    .summary-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.65rem;
+    }
+    .summary-card-head h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .summary-link {
+      font-size: 0.75rem;
+      color: var(--accent);
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: inherit;
+      padding: 0;
+      white-space: nowrap;
+    }
+    .summary-link:hover { color: var(--accent-hover); text-decoration: underline; }
+    .summary-mini-table { width: 100%; font-size: 0.78rem; border-collapse: collapse; }
+    .summary-mini-table th, .summary-mini-table td {
+      padding: 0.35rem 0.4rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .summary-mini-table th { color: var(--text-muted); font-weight: 500; font-size: 0.68rem; text-transform: uppercase; }
+    .summary-empty { font-size: 0.82rem; color: var(--text-muted); padding: 0.5rem 0; }
+    .sub-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sub-tab {
+      padding: 0.35rem 0.7rem;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 500;
+      font-family: inherit;
+    }
+    .sub-tab:hover { color: var(--text); border-color: var(--accent); }
+    .sub-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(99,102,241,0.12); }
+    .scanner-sub-panel { display: none; }
+    .scanner-sub-panel.active { display: block; }
   </style>
 </head>
 <body>
@@ -231,28 +298,33 @@
     </nav>
     <header class="header">
       <h1>F&O Stock Signals</h1>
-      <p class="sub">F&amp;O research scanners • 30-min analysis • EOD indicators • multi-timeframe watchlist</p>
+      <p class="sub">EOD summary • 30-min intraday • full scanners on demand</p>
     </header>
     <div class="toolbar">
       <button class="btn btn-primary" id="btnRefreshAll">Refresh dashboard</button>
       <span class="status" id="refreshAllStatus"></span>
       <span class="status" id="refreshAllMeta">Last dashboard refresh: —</span>
-      <span class="status" style="color:var(--text-muted);font-size:0.78rem;">Runs scanners first (Silent → Watchlist last). EOD is a live Kite pull and runs near the end. 30-min &amp; Combined are manual.</span>
+      <span class="status" style="color:var(--text-muted);font-size:0.78rem;">Refresh runs all EOD scanners and updates the summary. 30-min is manual.</span>
     </div>
     <div class="tabs">
-      <button class="tab active" data-tab="30min">30-min Analysis</button>
-      <button class="tab" data-tab="eod">EOD FnO Analysis</button>
-      <button class="tab" data-tab="tomorrow">Watchlist for Tomorrow</button>
-      <button class="tab" data-tab="silent">Silent Accumulation</button>
-      <button class="tab" data-tab="fiidii">FII/DII &amp; OI Trends</button>
-      <button class="tab" data-tab="rs">RS vs NIFTY</button>
-      <button class="tab" data-tab="minervini">Minervini SEPA</button>
-      <button class="tab" data-tab="intraday-rs">Intraday RS</button>
-      <button class="tab" data-tab="sector-rs">Sector RS</button>
-      <button class="tab" data-tab="instvol">Institutional Volume</button>
-      <button class="tab" data-tab="combined">Combined Signals</button>
+      <button class="tab active" data-tab="eod-summary">EOD Summary</button>
+      <button class="tab" data-tab="30min">30-min Analysis</button>
+      <button class="tab" data-tab="scanners">Scanners</button>
     </div>
-    <div id="panel-30min" class="tab-panel active">
+    <div id="panel-eod-summary" class="tab-panel active">
+      <div class="toolbar">
+        <span class="status" id="summaryStatus">One-page view of today&apos;s scanner outputs.</span>
+      </div>
+      <div id="summaryLoading" class="loading">Loading EOD summary from saved scans…</div>
+      <div id="summaryContent" style="display:none;">
+        <div class="day-overview" id="summaryMacro"></div>
+        <div class="summary-grid" id="summaryGrid"></div>
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0.5rem;">
+          Need full tables or charts? Open the <button type="button" class="summary-link" id="summaryGoScanners">Scanners</button> tab.
+        </p>
+      </div>
+    </div>
+    <div id="panel-30min" class="tab-panel">
       <div class="toolbar">
         <div class="limit-row">
           <label for="stock30">Stock:</label>
@@ -324,7 +396,21 @@
         </div>
       </div>
     </div>
-    <div id="panel-eod" class="tab-panel">
+    <div id="panel-scanners" class="tab-panel">
+      <div class="sub-tabs" id="scannerSubTabs">
+        <button class="sub-tab active" data-scanner="tomorrow">Watchlist</button>
+        <button class="sub-tab" data-scanner="silent">Silent Acc.</button>
+        <button class="sub-tab" data-scanner="combined">Combined</button>
+        <button class="sub-tab" data-scanner="swing-playbook">Swing Playbook</button>
+        <button class="sub-tab" data-scanner="rs">RS vs NIFTY</button>
+        <button class="sub-tab" data-scanner="intraday-rs">Intraday RS</button>
+        <button class="sub-tab" data-scanner="minervini">Minervini</button>
+        <button class="sub-tab" data-scanner="sector-rs">Sector RS</button>
+        <button class="sub-tab" data-scanner="instvol">Inst. Volume</button>
+        <button class="sub-tab" data-scanner="fiidii">FII/DII</button>
+        <button class="sub-tab" data-scanner="eod">EOD FnO</button>
+      </div>
+    <div id="panel-eod" class="scanner-sub-panel">
       <div class="toolbar">
         <div class="limit-row">
           <label for="eodDate">Date:</label>
@@ -369,7 +455,7 @@
         </div>
       </div>
     </div>
-    <div id="panel-tomorrow" class="tab-panel">
+    <div id="panel-tomorrow" class="scanner-sub-panel active">
       <div class="toolbar">
         <button class="btn btn-primary btn-tab-refresh" data-refresh="tomorrow">Refresh watchlist</button>
         <span class="status" id="twStatus">Uses data from dashboard refresh.</span>
@@ -412,7 +498,7 @@
       </div>
     </div>
 
-    <div id="panel-silent" class="tab-panel">
+    <div id="panel-silent" class="scanner-sub-panel">
       <div class="toolbar">
         <label style="font-size: 0.85rem; color: var(--text-muted);">
           <input type="checkbox" id="silentUseNse" checked> Include NSE delivery % &amp; bulk-deal data
@@ -440,6 +526,7 @@
                   <th class="num">Width %</th>
                   <th class="num">OBV +%</th>
                   <th class="num">CMF</th>
+                  <th class="num">MFI</th>
                   <th class="num">Up/Dn Vol</th>
                   <th class="num">Upper⅓ %</th>
                   <th>HL</th>
@@ -457,7 +544,7 @@
       </div>
     </div>
 
-    <div id="panel-fiidii" class="tab-panel">
+    <div id="panel-fiidii" class="scanner-sub-panel">
       <div class="toolbar">
         <button class="btn btn-primary btn-tab-refresh" data-refresh="fiidii">Refresh</button>
         <span class="status" id="fiidiiStatus">Use Refresh dashboard in the header.</span>
@@ -599,7 +686,7 @@
       </div>
     </div>
 
-    <div id="panel-rs" class="tab-panel">
+    <div id="panel-rs" class="scanner-sub-panel">
       <div class="toolbar">
         <label style="font-size: 0.85rem; color: var(--text-muted);">
           <input type="checkbox" id="rsOnlyOuter" checked> Only outperformers (RS slope &gt; 0)
@@ -640,7 +727,7 @@
       </div>
     </div>
 
-    <div id="panel-minervini" class="tab-panel">
+    <div id="panel-minervini" class="scanner-sub-panel">
       <div class="toolbar">
         <label style="font-size: 0.85rem; color: var(--text-muted);">
           Mode
@@ -693,7 +780,7 @@
       </div>
     </div>
 
-    <div id="panel-intraday-rs" class="tab-panel">
+    <div id="panel-intraday-rs" class="scanner-sub-panel">
       <div class="toolbar">
         <button class="btn btn-primary btn-tab-refresh" data-refresh="intraday-rs">Refresh</button>
         <span class="status" id="intradayRsStatus">Use Refresh dashboard in the header.</span>
@@ -756,7 +843,7 @@
       </div>
     </div>
 
-    <div id="panel-sector-rs" class="tab-panel">
+    <div id="panel-sector-rs" class="scanner-sub-panel">
       <div class="toolbar">
         <button class="btn btn-primary btn-tab-refresh" data-refresh="sector-rs">Refresh</button>
         <span class="status" id="sectorRsStatus">Use Refresh dashboard in the header.</span>
@@ -813,7 +900,7 @@
       </div>
     </div>
 
-    <div id="panel-instvol" class="tab-panel">
+    <div id="panel-instvol" class="scanner-sub-panel">
       <div class="toolbar">
         <label style="font-size: 0.85rem; color: var(--text-muted); display:inline-flex; align-items:center; gap:0.35rem;">
           Recent days:
@@ -872,7 +959,7 @@
       </div>
     </div>
 
-    <div id="panel-combined" class="tab-panel">
+    <div id="panel-combined" class="scanner-sub-panel">
       <div class="toolbar">
         <button class="btn btn-primary" id="btnCombinedRefresh">Rebuild Combined</button>
         <button class="btn" id="btnCombinedRefreshFund">Refresh Fundamentals (slow)</button>
@@ -939,6 +1026,45 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div id="panel-swing-playbook" class="scanner-sub-panel">
+      <div class="toolbar">
+        <label style="font-size: 0.85rem; color: var(--text-muted);">
+          Scanner:
+          <select id="swingScannerSelect" style="margin-left:0.35rem;padding:0.2rem 0.4rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+            <option value="rankings">Composite Rankings</option>
+            <option value="momentum_leaders">A — Momentum Leaders</option>
+            <option value="breakout">B — Breakout</option>
+            <option value="vcp_contraction">C — VCP Contraction</option>
+            <option value="pullback">D — Pullback</option>
+            <option value="earnings_acceleration">E — Earnings Acceleration</option>
+            <option value="can_slim">CAN SLIM</option>
+            <option value="stage_2">Stage 2 (Weinstein)</option>
+            <option value="dual_momentum">Dual Momentum</option>
+            <option value="mean_reversion">Mean Reversion</option>
+            <option value="turtle_breakout">Turtle Breakout</option>
+            <option value="post_earnings_momentum">Post-Earnings Momentum</option>
+          </select>
+        </label>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="swing-playbook">Refresh</button>
+        <span class="status" id="swingStatus">Use Refresh dashboard in the header.</span>
+      </div>
+      <div id="swingRegime" class="card" style="margin-bottom:1rem;font-size:0.88rem;color:var(--text-muted);"></div>
+      <div id="swingLoading" class="loading" style="display:none;">Scanning NIFTY 500 daily bars…</div>
+      <div id="swingEmpty" class="empty" style="display:none;">No saved swing playbook scan yet. Run Refresh dashboard.</div>
+      <div id="swingContent" style="display:none;">
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head" id="swingPanelHead">Composite Rankings (100-point model)</div>
+          <div class="panel-body" style="max-height: 820px; overflow: auto;">
+            <table id="swingTable" style="font-size: 0.82rem;">
+              <thead id="swingThead"></thead>
+              <tbody id="swingTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1084,25 +1210,291 @@
     }
 
     // Tabs
+    const SCANNER_LOADERS = {
+      eod: loadEodTab,
+      tomorrow: loadTomorrowWatchlist,
+      silent: loadSilentAccumulation,
+      fiidii: loadFiiDiiTrends,
+      rs: loadRelativeStrength,
+      minervini: loadMinerviniTemplate,
+      'intraday-rs': loadIntradayRs,
+      'sector-rs': loadSectorRs,
+      instvol: loadInstitutionalVolume,
+      combined: loadCombinedSignals,
+      'swing-playbook': loadSwingPlaybook,
+    };
+
+    function activateScannerSubTab(key) {
+      document.querySelectorAll('.sub-tab').forEach(x => x.classList.toggle('active', x.dataset.scanner === key));
+      document.querySelectorAll('.scanner-sub-panel').forEach(x => x.classList.remove('active'));
+      const panel = document.getElementById('panel-' + key);
+      if (panel) panel.classList.add('active');
+      const loader = SCANNER_LOADERS[key];
+      if (loader) loader();
+    }
+
+    function openScannerSubTab(key) {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+      document.querySelector('.tab[data-tab="scanners"]')?.classList.add('active');
+      document.getElementById('panel-scanners')?.classList.add('active');
+      activateScannerSubTab(key);
+    }
+
     document.querySelectorAll('.tab').forEach(t => {
       t.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
         t.classList.add('active');
         document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+        if (t.dataset.tab === 'eod-summary') loadEodSummary();
         if (t.dataset.tab === '30min') loadStocksFor30min();
-        if (t.dataset.tab === 'eod') loadEodTab();
-        if (t.dataset.tab === 'tomorrow') loadTomorrowWatchlist();
-        if (t.dataset.tab === 'silent') loadSilentAccumulation();
-        if (t.dataset.tab === 'fiidii') loadFiiDiiTrends();
-        if (t.dataset.tab === 'rs') loadRelativeStrength();
-        if (t.dataset.tab === 'minervini') loadMinerviniTemplate();
-        if (t.dataset.tab === 'intraday-rs') loadIntradayRs();
-        if (t.dataset.tab === 'sector-rs') loadSectorRs();
-        if (t.dataset.tab === 'instvol') loadInstitutionalVolume();
-        if (t.dataset.tab === 'combined') loadCombinedSignals();
+        if (t.dataset.tab === 'scanners') activateScannerSubTab('tomorrow');
       });
     });
+
+    document.querySelectorAll('.sub-tab').forEach(t => {
+      t.addEventListener('click', () => activateScannerSubTab(t.dataset.scanner));
+    });
+
+    document.getElementById('summaryGoScanners')?.addEventListener('click', () => openScannerSubTab('tomorrow'));
+
+    // ---------- EOD Summary ----------
+    const summaryLoading = document.getElementById('summaryLoading');
+    const summaryContent = document.getElementById('summaryContent');
+    const summaryGrid = document.getElementById('summaryGrid');
+    const summaryMacro = document.getElementById('summaryMacro');
+    const summaryStatus = document.getElementById('summaryStatus');
+    let _summaryLoadedAt = null;
+
+    function summaryCard(title, scannerKey, rowsHtml, meta = '') {
+      const viewAll = scannerKey
+        ? `<button type="button" class="summary-link" data-scanner-link="${scannerKey}">View all →</button>`
+        : '';
+      return `<div class="summary-card">
+        <div class="summary-card-head"><h3>${title}</h3>${viewAll}</div>
+        ${meta ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">${meta}</div>` : ''}
+        ${rowsHtml}
+      </div>`;
+    }
+
+    function summaryMiniTable(headers, rows) {
+      if (!rows.length) return '<div class="summary-empty">No data — run Refresh dashboard.</div>';
+      return `<table class="summary-mini-table"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    }
+
+    function fmtCrSummary(v) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return '—';
+      const sign = n >= 0 ? '+' : '';
+      return sign + n.toLocaleString('en-IN', { maximumFractionDigits: 0 }) + ' Cr';
+    }
+
+    function renderEodSummary(data) {
+      const { tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing } = data;
+      const cards = [];
+
+      // Macro — FII/DII
+      const flow = fiidii?.fii_dii || fiidii?.flow || [];
+      const last = flow.length ? flow[flow.length - 1] : null;
+      if (last) {
+        const fii = parseFloat(last.fii_net);
+        const dii = parseFloat(last.dii_net);
+        const net = (Number.isFinite(fii) ? fii : 0) + (Number.isFinite(dii) ? dii : 0);
+        summaryMacro.innerHTML = `
+          <div class="day-card"><div class="label">FII cash</div><div class="val ${fii >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmtCrSummary(fii)}</div><div class="label small">${fmt(last.date)}</div></div>
+          <div class="day-card"><div class="label">DII cash</div><div class="val ${dii >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmtCrSummary(dii)}</div></div>
+          <div class="day-card"><div class="label">Combined</div><div class="val ${net >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmtCrSummary(net)}</div></div>
+          <div class="day-card"><div class="label">Trade date</div><div class="val small">${fmt(fiidii?.trade_date || tw?.trade_date || '—')}</div></div>`;
+      } else {
+        summaryMacro.innerHTML = '';
+      }
+
+      // Tomorrow watchlist — top 5
+      const twPicks = (tw?.picks || []).slice(0, 5);
+      cards.push(summaryCard(
+        'Watchlist for Tomorrow',
+        'tomorrow',
+        summaryMiniTable(
+          ['Stock', 'Setup', 'Bias', 'Conf'],
+          twPicks.map(p => `<tr>
+            <td class="stock">${fmt(p.stock)}</td>
+            <td>${fmt(p.setup_type)}</td>
+            <td class="${p.next_day_bias === 'Bullish' ? 'sig-buy' : 'sig-sell'}">${fmt(p.next_day_bias)}</td>
+            <td class="num">${p.confidence_score != null ? Number(p.confidence_score).toFixed(0) : '—'}</td>
+          </tr>`)
+        ),
+        tw?.picks?.length ? `${tw.picks.length} picks · scanned ${tw.scanned || '—'}` : (tw?.message || '')
+      ));
+
+      // Combined — top 5
+      const combRows = (combined?.rows || []).slice().sort((a, b) => parseFloat(b.combined_score) - parseFloat(a.combined_score)).slice(0, 5);
+      cards.push(summaryCard(
+        'Combined Confluence',
+        'combined',
+        summaryMiniTable(
+          ['Stock', 'Score', 'Inst', 'Fund'],
+          combRows.map(r => `<tr>
+            <td class="stock">${fmt(r.stock || r.symbol)}</td>
+            <td class="num">${fmtNum(r.combined_score, 1)}</td>
+            <td class="num">${fmtNum(r.institutional_signal, 1)}</td>
+            <td class="num">${fmtNum(r.fundamental_score, 1)}</td>
+          </tr>`)
+        ),
+        combined?.rows?.length ? `${combined.rows.length} ranked` : 'Run Rebuild in Combined scanner'
+      ));
+
+      // Swing playbook — top 5 composite + regime
+      const swingRank = (swing?.rankings || []).slice(0, 5);
+      const regime = swing?.market_regime || {};
+      cards.push(summaryCard(
+        'Swing Playbook',
+        'swing-playbook',
+        summaryMiniTable(
+          ['Stock', 'Score', 'Hits'],
+          swingRank.map(r => `<tr>
+            <td class="stock">${fmt(r.stock)}</td>
+            <td class="num">${fmtNum(r.total_score, 1)}</td>
+            <td style="font-size:0.75rem;">${(r.scanner_hits || []).slice(0, 2).join(', ') || '—'}</td>
+          </tr>`)
+        ),
+        regime.regime ? `Market ${String(regime.regime).toUpperCase()} · breadth ${fmtNum(regime.breadth_pct_above_200, 0)}%` : 'Run Swing Playbook refresh'
+      ));
+
+      // Silent accumulation — top 3
+      const silentRows = (silent?.rows || []).slice(0, 3);
+      cards.push(summaryCard(
+        'Silent Accumulation',
+        'silent',
+        summaryMiniTable(
+          ['Stock', 'Score', 'MFI', 'CMF'],
+          silentRows.map(r => `<tr>
+            <td class="stock">${fmt(r.stock)}</td>
+            <td class="num">${fmtNum(r.score, 1)}</td>
+            <td class="num">${r.mfi == null ? '—' : fmtNum(r.mfi, 0)}</td>
+            <td class="num">${fmtNum(r.cmf, 3)}</td>
+          </tr>`)
+        ),
+        silent?.passed != null ? `${silent.passed} passed filters` : ''
+      ));
+
+      // RS vs NIFTY — top 5
+      const rsRows = (rs?.rows || []).slice(0, 5);
+      cards.push(summaryCard(
+        'RS vs NIFTY (daily)',
+        'rs',
+        summaryMiniTable(
+          ['Stock', 'Strength', '20d vs NIFTY'],
+          rsRows.map(r => `<tr>
+            <td class="stock">${fmt(r.stock)}</td>
+            <td class="num">${fmtNum(r.strength_score, 1)}</td>
+            <td class="num ${parseFloat(r.excess_20d || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmtNum(r.excess_20d, 2)}%</td>
+          </tr>`)
+        ),
+        rs?.rows?.length ? `${rs.rows.length} outperformers` : ''
+      ));
+
+      // Intraday RS
+      const strong = (intraday?.stronger || intraday?.leaders || []).slice(0, 3);
+      const weak = (intraday?.weaker || intraday?.laggards || []).slice(0, 3);
+      const intraHtml = strong.length || weak.length
+        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+            <div><div style="font-size:0.72rem;color:var(--buy);margin-bottom:0.35rem;">▲ Stronger</div>${summaryMiniTable(['Stock', 'Excess%'], strong.map(r => `<tr><td class="stock">${fmt(r.stock || r.symbol)}</td><td class="num pnl-positive">${fmtNum(r.excess_pct != null ? r.excess_pct : r.rs_vs_nifty_pct, 2)}%</td></tr>`))}</div>
+            <div><div style="font-size:0.72rem;color:var(--sell);margin-bottom:0.35rem;">▼ Weaker</div>${summaryMiniTable(['Stock', 'Excess%'], weak.map(r => `<tr><td class="stock">${fmt(r.stock || r.symbol)}</td><td class="num pnl-negative">${fmtNum(r.excess_pct != null ? r.excess_pct : r.rs_vs_nifty_pct, 2)}%</td></tr>`))}</div>
+          </div>`
+        : '<div class="summary-empty">No intraday RS cache for today.</div>';
+      cards.push(summaryCard('Intraday RS vs NIFTY', 'intraday-rs', intraHtml, intraday?.session_day || intraday?.trade_date ? `Session ${fmt(intraday.session_day || intraday.trade_date)}` : ''));
+
+      // Minervini — top 3
+      const minRows = (minervini?.rows || minervini?.setups || []).slice(0, 3);
+      cards.push(summaryCard(
+        'Minervini SEPA',
+        'minervini',
+        summaryMiniTable(
+          ['Stock', 'Score', 'Stage'],
+          minRows.map(r => `<tr>
+            <td class="stock">${fmt(r.stock || r.symbol)}</td>
+            <td class="num">${fmtNum(r.setup_score != null ? r.setup_score : r.score, 1)}</td>
+            <td>${fmt(r.stage || r.template_stage || '—')}</td>
+          </tr>`)
+        ),
+        minervini?.rows?.length ? `${minervini.rows.length} setups` : ''
+      ));
+
+      // Sector RS — top 3
+      const sectors = (sector?.sectors || []).slice(0, 3);
+      cards.push(summaryCard(
+        'Sector RS',
+        'sector-rs',
+        summaryMiniTable(
+          ['Sector', 'Avg excess'],
+          sectors.map(s => `<tr>
+            <td>${fmt(s.sector || s.name)}</td>
+            <td class="num ${parseFloat(s.avg_excess_pct || s.change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmtNum(s.avg_excess_pct != null ? s.avg_excess_pct : s.change_pct, 2)}%</td>
+          </tr>`)
+        ),
+        sector?.message || ''
+      ));
+
+      // Index FnO — NIFTY + BANKNIFTY
+      const indexRows = (eod?.indicators || []).filter(i => /^(NIFTY|BANKNIFTY)/i.test(String(i.stock || '').trim())).slice(0, 2);
+      cards.push(summaryCard(
+        'Index FnO (EOD)',
+        'eod',
+        summaryMiniTable(
+          ['Index', 'Spot chg', 'OI buildup', 'PCR'],
+          indexRows.map(i => `<tr>
+            <td class="stock">${fmt(i.stock)}</td>
+            <td class="num ${(i.spot_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmtNum(i.spot_change_pct, 2)}%</td>
+            <td>${fmt((i.oi_buildup || '—').replace(/_/g, ' '))}</td>
+            <td class="num">${fmtNum(i.pcr, 2)}</td>
+          </tr>`)
+        ),
+        eod?.indicators?.length ? `${eod.indicators.length} FnO symbols scanned` : 'Run Refresh EOD'
+      ));
+
+      summaryGrid.innerHTML = cards.join('');
+      summaryGrid.querySelectorAll('[data-scanner-link]').forEach(btn => {
+        btn.addEventListener('click', () => openScannerSubTab(btn.dataset.scannerLink));
+      });
+
+      summaryLoading.style.display = 'none';
+      summaryContent.style.display = 'block';
+      const parts = [];
+      if (tw?.trade_date) parts.push(`Watchlist ${tw.trade_date}`);
+      if (silent?.trade_date) parts.push(`Silent ${silent.trade_date}`);
+      summaryStatus.textContent = parts.length ? `Summary from saved scans · ${parts.join(' · ')}` : 'Some scans missing — click Refresh dashboard.';
+      summaryStatus.className = 'status ok';
+    }
+
+    async function loadEodSummary(force = false) {
+      if (!summaryGrid) return;
+      if (!force && _summaryLoadedAt && (Date.now() - _summaryLoadedAt) < 60000) return;
+      summaryLoading.style.display = 'block';
+      summaryContent.style.display = 'none';
+      summaryStatus.textContent = 'Loading saved scans…';
+      try {
+        const safe = (url) => stocksGetJson(url).catch(() => null);
+        const [tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing] = await Promise.all([
+          safe('/api/stocks/tomorrow-watchlist'),
+          safe('/api/stocks/silent-accumulation'),
+          safe('/api/stocks/relative-strength'),
+          safe('/api/stocks/intraday-rs'),
+          safe('/api/stocks/minervini-template'),
+          safe('/api/stocks/combined-signals'),
+          safe('/api/stocks/eod-indicators'),
+          safe('/api/stocks/fii-dii-trends'),
+          safe('/api/stocks/sector-rs'),
+          safe('/api/stocks/swing-playbook'),
+        ]);
+        renderEodSummary({ tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing });
+        _summaryLoadedAt = Date.now();
+      } catch (e) {
+        summaryLoading.textContent = 'Could not build summary: ' + e.message;
+        summaryStatus.textContent = 'Error loading summary';
+        summaryStatus.className = 'status err';
+      }
+    }
 
     // EOD FnO Analysis tab
     const eodDate = document.getElementById('eodDate');
@@ -1217,7 +1609,8 @@
 
     eodDate?.addEventListener('change', () => {
       _eodLoadedKey = null;
-      if (document.getElementById('panel-eod')?.classList.contains('active')) loadEodTab(true);
+      const eodPanel = document.getElementById('panel-eod');
+      if (eodPanel?.classList.contains('active')) loadEodTab(true);
     });
     // Watchlist for Tomorrow
     const twStatus = document.getElementById('twStatus');
@@ -1554,8 +1947,8 @@
     }
     function componentBars(comp) {
       if (!comp) return '';
-      const max = { obv_slope: 25, cmf: 20, up_down_vol: 15, close_upper_third: 10, structure: 10, delivery: 15, institutional_deals: 15 };
-      const labels = { obv_slope: 'OBV', cmf: 'CMF', up_down_vol: 'U/D', close_upper_third: 'Up⅓', structure: 'Str', delivery: 'Del', institutional_deals: 'Inst' };
+      const max = { obv_slope: 25, cmf: 20, mfi: 10, up_down_vol: 15, close_upper_third: 10, structure: 10, delivery: 15, institutional_deals: 15 };
+      const labels = { obv_slope: 'OBV', cmf: 'CMF', mfi: 'MFI', up_down_vol: 'U/D', close_upper_third: 'Up⅓', structure: 'Str', delivery: 'Del', institutional_deals: 'Inst' };
       return Object.entries(max).map(([k, m]) => {
         const v = parseFloat(comp[k] || 0);
         const pct = Math.max(0, Math.min(100, (v / m) * 100));
@@ -1582,6 +1975,7 @@
         <td class="num">${fmtNum(r.range_width_pct, 1)}</td>
         <td class="num ${deltaCls(r.obv_slope_pct)}">${fmtNum(r.obv_slope_pct, 1)}</td>
         <td class="num ${deltaCls(r.cmf)}">${fmtNum(r.cmf, 3)}</td>
+        <td class="num ${deltaCls(r.mfi != null ? r.mfi - 50 : 0)}">${r.mfi == null ? '—' : fmtNum(r.mfi, 0)}</td>
         <td class="num">${fmtNum(r.up_down_vol_ratio)}</td>
         <td class="num">${fmtNum(r.close_upper_third_pct, 0)}</td>
         <td>${r.higher_lows ? '<span class="sig-buy">✓</span>' : '<span style="color:var(--neutral)">—</span>'}</td>
@@ -2044,6 +2438,144 @@
         await _combinedRefresh('?refresh_news=true', 'Fetching Google News RSS for NIFTY 500… ~2 minutes.');
       } finally { btnCombinedRefreshNews.disabled = false; }
     });
+
+    // ---------- Swing Playbook ----------
+    const swingStatus = document.getElementById('swingStatus');
+    const swingLoading = document.getElementById('swingLoading');
+    const swingEmpty = document.getElementById('swingEmpty');
+    const swingContent = document.getElementById('swingContent');
+    const swingRegime = document.getElementById('swingRegime');
+    const swingScannerSelect = document.getElementById('swingScannerSelect');
+    const swingPanelHead = document.getElementById('swingPanelHead');
+    const swingThead = document.getElementById('swingThead');
+    const swingTbody = document.getElementById('swingTbody');
+    let _swingPayload = null;
+
+    const SWING_SCANNER_LABELS = {
+      momentum_leaders: 'A — Momentum Leaders',
+      breakout: 'B — Breakout',
+      vcp_contraction: 'C — VCP Contraction',
+      pullback: 'D — Pullback',
+      earnings_acceleration: 'E — Earnings Acceleration',
+      can_slim: 'CAN SLIM',
+      stage_2: 'Stage 2 (Weinstein)',
+      dual_momentum: 'Dual Momentum',
+      mean_reversion: 'Mean Reversion',
+      turtle_breakout: 'Turtle Breakout',
+      post_earnings_momentum: 'Post-Earnings Momentum',
+    };
+
+    function renderSwingRegime(d) {
+      const r = d?.market_regime || {};
+      if (!swingRegime) return;
+      if (!r.regime) {
+        swingRegime.innerHTML = '';
+        return;
+      }
+      const cls = r.regime === 'bull' ? 'pnl-positive' : r.regime === 'bear' ? 'pnl-negative' : '';
+      swingRegime.innerHTML =
+        `<strong>Market regime:</strong> <span class="${cls}">${String(r.regime).toUpperCase()}</span> ` +
+        `(score ${fmtNum(r.score, 0)}) · Nifty ${fmtNum(r.nifty_close, 0)} · ` +
+        `3M ${fmtNum(r.nifty_return_63d, 1)}% · Breadth ${fmtNum(r.breadth_pct_above_200, 0)}% above 200 DMA` +
+        (r.reasons?.length ? `<div style="margin-top:0.35rem;font-size:0.8rem;">${r.reasons.join(' · ')}</div>` : '');
+    }
+
+    function renderSwingTable() {
+      if (!_swingPayload || !swingThead || !swingTbody) return;
+      const key = swingScannerSelect ? swingScannerSelect.value : 'rankings';
+      if (key === 'rankings') {
+        swingPanelHead.textContent = 'Composite Rankings (100-point model)';
+        swingThead.innerHTML = `<tr>
+          <th>#</th><th>Stock</th><th class="num">Total</th><th class="num">Market</th><th class="num">Sector</th>
+          <th class="num">Trend</th><th class="num">Fund</th><th class="num">Setup</th><th class="num">Risk</th><th>Scanner hits</th>
+        </tr>`;
+        const rows = _swingPayload.rankings || [];
+        swingTbody.innerHTML = rows.map((r, i) => `<tr>
+          <td class="num">${i + 1}</td>
+          <td class="stock">${fmt(r.stock)}</td>
+          <td class="num">${fmtNum(r.total_score, 1)}</td>
+          <td class="num">${fmtNum(r.components?.market, 1)}</td>
+          <td class="num">${fmtNum(r.components?.sector_rs, 1)}</td>
+          <td class="num">${fmtNum(r.components?.trend, 1)}</td>
+          <td class="num">${fmtNum(r.components?.fundamentals, 1)}</td>
+          <td class="num">${fmtNum(r.components?.setup, 1)}</td>
+          <td class="num">${fmtNum(r.components?.risk, 1)}</td>
+          <td style="font-size:0.75rem;">${(r.scanner_hits || []).join(', ') || '—'}</td>
+        </tr>`).join('');
+        return;
+      }
+      swingPanelHead.textContent = SWING_SCANNER_LABELS[key] || key;
+      swingThead.innerHTML = `<tr>
+        <th>#</th><th>Stock</th><th class="num">Score</th><th class="num">Close</th><th class="num">3M vs Nifty</th><th>Reasons</th>
+      </tr>`;
+      const rows = (_swingPayload.scanners || {})[key] || [];
+      swingTbody.innerHTML = rows.map((r, i) => `<tr>
+        <td class="num">${i + 1}</td>
+        <td class="stock">${fmt(r.stock)}</td>
+        <td class="num">${fmtNum(r.score, 1)}</td>
+        <td class="num">${fmtNum(r.metrics?.close, 2)}</td>
+        <td class="num ${parseFloat(r.metrics?.excess_63d || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmtNum(r.metrics?.excess_63d, 1)}%</td>
+        <td style="font-size:0.75rem;">${(r.reasons || []).join(' · ')}</td>
+      </tr>`).join('');
+    }
+
+    function renderSwingPayload(d) {
+      _swingPayload = d;
+      swingLoading.style.display = 'none';
+      renderSwingRegime(d);
+      const hasData = (d.rankings && d.rankings.length) || Object.values(d.scanners || {}).some(a => a && a.length);
+      if (!hasData) {
+        swingEmpty.style.display = 'block';
+        swingEmpty.textContent = d.message || 'No swing playbook candidates for current filters.';
+        swingContent.style.display = 'none';
+        swingStatus.textContent = d.message || 'No data';
+        swingStatus.className = 'status';
+        return;
+      }
+      swingEmpty.style.display = 'none';
+      swingContent.style.display = 'block';
+      renderSwingTable();
+      const counts = d.scanner_counts || {};
+      const parts = Object.entries(counts).filter(([, n]) => n > 0).slice(0, 4).map(([k, n]) => `${k.replace(/_/g, ' ')}: ${n}`);
+      swingStatus.textContent = `Trade date ${fmt(d.trade_date)} · ${parts.join(' · ')}`;
+      swingStatus.className = 'status ok';
+    }
+
+    swingScannerSelect?.addEventListener('change', renderSwingTable);
+
+    async function loadSwingPlaybook() {
+      swingLoading.style.display = 'block';
+      swingEmpty.style.display = 'none';
+      swingContent.style.display = 'none';
+      try {
+        const d = await stocksGetJson('/api/stocks/swing-playbook');
+        renderSwingPayload(d);
+      } catch (e) {
+        swingLoading.style.display = 'none';
+        swingEmpty.style.display = 'block';
+        swingEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    async function refreshSwingTab() {
+      swingStatus.textContent = 'Running swing playbook on NIFTY 500 daily bars…';
+      swingStatus.className = 'status';
+      swingLoading.style.display = 'block';
+      swingEmpty.style.display = 'none';
+      swingContent.style.display = 'none';
+      try {
+        const d = await postRefreshJson('/api/stocks/swing-playbook/refresh', 'Swing playbook');
+        renderSwingPayload(d);
+        return d;
+      } catch (e) {
+        swingLoading.style.display = 'none';
+        swingEmpty.style.display = 'block';
+        swingEmpty.textContent = 'Refresh error: ' + e.message;
+        swingStatus.textContent = 'Error: ' + e.message;
+        swingStatus.className = 'status err';
+        throw e;
+      }
+    }
 
     // ---------- FII/DII Trends ----------
     const fiidiiStatus = document.getElementById('fiidiiStatus');
@@ -3307,6 +3839,7 @@
       'intraday-rs': refreshIntradayRsTab,
       'sector-rs': refreshSectorRsTab,
       instvol: refreshInstVolTab,
+      'swing-playbook': refreshSwingTab,
     };
 
     function setRefreshControlsDisabled(disabled) {
@@ -3355,6 +3888,7 @@
         loadIntradayRs(),
         loadSectorRs(),
         loadInstitutionalVolume(),
+        loadSwingPlaybook(),
       ]);
     }
 
@@ -3369,6 +3903,7 @@
         { label: 'FII/DII & OI Trends', fn: refreshFiidiiTab },
         { label: 'RS vs NIFTY', fn: refreshRsTab },
         { label: 'Minervini SEPA', fn: refreshMinerviniTab },
+        { label: 'Swing Playbook', fn: refreshSwingTab },
         { label: 'Intraday RS', fn: refreshIntradayRsTab },
         { label: 'Sector RS', fn: refreshSectorRsTab },
       ];
@@ -3401,13 +3936,14 @@
 
       setRefreshAllStatus('Updating tab views…', null);
       await reloadAllDesignatedTabs();
+      await loadEodSummary(true);
       if (errors.length) {
         setRefreshAllStatus(
           `Done with ${errors.length} error(s): ${errors.slice(0, 2).join(' · ')}${errors.length > 2 ? '…' : ''}`,
           false
         );
       } else {
-        setRefreshAllStatus(`All ${steps.length} tabs refreshed (30-min & Combined skipped).`, true);
+        setRefreshAllStatus(`All ${steps.length} scanners refreshed — see EOD Summary.`, true);
       }
       setRefreshAllMeta(new Date().toISOString(), tradeDate);
       setRefreshControlsDisabled(false);
@@ -3433,10 +3969,13 @@
       });
     });
 
-    // Allow opening new tabs by hash
-    if (['#silent', '#fiidii', '#rs', '#minervini', '#intraday-rs', '#sector-rs', '#instvol'].includes(window.location.hash)) {
-      const tab = window.location.hash.replace('#', '');
-      document.querySelector(`.tab[data-tab="${tab}"]`)?.click();
+    // Allow opening scanners by hash
+    const hashScanner = window.location.hash.replace('#', '');
+    const SCANNER_HASH_KEYS = ['silent', 'fiidii', 'rs', 'minervini', 'intraday-rs', 'sector-rs', 'instvol', 'combined', 'swing-playbook', 'eod', 'tomorrow'];
+    if (SCANNER_HASH_KEYS.includes(hashScanner)) {
+      openScannerSubTab(hashScanner);
+    } else {
+      loadEodSummary();
     }
   </script>
 </body>

@@ -4,6 +4,7 @@ from typing import Dict
 
 import pandas as pd
 
+from intraday_engine.analysis.money_flow import money_flow_snapshot
 from intraday_engine.core.models import MarketSnapshot
 
 
@@ -63,6 +64,12 @@ def compute_features(df: pd.DataFrame) -> Dict[str, float]:
     # Options OI: CE OI up = bullish, PE OI up = bearish
     oi_available = (call_oi_first > 0 or call_oi_last > 0) and (put_oi_first > 0 or put_oi_last > 0)
 
+    mf = money_flow_snapshot(df)
+    mf_bias = str(mf.get("bias") or "neutral")
+    mf_zone = str(mf.get("mfi_zone") or "n/a")
+    mfi_val = mf.get("mfi")
+    cmf_val = mf.get("cmf")
+
     return {
         "spot_above_open": 1.0 if spot_ltp > spot_open else 0.0,
         "spot_below_open": 1.0 if spot_ltp < spot_open else 0.0,
@@ -80,6 +87,13 @@ def compute_features(df: pd.DataFrame) -> Dict[str, float]:
         "fut_oi_bullish": 1.0 if fut_oi_available and fut_oi_bullish else 0.0,
         "fut_oi_bearish": 1.0 if fut_oi_available and fut_oi_bearish else 0.0,
         "oi_available": oi_available,
+        "mfi": float(mfi_val) if mfi_val is not None else float("nan"),
+        "cmf": float(cmf_val) if cmf_val is not None else float("nan"),
+        "obv_slope_pct": float(mf.get("obv_slope_pct") or 0.0),
+        "money_flow_bullish": 1.0 if mf_bias == "bullish" else 0.0,
+        "money_flow_bearish": 1.0 if mf_bias == "bearish" else 0.0,
+        "mfi_overbought": 1.0 if mf_zone == "overbought" else 0.0,
+        "mfi_oversold": 1.0 if mf_zone == "oversold" else 0.0,
     }
 
 

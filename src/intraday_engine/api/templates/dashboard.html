@@ -2049,6 +2049,8 @@
               <th>PE</th>
               <th>Bias</th>
               <th>Mom</th>
+              <th>MFI</th>
+              <th>CMF</th>
               <th>Pro</th>
             </tr>
           </thead>
@@ -5638,6 +5640,9 @@
           const dirCls = dir === 'CE' ? 'pnl-negative' : dir === 'PE' ? 'pnl-positive' : '';
           const ceSc = cf.ce_score != null ? cf.ce_score : '—';
           const peSc = cf.pe_score != null ? cf.pe_score : '—';
+          const mf = s.money_flow || {};
+          const mfiVal = mf.mfi;
+          const cmfVal = mf.cmf;
           const pp = s.pro_print || {};
           const proCell = pp.fired
             ? `<span style="color:${proPrintSideColor(pp.side)};font-weight:700;" title="Pro ${pp.side} · ${pp.score}">${pp.side}</span>`
@@ -5659,9 +5664,11 @@
             <td class="num">${peSc}</td>
             <td><span class="badge ${biasCls}">${fmt(s.bias)?.replace('_DAY','') || '—'}</span></td>
             <td><span class="badge ${momCls}">${fmt(pa.momentum) || '—'}</span></td>
+            <td class="num ${mfiVal != null && mfiVal >= 55 ? 'pnl-positive' : mfiVal != null && mfiVal <= 45 ? 'pnl-negative' : ''}">${mfiVal == null ? '—' : fmt(mfiVal, 0)}</td>
+            <td class="num ${cmfVal != null && cmfVal > 0 ? 'pnl-positive' : cmfVal != null && cmfVal < 0 ? 'pnl-negative' : ''}">${cmfVal == null ? '—' : fmt(cmfVal, 3)}</td>
             <td class="num">${proCell}</td>
           </tr>`;
-        }).join('') || '<tr><td colspan="17">No data. Run Refresh first.</td></tr>';
+        }).join('') || '<tr><td colspan="19">No data. Run Refresh first.</td></tr>';
         document.querySelectorAll('.analysis-row').forEach(row => {
           row.onclick = () => {
             const ts = row.dataset.ts;
@@ -6538,6 +6545,7 @@
       const pavVs = pav.volume_spread || {};
       const asq = s.atr_squeeze || {};
       const pp = s.pro_print || {};
+      const mf = s.money_flow || {};
       const sc = s.scores || {};
       const tp = s.trade_plan || {};
       const rangePct = rangeBarPct(pa.support, pa.resistance, pa.spot);
@@ -6618,6 +6626,14 @@
           <tr><th>Fut OI</th><td class="num">${fmt(s.oi.future_oi)}</td><th>Fut OI chg</th><td class="num ${(s.oi.fut_oi_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(s.oi.fut_oi_change_pct)}%</td></tr>
           <tr><th>CE OI</th><td class="num">${fmt(s.oi.call_oi)}</td><th>CE OI chg</th><td class="num ${(s.oi.call_oi_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(s.oi.call_oi_change_pct)}%</td></tr>
           <tr><th>PE OI</th><td class="num">${fmt(s.oi.put_oi)}</td><th>PE OI chg</th><td class="num ${(s.oi.put_oi_change_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${fmt(s.oi.put_oi_change_pct)}%</td></tr>
+        </table>
+        ` : ''}
+        ${(mf.mfi != null || mf.cmf != null) ? `
+        <h3 style="margin: 1rem 0 0.5rem;">Money Flow (5-min spot)</h3>
+        <table class="analysis-table summary-table" style="max-width: 520px;">
+          <tr><th>MFI</th><td class="num">${mf.mfi == null ? '—' : fmt(mf.mfi, 0)}</td><th>Zone</th><td><span class="badge ${mf.mfi_zone === 'overbought' ? 'badge-bear' : mf.mfi_zone === 'oversold' ? 'badge-bull' : 'badge-neutral'}">${fmt(mf.mfi_zone)}</span></td></tr>
+          <tr><th>CMF</th><td class="num ${(mf.cmf || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${mf.cmf == null ? '—' : fmt(mf.cmf, 3)}</td><th>Bias</th><td><span class="badge ${badgeClass(mf.bias)}">${fmt(mf.bias)}</span></td></tr>
+          <tr><th>OBV slope</th><td class="num ${(mf.obv_slope_pct || 0) >= 0 ? 'pnl-positive' : 'pnl-negative'}">${mf.obv_slope_pct == null ? '—' : fmt(mf.obv_slope_pct, 1)}%</td><th></th><td></td></tr>
         </table>
         ` : ''}
         ${pav.price_action ? `

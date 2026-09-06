@@ -10,7 +10,7 @@ from intraday_engine.core.config import Settings
 from intraday_engine.core.underlyings import list_index_underlyings
 from intraday_engine.engine import DirectionEngine
 from intraday_engine.fetch.instrument_resolver import InstrumentResolver
-from intraday_engine.fetch.market_data import MarketDataFetcher
+from intraday_engine.fetch.market_data import MarketDataFetcher, NoCompletedCandlesError
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.research.options_trading_signals import run_options_trading_scan
 from intraday_engine.storage import DataStore
@@ -75,13 +75,26 @@ def run_index_pipeline_cycle(
                 "latest_signal": payload.get("signal"),
                 "options_trading_signals": signal_count,
             })
+        except NoCompletedCandlesError as exc:
+            logger.info("Index pipeline deferred for %s: %s", u_key, exc)
+            results.append({"underlying": u_key, "status": "waiting", "reason": str(exc)})
         except Exception as exc:
             logger.exception("Index pipeline failed for %s: %s", u_key, exc)
             errors.append(f"{u_key}: {exc}")
             results.append({"underlying": u_key, "status": "error", "reason": str(exc)})
 
     ok_count = sum(1 for r in results if r.get("status") == "ok")
-    status = "ok" if ok_count == len(targets) else ("partial" if ok_count else "failed")
+    waiting_count = sum(1 for r in results if r.get("status") == "waiting")
+    if ok_count == len(targets):
+        status = "ok"
+    elif ok_count:
+        status = "partial"
+    elif waiting_count == len(targets):
+        status = "waiting"
+    elif waiting_count:
+        status = "partial"
+    else:
+        status = "failed"
     return {
         "status": status,
         "trade_date": td.isoformat(),

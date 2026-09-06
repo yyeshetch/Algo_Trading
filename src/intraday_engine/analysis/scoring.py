@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Dict, List
 
 from intraday_engine.core.models import ScoreBreakdown
@@ -104,6 +105,30 @@ def score_signal(
     else:
         no_trade_penalty += _pen("momentum_neutral", 0.05)
         reasons.append("Momentum is neutral.")
+
+    if features.get("money_flow_bullish"):
+        bullish += _w("money_flow", 0.08)
+        mfi = features.get("mfi")
+        cmf = features.get("cmf")
+        if mfi is not None and cmf is not None and math.isfinite(mfi) and math.isfinite(cmf):
+            reasons.append(f"Bullish money flow: MFI {mfi:.0f}, CMF {cmf:.3f}.")
+        else:
+            reasons.append("Bullish money flow (MFI + CMF aligned).")
+    elif features.get("money_flow_bearish"):
+        bearish += _w("money_flow", 0.08)
+        mfi = features.get("mfi")
+        cmf = features.get("cmf")
+        if mfi is not None and cmf is not None and math.isfinite(mfi) and math.isfinite(cmf):
+            reasons.append(f"Bearish money flow: MFI {mfi:.0f}, CMF {cmf:.3f}.")
+        else:
+            reasons.append("Bearish money flow (MFI + CMF aligned).")
+
+    if features.get("mfi_overbought") and bullish >= bearish:
+        no_trade_penalty += _pen("mfi_overbought", 0.05)
+        reasons.append("MFI overbought — long exhaustion risk.")
+    elif features.get("mfi_oversold") and bearish >= bullish:
+        no_trade_penalty += _pen("mfi_oversold", 0.05)
+        reasons.append("MFI oversold — short exhaustion risk.")
 
     if is_mid_range:
         no_trade_penalty += _w("structure_quality", 0.05)

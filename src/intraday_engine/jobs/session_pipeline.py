@@ -106,7 +106,7 @@ def run_session_cycle(
     index = run_index_pipeline_cycle(underlyings=targets, trade_date=td)
 
     chain_ok = chain.get("status") in ("ok", "partial")
-    index_ok = index.get("status") in ("ok", "partial")
+    index_ok = index.get("status") in ("ok", "partial", "waiting")
     if chain_ok and index_ok:
         status = "ok"
     elif chain_ok or index_ok:

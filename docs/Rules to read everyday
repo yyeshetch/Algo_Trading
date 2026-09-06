@@ -3,7 +3,7 @@ You are not here to be the greatest winner / win everything, you are to take pro
 Respect every trade
 Losses are part of the game. Learn to book a loss.
 Cutting a finger is better than losing a hand.
-Look at PnL after every 20 trades
+Don't look at PnL during trade. Look at PnL after every 20 trades
 More trades doesn't mean more money
 
 If you are in profit, then stop the trading for the day. Greed kills you.
@@ -15,9 +15,18 @@ If you are in profit, then stop the trading for the day. Greed kills you.
         revenge trading
 Market gives 2 opportunities in a day to exit in profits after making Losses
 
+I'm making profit initially, being greedy and taking more trades, pnl goes to losses, then taking more trades to exit day in profit. Result = Little profit or heavy charges
+
+You will take multiple trades if you don't wait for your setup.
+Don't use 1-min timeframe, I'm taking more trades
+
 python src/update_credentials/update_access_token.py
 
 PYTHONPATH=src python -m intraday_engine.cli.main \
   --dashboard --read-only --host 0.0.0.0 --port 8000
 
 PYTHONPATH=src caffeinate -dims python -m intraday_engine.cli.main --session-scheduler --storage write_to_files
+
+
+python -m intraday_engine.cli.main --swing-playbook
+python -m intraday_engine.cli.main --swing-playbook --swing-top 30 --swing-ranking-top 50

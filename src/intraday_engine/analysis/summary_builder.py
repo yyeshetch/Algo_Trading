@@ -6,6 +6,8 @@ from typing import Any
 
 import pandas as pd
 
+from intraday_engine.analysis.money_flow import money_flow_snapshot
+
 
 def _str_safe(v: Any, default: str = "—") -> str:
     if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -213,6 +215,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         call_oi_chg_candle = _pct_change(call_oi, prev_call_oi) if prev_call_oi and idx > 0 else 0
         put_oi_chg_candle = _pct_change(put_oi, prev_put_oi) if prev_put_oi and idx > 0 else 0
         volume_bias = _latest_volume_bias(frame)
+        money_flow = money_flow_snapshot(frame)
         straddle = round(call_ltp + put_ltp, 2)
         expected_pts = first_straddle if first_straddle > 0 else straddle
         em_upper = round(first_spot_open + expected_pts, 2) if expected_pts > 0 else None
@@ -313,6 +316,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
                 "put_oi_change_candle_pct": put_oi_chg_candle,
             },
             "volume_bias": volume_bias,
+            "money_flow": money_flow,
             "scores": {
                 "bullish": float(sig.get("bullish_score", 0) or 0),
                 "bearish": float(sig.get("bearish_score", 0) or 0),

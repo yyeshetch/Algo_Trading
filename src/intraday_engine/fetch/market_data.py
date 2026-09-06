@@ -9,6 +9,10 @@ from intraday_engine.fetch.instrument_resolver import InstrumentResolver
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 
 
+class NoCompletedCandlesError(RuntimeError):
+    """Raised when the session has started but no completed interval candles exist yet."""
+
+
 class MarketDataFetcher:
     def __init__(self, client: ZerodhaClient, resolver: InstrumentResolver, settings: Settings) -> None:
         self.client = client
@@ -21,7 +25,7 @@ class MarketDataFetcher:
     def fetch_intraday_frame_for_date(self, trade_date: date | None) -> pd.DataFrame:
         from_dt, to_dt = _market_window(trade_date)
         if to_dt < from_dt:
-            raise RuntimeError("No completed 5-minute candle available for the requested session.")
+            raise NoCompletedCandlesError("No completed 5-minute candle available for the requested session.")
         effective_date = from_dt.date()
 
         spot_quote_raw = self.client.quote([self.settings.spot_symbol])
@@ -30,7 +34,9 @@ class MarketDataFetcher:
         spot_rows = self.client.historical_data(spot_token, from_dt, to_dt)
         spot_df = _drop_incomplete_candles(_to_candle_df(spot_rows, "spot"), trade_date, 5)
         if spot_df.empty:
-            raise RuntimeError("No spot candles returned for today's session window.")
+            raise NoCompletedCandlesError(
+                "No completed 5-minute spot candles yet for today's session window."
+            )
 
         reference_spot = float(spot_df.iloc[0]["spot_open_raw"])
         symbols = self.resolver.resolve_for_date(reference_spot, effective_date)

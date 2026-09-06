@@ -79,6 +79,10 @@ from intraday_engine.research.minervini_trend_template_scanner import (
     load_stored_minervini_trend_template,
     run_minervini_trend_template_scan,
 )
+from intraday_engine.research.swing_playbook import (
+    load_stored_swing_playbook,
+    run_swing_playbook_scan,
+)
 from intraday_engine.research.intraday_relative_strength_scanner import (
     load_stored_intraday_relative_strength,
     run_intraday_relative_strength_scan,
@@ -745,6 +749,49 @@ async def api_minervini_template_refresh(
         return _sanitize_for_json(payload)
     except Exception as e:
         logger.exception("Minervini template refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/swing-playbook")
+async def api_swing_playbook_get(trade_date: str | None = None):
+    """Load stored swing playbook scan (momentum, breakout, VCP, pullback, earnings, rankings)."""
+    try:
+        td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
+        data = load_stored_swing_playbook(settings.data_dir, td)
+        if not data:
+            return {
+                "trade_date": td.isoformat(),
+                "scanners": {},
+                "rankings": [],
+                "message": "No saved swing playbook scan yet. Click Refresh to run.",
+            }
+        return _sanitize_for_json(data)
+    except Exception as e:
+        logger.exception("Swing playbook load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/swing-playbook/refresh")
+async def api_swing_playbook_refresh(
+    trade_date: str | None = None,
+    top_n: int = 30,
+    ranking_top_n: int = 50,
+):
+    try:
+        td = _parse_trade_date(trade_date)
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_swing_playbook_scan(
+                trade_date=td,
+                top_n=top_n,
+                ranking_top_n=ranking_top_n,
+            ),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("Swing playbook refresh failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

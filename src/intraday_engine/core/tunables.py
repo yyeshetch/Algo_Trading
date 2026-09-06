@@ -286,6 +286,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
             "breakout_follow_through": _L(0.18, "float", "Weight: breakout with follow-through."),
             "momentum": _L(0.12, "float", "Weight: momentum direction."),
             "structure_quality": _L(0.05, "float", "Weight: structure / mid-range penalty bucket."),
+            "money_flow": _L(0.08, "float", "Weight: MFI + CMF aligned money flow."),
         },
         "penalties": {
             "chop_open_vwap": _L(0.10, "float", "No-trade penalty: chop around open/VWAP."),
@@ -293,6 +294,8 @@ _DEFAULT_CONFIG: dict[str, Any] = {
             "no_follow_through": _L(0.08, "float", "Penalty: no follow-through on break."),
             "momentum_neutral": _L(0.05, "float", "Penalty: neutral momentum."),
             "stop_too_wide": _L(0.15, "float", "Penalty: stop too wide."),
+            "mfi_overbought": _L(0.05, "float", "Penalty: MFI overbought while scoring long."),
+            "mfi_oversold": _L(0.05, "float", "Penalty: MFI oversold while scoring short."),
         },
         "thresholds": {
             "fut_strength_pct": _L(0.03, "float", "Futures strength vs spot threshold (%%)."),
@@ -329,5 +332,12 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     },
     "rsi": {
         "DEFAULT_PERIOD": _L(14, "int", "Default RSI period (Wilder)."),
+    },
+    "money_flow": {
+        "MFI_PERIOD": _L(14, "int", "Money Flow Index lookback."),
+        "CMF_PERIOD": _L(20, "int", "Chaikin Money Flow lookback."),
+        "MFI_OVERBOUGHT": _L(80.0, "float", "MFI at or above this level is overbought."),
+        "MFI_OVERSOLD": _L(20.0, "float", "MFI at or below this level is oversold."),
+        "INDEX_OBV_LOOKBACK": _L(10, "int", "5-min index OBV slope lookback (bars)."),
     },
 }

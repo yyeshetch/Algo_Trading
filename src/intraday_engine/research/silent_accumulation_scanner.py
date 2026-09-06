@@ -34,6 +34,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from intraday_engine.analysis.money_flow import cmf_series, mfi_last, obv_slope_pct
 from intraday_engine.core.config import Settings
 from intraday_engine.fetch.nse_public_data import (
     fetch_delivery_bhavcopy,
@@ -72,6 +73,7 @@ class SilentAccumulationRow:
     range_width_pct: float
     obv_slope_pct: float
     cmf: float
+    mfi: float
     up_down_vol_ratio: float
     close_upper_third_pct: float
     higher_lows: bool
@@ -91,19 +93,6 @@ def _load_daily(data_dir: Path, symbol: str) -> pd.DataFrame:
     if "date" in df.columns:
         df = df.dropna(subset=["date", "open", "high", "low", "close", "volume"])
     return df.tail(220).reset_index(drop=True)
-
-
-def _obv(close: pd.Series, volume: pd.Series) -> pd.Series:
-    sign = np.sign(close.diff().fillna(0.0))
-    return (sign * volume.fillna(0.0)).cumsum()
-
-
-def _cmf(df: pd.DataFrame, period: int = 20) -> pd.Series:
-    h, l, c, v = df["high"], df["low"], df["close"], df["volume"]
-    rng = (h - l).replace(0, np.nan)
-    mfm = ((c - l) - (h - c)) / rng
-    mfv = (mfm * v).fillna(0.0)
-    return mfv.rolling(period, min_periods=period).sum() / v.rolling(period, min_periods=period).sum()
 
 
 def _up_down_volume_ratio(df: pd.DataFrame, lookback: int = 20) -> float:
@@ -148,21 +137,6 @@ def _range_metrics(df: pd.DataFrame, lookback: int = 30) -> tuple[float, float, 
     mid = (rh + rl) / 2.0
     width_pct = (rh - rl) / mid * 100.0 if mid > 0 else 100.0
     return rh, rl, width_pct
-
-
-def _obv_slope_pct(df: pd.DataFrame, lookback: int = 20) -> float:
-    """Net OBV change over the lookback as a percentage of total volume traded in the
-    same window. Range roughly [-100, +100]. Survives OBV sign-flips because the
-    denominator is total volume (always positive), not OBV itself."""
-    if len(df) < lookback + 1:
-        return 0.0
-    tail = df.tail(lookback + 1).copy()
-    sign = np.sign(tail["close"].diff().fillna(0.0))
-    signed_vol = (sign * tail["volume"]).iloc[1:]
-    total_vol = float(tail["volume"].iloc[1:].sum())
-    if total_vol <= 0:
-        return 0.0
-    return float(signed_vol.sum() / total_vol) * 100.0
 
 
 def _delivery_trend(deliv_series: list[float]) -> str:
@@ -213,9 +187,10 @@ def _score_row(
     if abs(five_close_pct) > MAX_RECENT_MOVE_PCT:
         return None
 
-    obv_slope = _obv_slope_pct(df, lookback=LOOKBACK_DAYS)
-    cmf_series = _cmf(df, period=20).dropna()
-    cmf_val = float(cmf_series.iloc[-1]) if not cmf_series.empty else 0.0
+    obv_slope = obv_slope_pct(df, lookback=LOOKBACK_DAYS)
+    cmf_vals = cmf_series(df).dropna()
+    cmf_val = float(cmf_vals.iloc[-1]) if not cmf_vals.empty else 0.0
+    mfi_val = mfi_last(df) or 0.0
     udr = _up_down_volume_ratio(df, lookback=20)
     upper_pct = _close_position_pct(df, lookback=20)
     hl = _higher_lows(df, lookback=LOOKBACK_DAYS)
@@ -238,6 +213,16 @@ def _score_row(
     components["cmf"] = round(cmf_pts, 2)
     if cmf_val > 0.05:
         reasons.append(f"CMF +{cmf_val:.2f} (volume on closes near high)")
+
+    # 2b) MFI: 50..75 maps 0..10 (accumulation without overbought)
+    mfi_pts = 0.0
+    if 50.0 <= mfi_val <= 75.0:
+        mfi_pts = max(0.0, min(10.0, (mfi_val - 50.0) / 2.5))
+    elif 45.0 <= mfi_val < 50.0:
+        mfi_pts = (mfi_val - 45.0) / 5.0
+    components["mfi"] = round(mfi_pts, 2)
+    if mfi_val >= 50.0:
+        reasons.append(f"MFI {mfi_val:.0f} — volume-weighted buying pressure")
 
     # 3) Up/down volume ratio: 1.0..2.5 → 0..15
     if np.isfinite(udr):
@@ -298,6 +283,7 @@ def _score_row(
         range_width_pct=round(width_pct, 2),
         obv_slope_pct=round(obv_slope, 2),
         cmf=round(cmf_val, 4),
+        mfi=round(mfi_val, 1),
         up_down_vol_ratio=round(udr, 2) if np.isfinite(udr) else 0.0,
         close_upper_third_pct=round(upper_pct, 1),
         higher_lows=hl,

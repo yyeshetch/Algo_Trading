@@ -5,6 +5,7 @@ from datetime import date
 from typing import Dict
 
 from intraday_engine.analysis.day_bias import probable_day_bias
+from intraday_engine.analysis.money_flow import money_flow_snapshot
 from intraday_engine.analysis.momentum import momentum_direction
 from intraday_engine.analysis.scoring import score_signal
 from intraday_engine.analysis.sideways import is_sideways_day
@@ -144,6 +145,11 @@ class DirectionEngine:
             put_ltp=put_ltp,
         )
         payload = {"timestamp": str(frame.iloc[-1]["timestamp"]), **plan.to_dict()}
+        mf = money_flow_snapshot(frame)
+        payload["mfi"] = mf.get("mfi")
+        payload["cmf"] = mf.get("cmf")
+        payload["money_flow_bias"] = mf.get("bias")
+        payload["money_flow"] = mf
         ce_symbol = str(last_row.get("ce_symbol", ""))
         pe_symbol = str(last_row.get("pe_symbol", ""))
         if plan.signal == "BUY" and ce_symbol:

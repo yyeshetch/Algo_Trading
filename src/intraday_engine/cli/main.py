@@ -27,6 +27,7 @@ from intraday_engine.research.minervini_trend_template_scanner import run_minerv
 from intraday_engine.research.fundamentals_screener import run_fundamentals_scan
 from intraday_engine.research.stock_news_scanner import run_news_scan
 from intraday_engine.research.combined_signals_scanner import run_combined_scan
+from intraday_engine.research.swing_playbook import run_swing_playbook_scan
 from intraday_engine.storage import DataStore
 from intraday_engine.utils.logging_setup import setup_logging
 
@@ -435,6 +436,23 @@ def main() -> None:
         action="store_true",
         help="Join latest institutional volume + fundamentals + news into one ranked CSV.",
     )
+    parser.add_argument(
+        "--swing-playbook",
+        action="store_true",
+        help="Run swing playbook scanners A–E + strategy filters on NIFTY 500 daily bars.",
+    )
+    parser.add_argument(
+        "--swing-top",
+        type=int,
+        default=30,
+        help="Top-N per scanner in swing playbook output (default 30).",
+    )
+    parser.add_argument(
+        "--swing-ranking-top",
+        type=int,
+        default=50,
+        help="Top-N composite rankings in swing playbook output (default 50).",
+    )
     args = parser.parse_args()
     selected_date = _parse_date(args.date) if args.date else None
     underlying = args.underlying or None
@@ -491,7 +509,7 @@ def main() -> None:
         for r in rows[:15]:
             print(
                 f"  {r.get('stock'):12} score={r.get('score'):>5}  "
-                f"OBV+{r.get('obv_slope_pct'):>5}%  CMF={r.get('cmf'):>6}  "
+                f"OBV+{r.get('obv_slope_pct'):>5}%  CMF={r.get('cmf'):>6}  MFI={r.get('mfi'):>5}  "
                 f"U/D={r.get('up_down_vol_ratio')} deliv={r.get('avg_delivery_pct')}"
             )
         return
@@ -608,6 +626,33 @@ def main() -> None:
             f"(inst={payload['with_institutional']}, fund={payload['with_fundamentals']}, "
             f"news={payload['with_news']}) -> {payload['output_csv']}"
         )
+        return
+
+    if args.swing_playbook:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        sym_path = Path(args.nifty500_symbols_file) if args.nifty500_symbols_file else None
+        payload = run_swing_playbook_scan(
+            settings=settings,
+            trade_date=selected_date or date.today(),
+            top_n=args.swing_top,
+            ranking_top_n=args.swing_ranking_top,
+            symbols_file=sym_path,
+        )
+        regime = payload.get("market_regime", {})
+        counts = payload.get("scanner_counts", {})
+        print(
+            f"Swing playbook: regime={regime.get('regime')} score={regime.get('score')} "
+            f"({payload.get('universe_meta', {}).get('computed', 0)} symbols)"
+        )
+        for k, n in counts.items():
+            print(f"  {k:24} {n:>4} hits")
+        print("Top composite rankings:")
+        for r in (payload.get("rankings") or [])[:15]:
+            print(
+                f"  {r.get('stock'):12} total={r.get('total_score'):>5.1f}  "
+                f"hits={','.join(r.get('scanner_hits') or [])[:40]}"
+            )
         return
 
     if args.tomorrow_watchlist:
