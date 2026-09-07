@@ -7,6 +7,8 @@ from typing import Any
 import pandas as pd
 
 from intraday_engine.analysis.money_flow import money_flow_snapshot
+from intraday_engine.analysis.volume_profile import compact_volume_profile, multi_period_volume_profiles
+from intraday_engine.core.tunables import get_int
 
 
 def _str_safe(v: Any, default: str = "—") -> str:
@@ -126,10 +128,18 @@ def _latest_volume_bias(frame: pd.DataFrame) -> dict[str, Any]:
     return latest
 
 
-def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFrame, lookback: int = 20) -> list[dict[str, Any]]:
+def build_analysis_summaries(
+    snapshots_df: pd.DataFrame,
+    signals_df: pd.DataFrame,
+    lookback: int = 20,
+    *,
+    daily_df: pd.DataFrame | None = None,
+) -> list[dict[str, Any]]:
     """Build analysis summary for each timestamp in snapshots."""
     if snapshots_df.empty:
         return []
+    include_daily_ctx = bool(get_int("volume_profile", "INTRADAY_INCLUDE_DAILY_CONTEXT", 1))
+    use_daily = daily_df if (include_daily_ctx and daily_df is not None and not daily_df.empty) else None
     summaries = []
     signals_by_ts = {}
     if not signals_df.empty and "timestamp" in signals_df.columns:
@@ -224,6 +234,12 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
         range_used_pct = round(abs(move_from_open) / expected_pts * 100, 1) if expected_pts > 0 else None
         session_range_pts = round(session_high - session_low, 2) if (session_high and session_low) else 0
         range_captured_pct = round(session_range_pts / expected_pts * 100, 1) if expected_pts > 0 else None
+        vp_raw = multi_period_volume_profiles(
+            intraday_df=frame,
+            daily_df=use_daily,
+            spot=spot_ltp,
+        )
+        volume_profile = compact_volume_profile(vp_raw)
         summaries.append({
             "timestamp": ts,
             "signal": _str_safe(sig.get("signal"), "—"),
@@ -317,6 +333,7 @@ def build_analysis_summaries(snapshots_df: pd.DataFrame, signals_df: pd.DataFram
             },
             "volume_bias": volume_bias,
             "money_flow": money_flow,
+            "volume_profile": volume_profile,
             "scores": {
                 "bullish": float(sig.get("bullish_score", 0) or 0),
                 "bearish": float(sig.get("bearish_score", 0) or 0),

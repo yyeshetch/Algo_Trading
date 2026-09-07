@@ -220,6 +220,19 @@ PYTHONPATH=src python -m intraday_engine.cli.main --init-db
 # Write to Interserver MySQL
 PYTHONPATH=src caffeinate -dims python -m intraday_engine.cli.main --session-scheduler --storage write_to_db
 
+# VPS production setup (InterServer) — full guide: docs/vps_setup.md | quick ref: docs/interserver.txt
+# On VPS as root:
+#   cd ~/Algo_Trading && sudo bash scripts/vps_setup.sh
+#   sudo bash scripts/vps_setup.sh --mysql-only | --init-db-only | --check-mysql
+# Logs: journalctl -u algo-scheduler -f
+# Git:  git push origin main   (branch is main, not master)
+
+# Swing playbook EOD scanners (NIFTY500 daily bars → data/analysis/swing_playbook/)
+PYTHONPATH=src python -m intraday_engine.cli.main --swing-playbook
+PYTHONPATH=src python -m intraday_engine.cli.main --swing-playbook --swing-top 30 --swing-ranking-top 50
+PYTHONPATH=src python -m intraday_engine.cli.main --volume-profile
+PYTHONPATH=src python -m intraday_engine.cli.main --volume-profile --volume-profile-top 50 --volume-profile-limit 20
+
 
 # Running dashboard only
 PYTHONPATH=src python -m intraday_engine.cli.main \ 

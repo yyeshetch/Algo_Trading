@@ -257,6 +257,16 @@ def minervini_trend_template_path(data_dir: Path, trade_date: date) -> Path:
     return minervini_trend_template_dir(data_dir) / f"minervini_template_{trade_date.isoformat()}.json"
 
 
+def volume_profile_dir(data_dir: Path) -> Path:
+    p = data_dir / "analysis" / "volume_profile"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def volume_profile_path(data_dir: Path, trade_date: date) -> Path:
+    return volume_profile_dir(data_dir) / f"volume_profile_{trade_date.isoformat()}.json"
+
+
 def swing_playbook_dir(data_dir: Path) -> Path:
     p = data_dir / "analysis" / "swing_playbook"
     p.mkdir(parents=True, exist_ok=True)

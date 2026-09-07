@@ -36,6 +36,7 @@ from intraday_engine.fetch.market_data import MarketDataFetcher
 from intraday_engine.fetch.nse_market_indices import build_nse_sector_stock_map
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.storage import DataStore, invalidate_storage_cache
+from intraday_engine.storage.nifty500_csv import read_nifty500_symbol_ohlcv
 from intraday_engine.storage.backend import get_storage_backend, write_to_db
 from intraday_engine.storage.data_store import _flatten_for_csv
 from intraday_engine.analysis.summary_builder import build_analysis_summaries
@@ -82,6 +83,11 @@ from intraday_engine.research.minervini_trend_template_scanner import (
 from intraday_engine.research.swing_playbook import (
     load_stored_swing_playbook,
     run_swing_playbook_scan,
+)
+from intraday_engine.research.volume_profile_scanner import (
+    load_stored_volume_profile,
+    run_volume_profile_scan,
+    volume_profile_for_symbol,
 )
 from intraday_engine.research.intraday_relative_strength_scanner import (
     load_stored_intraday_relative_strength,
@@ -749,6 +755,58 @@ async def api_minervini_template_refresh(
         return _sanitize_for_json(payload)
     except Exception as e:
         logger.exception("Minervini template refresh failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stocks/volume-profile")
+async def api_volume_profile_get(trade_date: str | None = None, stock: str | None = None):
+    """Load stored volume profile scan or on-demand profile for one symbol."""
+    try:
+        td = _parse_trade_date(trade_date)
+        settings = Settings.from_env(underlying="NIFTY")
+        if stock and stock.strip():
+            sym = stock.strip().upper()
+            loop = asyncio.get_event_loop()
+            payload = await loop.run_in_executor(
+                None,
+                lambda: volume_profile_for_symbol(settings.data_dir, sym),
+            )
+            if not payload:
+                return {"stock": sym, "message": f"No daily OHLCV for {sym}."}
+            return _sanitize_for_json({"stock": sym, "trade_date": td.isoformat(), **payload})
+        data = load_stored_volume_profile(settings.data_dir, td)
+        if not data:
+            return {
+                "trade_date": td.isoformat(),
+                "rows": [],
+                "message": "No saved volume profile scan yet. Click Refresh to run.",
+            }
+        return _sanitize_for_json(data)
+    except Exception as e:
+        logger.exception("Volume profile load failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stocks/volume-profile/refresh")
+async def api_volume_profile_refresh(
+    trade_date: str | None = None,
+    top_n: int = 50,
+    symbol_limit: int | None = None,
+):
+    try:
+        td = _parse_trade_date(trade_date)
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(
+            None,
+            lambda: run_volume_profile_scan(
+                trade_date=td,
+                top_n=top_n,
+                symbol_limit=symbol_limit,
+            ),
+        )
+        return _sanitize_for_json(payload)
+    except Exception as e:
+        logger.exception("Volume profile refresh failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1445,6 +1503,7 @@ async def api_stocks_30min_analysis_summary(
         loop = asyncio.get_event_loop()
         settings = Settings.from_env(underlying="NIFTY")
         client = ZerodhaClient(settings)
+        daily = read_nifty500_symbol_ohlcv(settings.data_dir, stock, "1D")
         merged, signals = await loop.run_in_executor(
             None,
             lambda: run_stock_analysis_30min(client, stock, sel_date, include_options=True),
@@ -1452,7 +1511,12 @@ async def api_stocks_30min_analysis_summary(
         if merged is None or merged.empty:
             return {"summaries": [], "selected": None}
         sig_df = pd.DataFrame([_flatten_for_csv(s) for s in signals]) if signals else pd.DataFrame()
-        summaries = build_analysis_summaries(merged, sig_df, lookback=min(settings.lookback_bars, 10))
+        summaries = build_analysis_summaries(
+            merged,
+            sig_df,
+            lookback=min(settings.lookback_bars, 10),
+            daily_df=daily if not daily.empty else None,
+        )
         summaries = [s for s in summaries if s]
         for s in summaries:
             for k, v in s.items():

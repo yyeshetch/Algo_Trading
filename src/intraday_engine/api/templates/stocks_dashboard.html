@@ -402,6 +402,7 @@
         <button class="sub-tab" data-scanner="silent">Silent Acc.</button>
         <button class="sub-tab" data-scanner="combined">Combined</button>
         <button class="sub-tab" data-scanner="swing-playbook">Swing Playbook</button>
+        <button class="sub-tab" data-scanner="volume-profile">Volume Profile</button>
         <button class="sub-tab" data-scanner="rs">RS vs NIFTY</button>
         <button class="sub-tab" data-scanner="intraday-rs">Intraday RS</button>
         <button class="sub-tab" data-scanner="minervini">Minervini</button>
@@ -1065,6 +1066,34 @@
         </div>
       </div>
     </div>
+
+    <div id="panel-volume-profile" class="scanner-sub-panel">
+      <div class="toolbar">
+        <label style="font-size: 0.85rem; color: var(--text-muted);">
+          Period:
+          <select id="vpPeriodSelect" style="margin-left:0.35rem;padding:0.2rem 0.4rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </label>
+        <button class="btn btn-primary btn-tab-refresh" data-refresh="volume-profile">Refresh</button>
+        <span class="status" id="vpStatus">Use Refresh dashboard in the header.</span>
+      </div>
+      <div id="vpLoading" class="loading" style="display:none;">Scanning NIFTY 500 volume profiles…</div>
+      <div id="vpEmpty" class="empty" style="display:none;">No saved volume profile scan yet. Run Refresh dashboard.</div>
+      <div id="vpContent" style="display:none;">
+        <div class="panel" style="box-shadow: var(--shadow);">
+          <div class="panel-head" id="vpPanelHead">Volume Profile — Daily POC / VAH / VAL</div>
+          <div class="panel-body" style="max-height: 820px; overflow: auto;">
+            <table id="vpTable" style="font-size: 0.82rem;">
+              <thead id="vpThead"></thead>
+              <tbody id="vpTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1222,6 +1251,7 @@
       instvol: loadInstitutionalVolume,
       combined: loadCombinedSignals,
       'swing-playbook': loadSwingPlaybook,
+      'volume-profile': loadVolumeProfile,
     };
 
     function activateScannerSubTab(key) {
@@ -1291,7 +1321,7 @@
     }
 
     function renderEodSummary(data) {
-      const { tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing } = data;
+      const { tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing, volprofile } = data;
       const cards = [];
 
       // Macro — FII/DII
@@ -1359,6 +1389,26 @@
           </tr>`)
         ),
         regime.regime ? `Market ${String(regime.regime).toUpperCase()} · breadth ${fmtNum(regime.breadth_pct_above_200, 0)}%` : 'Run Swing Playbook refresh'
+      ));
+
+      // Volume profile — top 5 near POC / inside VA
+      const vpRows = (volprofile?.rows || []).slice(0, 5);
+      cards.push(summaryCard(
+        'Volume Profile',
+        'volume-profile',
+        summaryMiniTable(
+          ['Stock', 'Score', 'POC', 'Position'],
+          vpRows.map(r => {
+            const d = r.daily || {};
+            return `<tr>
+              <td class="stock">${fmt(r.stock)}</td>
+              <td class="num">${fmtNum(r.score, 1)}</td>
+              <td class="num">${fmtNum(d.poc, 2)}</td>
+              <td style="font-size:0.75rem;">${biasText(d.position)}</td>
+            </tr>`;
+          })
+        ),
+        volprofile?.passed != null ? `${volprofile.passed} with profiles · daily/weekly/monthly` : 'Run Volume Profile refresh'
       ));
 
       // Silent accumulation — top 3
@@ -1475,7 +1525,7 @@
       summaryStatus.textContent = 'Loading saved scans…';
       try {
         const safe = (url) => stocksGetJson(url).catch(() => null);
-        const [tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing] = await Promise.all([
+        const [tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing, volprofile] = await Promise.all([
           safe('/api/stocks/tomorrow-watchlist'),
           safe('/api/stocks/silent-accumulation'),
           safe('/api/stocks/relative-strength'),
@@ -1486,8 +1536,9 @@
           safe('/api/stocks/fii-dii-trends'),
           safe('/api/stocks/sector-rs'),
           safe('/api/stocks/swing-playbook'),
+          safe('/api/stocks/volume-profile'),
         ]);
-        renderEodSummary({ tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing });
+        renderEodSummary({ tw, silent, rs, intraday, minervini, combined, eod, fiidii, sector, swing, volprofile });
         _summaryLoadedAt = Date.now();
       } catch (e) {
         summaryLoading.textContent = 'Could not build summary: ' + e.message;
@@ -2573,6 +2624,102 @@
         swingEmpty.textContent = 'Refresh error: ' + e.message;
         swingStatus.textContent = 'Error: ' + e.message;
         swingStatus.className = 'status err';
+        throw e;
+      }
+    }
+
+    // ---------- Volume Profile ----------
+    const vpStatus = document.getElementById('vpStatus');
+    const vpLoading = document.getElementById('vpLoading');
+    const vpEmpty = document.getElementById('vpEmpty');
+    const vpContent = document.getElementById('vpContent');
+    const vpPeriodSelect = document.getElementById('vpPeriodSelect');
+    const vpPanelHead = document.getElementById('vpPanelHead');
+    const vpThead = document.getElementById('vpThead');
+    const vpTbody = document.getElementById('vpTbody');
+    let _vpPayload = null;
+
+    const VP_PERIOD_LABELS = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
+
+    function renderVpTable() {
+      if (!_vpPayload || !vpThead || !vpTbody) return;
+      const period = vpPeriodSelect ? vpPeriodSelect.value : 'daily';
+      vpPanelHead.textContent = `Volume Profile — ${VP_PERIOD_LABELS[period] || period} POC / VAH / VAL`;
+      vpThead.innerHTML = `<tr>
+        <th>#</th><th>Stock</th><th class="num">Score</th><th class="num">Close</th>
+        <th class="num">POC</th><th class="num">VAH</th><th class="num">VAL</th>
+        <th>Position</th><th class="num">Dist POC%</th><th>Key levels</th>
+      </tr>`;
+      const rows = _vpPayload.rows || [];
+      vpTbody.innerHTML = rows.map((r, i) => {
+        const p = r[period] || {};
+        const levels = (r.important_levels || []).slice(0, 3).map(l => `${l.price} (${(l.labels || []).join('/')})`).join(' · ');
+        return `<tr>
+          <td class="num">${i + 1}</td>
+          <td class="stock">${fmt(r.stock)}</td>
+          <td class="num">${fmtNum(r.score, 1)}</td>
+          <td class="num">${fmtNum(r.close, 2)}</td>
+          <td class="num">${fmtNum(p.poc, 2)}</td>
+          <td class="num">${fmtNum(p.vah, 2)}</td>
+          <td class="num">${fmtNum(p.val, 2)}</td>
+          <td style="font-size:0.75rem;">${biasText(p.position)}</td>
+          <td class="num">${fmtNum(p.dist_poc_pct, 2)}</td>
+          <td style="font-size:0.72rem;">${levels || '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderVpPayload(d) {
+      _vpPayload = d;
+      vpLoading.style.display = 'none';
+      const rows = d.rows || [];
+      if (!rows.length) {
+        vpEmpty.style.display = 'block';
+        vpEmpty.textContent = d.message || 'No volume profile candidates.';
+        vpContent.style.display = 'none';
+        vpStatus.textContent = d.message || 'No data';
+        vpStatus.className = 'status';
+        return;
+      }
+      vpEmpty.style.display = 'none';
+      vpContent.style.display = 'block';
+      renderVpTable();
+      vpStatus.textContent = `Trade date ${fmt(d.trade_date)} · ${d.passed || rows.length} profiles · ${(d.periods || []).join(', ')}`;
+      vpStatus.className = 'status ok';
+    }
+
+    vpPeriodSelect?.addEventListener('change', renderVpTable);
+
+    async function loadVolumeProfile() {
+      vpLoading.style.display = 'block';
+      vpEmpty.style.display = 'none';
+      vpContent.style.display = 'none';
+      try {
+        const d = await stocksGetJson('/api/stocks/volume-profile');
+        renderVpPayload(d);
+      } catch (e) {
+        vpLoading.style.display = 'none';
+        vpEmpty.style.display = 'block';
+        vpEmpty.textContent = 'Load error: ' + e.message;
+      }
+    }
+
+    async function refreshVolumeProfileTab() {
+      vpStatus.textContent = 'Running volume profile on NIFTY 500…';
+      vpStatus.className = 'status';
+      vpLoading.style.display = 'block';
+      vpEmpty.style.display = 'none';
+      vpContent.style.display = 'none';
+      try {
+        const d = await postRefreshJson('/api/stocks/volume-profile/refresh', 'Volume profile');
+        renderVpPayload(d);
+        return d;
+      } catch (e) {
+        vpLoading.style.display = 'none';
+        vpEmpty.style.display = 'block';
+        vpEmpty.textContent = 'Refresh error: ' + e.message;
+        vpStatus.textContent = 'Error: ' + e.message;
+        vpStatus.className = 'status err';
         throw e;
       }
     }
@@ -3840,6 +3987,7 @@
       'sector-rs': refreshSectorRsTab,
       instvol: refreshInstVolTab,
       'swing-playbook': refreshSwingTab,
+      'volume-profile': refreshVolumeProfileTab,
     };
 
     function setRefreshControlsDisabled(disabled) {
@@ -3889,6 +4037,7 @@
         loadSectorRs(),
         loadInstitutionalVolume(),
         loadSwingPlaybook(),
+        loadVolumeProfile(),
       ]);
     }
 
@@ -3904,6 +4053,7 @@
         { label: 'RS vs NIFTY', fn: refreshRsTab },
         { label: 'Minervini SEPA', fn: refreshMinerviniTab },
         { label: 'Swing Playbook', fn: refreshSwingTab },
+        { label: 'Volume Profile', fn: refreshVolumeProfileTab },
         { label: 'Intraday RS', fn: refreshIntradayRsTab },
         { label: 'Sector RS', fn: refreshSectorRsTab },
       ];
@@ -3971,7 +4121,7 @@
 
     // Allow opening scanners by hash
     const hashScanner = window.location.hash.replace('#', '');
-    const SCANNER_HASH_KEYS = ['silent', 'fiidii', 'rs', 'minervini', 'intraday-rs', 'sector-rs', 'instvol', 'combined', 'swing-playbook', 'eod', 'tomorrow'];
+    const SCANNER_HASH_KEYS = ['silent', 'fiidii', 'rs', 'minervini', 'intraday-rs', 'sector-rs', 'instvol', 'combined', 'swing-playbook', 'volume-profile', 'eod', 'tomorrow'];
     if (SCANNER_HASH_KEYS.includes(hashScanner)) {
       openScannerSubTab(hashScanner);
     } else {

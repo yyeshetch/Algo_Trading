@@ -28,6 +28,7 @@ from intraday_engine.research.fundamentals_screener import run_fundamentals_scan
 from intraday_engine.research.stock_news_scanner import run_news_scan
 from intraday_engine.research.combined_signals_scanner import run_combined_scan
 from intraday_engine.research.swing_playbook import run_swing_playbook_scan
+from intraday_engine.research.volume_profile_scanner import run_volume_profile_scan
 from intraday_engine.storage import DataStore
 from intraday_engine.utils.logging_setup import setup_logging
 
@@ -453,6 +454,23 @@ def main() -> None:
         default=50,
         help="Top-N composite rankings in swing playbook output (default 50).",
     )
+    parser.add_argument(
+        "--volume-profile",
+        action="store_true",
+        help="Run volume profile scan (POC/VAH/VAL) on NIFTY 500 daily bars — daily, weekly, monthly.",
+    )
+    parser.add_argument(
+        "--volume-profile-top",
+        type=int,
+        default=50,
+        help="Top-N stocks in volume profile scan output (default 50).",
+    )
+    parser.add_argument(
+        "--volume-profile-limit",
+        type=int,
+        default=None,
+        help="Optional cap on symbols for volume profile scan (smoke tests).",
+    )
     args = parser.parse_args()
     selected_date = _parse_date(args.date) if args.date else None
     underlying = args.underlying or None
@@ -652,6 +670,30 @@ def main() -> None:
             print(
                 f"  {r.get('stock'):12} total={r.get('total_score'):>5.1f}  "
                 f"hits={','.join(r.get('scanner_hits') or [])[:40]}"
+            )
+        return
+
+    if args.volume_profile:
+        settings = Settings.from_env(underlying="NIFTY")
+        setup_logging(settings.log_level, settings.data_dir)
+        sym_path = Path(args.nifty500_symbols_file) if args.nifty500_symbols_file else None
+        payload = run_volume_profile_scan(
+            settings=settings,
+            trade_date=selected_date or date.today(),
+            top_n=args.volume_profile_top,
+            symbols_file=sym_path,
+            symbol_limit=args.volume_profile_limit,
+        )
+        print(
+            f"Volume profile: {payload.get('passed')} passed / {payload.get('scanned')} scanned "
+            f"→ data/analysis/volume_profile/volume_profile_{payload.get('trade_date')}.json"
+        )
+        for r in (payload.get("rows") or [])[:15]:
+            d = r.get("daily") or {}
+            print(
+                f"  {r.get('stock'):12} score={r.get('score'):>5.1f}  "
+                f"POC={d.get('poc')} VAH={d.get('vah')} VAL={d.get('val')}  "
+                f"pos={d.get('position')}"
             )
         return
 

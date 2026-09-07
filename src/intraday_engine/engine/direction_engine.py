@@ -10,6 +10,7 @@ from intraday_engine.analysis.momentum import momentum_direction
 from intraday_engine.analysis.scoring import score_signal
 from intraday_engine.analysis.sideways import is_sideways_day
 from intraday_engine.analysis.support_resistance import calculate_support_resistance
+from intraday_engine.analysis.volume_profile import compact_volume_profile, multi_period_volume_profiles
 from intraday_engine.analysis.trade_plan import build_trade_plan
 from intraday_engine.core.config import Settings
 from intraday_engine.features.feature_engineering import compute_features
@@ -158,6 +159,8 @@ class DirectionEngine:
             payload["option_symbol"] = pe_symbol
         else:
             payload["option_symbol"] = None
+        vp = multi_period_volume_profiles(intraday_df=frame, spot=spot)
+        payload["volume_profile"] = compact_volume_profile(vp)
         return payload
 
     def _no_trade_payload(

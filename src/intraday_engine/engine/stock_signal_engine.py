@@ -15,6 +15,7 @@ from intraday_engine.analysis.scoring import score_signal
 from intraday_engine.analysis.sideways import is_sideways_day
 from intraday_engine.analysis.support_resistance import calculate_support_resistance
 from intraday_engine.analysis.trade_plan import build_trade_plan
+from intraday_engine.analysis.volume_profile import compact_volume_profile, multi_period_volume_profiles
 from intraday_engine.core.config import Settings
 from intraday_engine.core.models import ScoreBreakdown
 from intraday_engine.core.underlyings import get_underlying_config
@@ -28,6 +29,7 @@ from intraday_engine.fetch.stock_market_data import (
 )
 from intraday_engine.fetch.zerodha_client import ZerodhaClient
 from intraday_engine.storage import DataStore
+from intraday_engine.storage.nifty500_csv import read_nifty500_symbol_ohlcv
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +522,13 @@ def _analyze_frame(frame: pd.DataFrame, stock_name: str, settings: Settings) -> 
         payload["option_symbol"] = pe_symbol
     else:
         payload["option_symbol"] = None
+    daily = read_nifty500_symbol_ohlcv(settings.data_dir, stock_name, "1D")
+    vp = multi_period_volume_profiles(
+        intraday_df=frame,
+        daily_df=daily if not daily.empty else None,
+        spot=spot,
+    )
+    payload["volume_profile"] = compact_volume_profile(vp)
     return payload
 
 

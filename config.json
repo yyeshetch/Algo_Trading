@@ -586,5 +586,52 @@
       "type": "int",
       "help": "5-min index OBV slope lookback (bars)."
     }
+  },
+  "volume_profile": {
+    "VALUE_AREA_PCT": {
+      "value": 70,
+      "type": "float",
+      "help": "Value area width as percent of total volume (POC-centered)."
+    },
+    "NUM_BINS": {
+      "value": 50,
+      "type": "int",
+      "help": "Price bins for volume histogram when tick size is not set."
+    },
+    "TICK_SIZE": {
+      "value": 0,
+      "type": "float",
+      "help": "Optional fixed tick size for binning (0 = auto bins)."
+    },
+    "HVN_TOP_N": {
+      "value": 3,
+      "type": "int",
+      "help": "High-volume nodes to keep per profile."
+    },
+    "LVN_TOP_N": {
+      "value": 2,
+      "type": "int",
+      "help": "Low-volume nodes to keep per profile."
+    },
+    "DAILY_LOOKBACK_BARS": {
+      "value": 1,
+      "type": "int",
+      "help": "Daily profile: number of recent sessions (1 = today/latest)."
+    },
+    "WEEKLY_LOOKBACK_BARS": {
+      "value": 10,
+      "type": "int",
+      "help": "Daily bars used to build weekly profile."
+    },
+    "MONTHLY_LOOKBACK_BARS": {
+      "value": 22,
+      "type": "int",
+      "help": "Daily bars used to build monthly profile."
+    },
+    "INTRADAY_INCLUDE_DAILY_CONTEXT": {
+      "value": 1,
+      "type": "int",
+      "help": "Attach cached daily/weekly/monthly levels to intraday summaries (1=yes)."
+    }
   }
 }

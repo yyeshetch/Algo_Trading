@@ -420,11 +420,28 @@ ensure_env_mysql_block() {
     mv "$tmp" "$env_path"
   }
 
+  # systemd EnvironmentFile treats unquoted # as a comment — always quote passwords.
+  set_env_kv_quoted() {
+    local key="$1" val="$2" env_path="$3" tmp="${env_path}.tmp.$$"
+    touch "$env_path"
+    if grep -q "^${key}=" "$env_path" 2>/dev/null; then
+      KEY="$key" VAL="$val" awk -F= '
+        BEGIN { OFS = "=" }
+        $1 == ENVIRON["KEY"] { print ENVIRON["KEY"], "\"" ENVIRON["VAL"] "\""; next }
+        { print }
+      ' "$env_path" >"$tmp"
+    else
+      cp "$env_path" "$tmp"
+      printf '%s="%s"\n' "$key" "$val" >>"$tmp"
+    fi
+    mv "$tmp" "$env_path"
+  }
+
   set_env_kv "MYSQL_HOST" "localhost" "$env_file"
   set_env_kv "MYSQL_PORT" "3306" "$env_file"
   set_env_kv "MYSQL_DATABASE" "$MYSQL_DATABASE" "$env_file"
   set_env_kv "MYSQL_USER" "$MYSQL_USER" "$env_file"
-  set_env_kv "MYSQL_PASSWORD" "$MYSQL_PASSWORD" "$env_file"
+  set_env_kv_quoted "MYSQL_PASSWORD" "$MYSQL_PASSWORD" "$env_file"
   set_env_kv "STORAGE_BACKEND" "write_to_db" "$env_file"
   set_env_kv "DATA_DIR" "data" "$env_file"
 
@@ -512,13 +529,16 @@ print_next_steps() {
 
 Next steps (if not automated above):
   1. Add GitHub deploy key on VPS:  ssh-keygen … && cat ~/.ssh/id_ed25519.pub
-  2. Fill Kite credentials in ${REPO_DIR}/.env
+  2. Fill Kite credentials in ${REPO_DIR}/.env (quote MYSQL_PASSWORD if it contains #)
   3. Dashboard: http://$(hostname -I 2>/dev/null | awk '{print $1}'):${DASHBOARD_PORT}
-  4. Logs: journalctl -u algo-scheduler -f
+  4. Logs: journalctl -u algo-scheduler -n 50 --no-pager
+         journalctl -u algo-scheduler -f
+  5. Verify data: mysql -u ${MYSQL_USER} -p ${MYSQL_DATABASE} -e "SELECT COUNT(*) FROM signals;"
+  6. After code changes: cd ${REPO_DIR} && git pull origin main && systemctl restart algo-scheduler algo-dashboard
+  7. Full docs: ${REPO_DIR}/docs/vps_setup.md  |  quick ref: ${REPO_DIR}/docs/interserver.txt
 
 MySQL:
   mysql -u ${MYSQL_USER} -p ${MYSQL_DATABASE}
-  (password is set in this script / .env MYSQL_PASSWORD)
 
 EOF
 }
