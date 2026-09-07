@@ -20,6 +20,7 @@ from intraday_engine.utils.nse_session import (
     seconds_to_next_interval_within_session,
     session_label,
     sleep_until_next_interval,
+    today_ist,
     wait_until_nse_session_open,
 )
 
@@ -52,7 +53,7 @@ def run_index_pipeline_cycle(
     """
     One pipeline pass per index: fetch 5-min bars → Index_Analysis/Signals → options-trading scan.
     """
-    td = trade_date or date.today()
+    td = trade_date or today_ist()
     targets = underlyings or _pipeline_underlyings()
     started = datetime.now()
     results: list[dict] = []

@@ -20,6 +20,7 @@ from intraday_engine.utils.nse_session import (
     seconds_to_next_interval_within_session,
     session_label,
     sleep_until_next_interval,
+    today_ist,
     wait_until_nse_session_open,
 )
 
@@ -139,7 +140,7 @@ def capture_option_chain_for_underlying(
     num_strikes: int | None = None,
 ) -> dict:
     """Fetch and store one option-chain snapshot. Returns status dict."""
-    td = trade_date or date.today()
+    td = trade_date or today_ist()
     u = normalize_underlying(underlying)
     if u not in list_index_underlyings():
         return {"underlying": u, "status": "skipped", "reason": "not an index underlying"}
@@ -189,7 +190,7 @@ def run_option_chain_scraper_job(
             "schedule": session_label(),
         }
 
-    td = trade_date or date.today()
+    td = trade_date or today_ist()
     started = datetime.now()
     results: list[dict] = []
     errors: list[str] = []

@@ -7,8 +7,9 @@
 #
 # Examples:
 #   bash scripts/vps_setup.sh                  # full setup
-#   bash scripts/vps_setup.sh --mysql-only      # only ensure MySQL db/user
-#   bash scripts/vps_setup.sh --check-mysql    # verify db/user/password only
+#   bash scripts/vps_setup.sh --mysql-only      # MySQL db/user + application tables
+#   bash scripts/vps_setup.sh --init-db-only    # create scheduler/dashboard tables only
+#   bash scripts/vps_setup.sh --check-mysql    # verify db/user/password/tables
 #   bash scripts/vps_setup.sh --skip-clone --skip-systemd
 #
 # Override defaults via env:
@@ -16,7 +17,15 @@
 
 set -euo pipefail
 
-# --- Config (override with env vars) ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Tables required by session scheduler (write_to_db) and read-only dashboard.
+readonly REQUIRED_TABLES=(
+  signals
+  market_snapshots
+  option_chain_rows
+  json_artifacts
+)
 REPO_DIR="${REPO_DIR:-${HOME}/Algo_Trading}"
 GITHUB_REPO="${GITHUB_REPO:-git@github.com:yyeshetch/Algo_Trading.git}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
@@ -50,19 +59,24 @@ Automates docs/vps_setup.md on an Ubuntu/Debian VPS (run as root).
 
 Options:
   --all              Full setup (default)
-  --mysql-only       Install/start MySQL + ensure database/user only
-  --check-mysql      Check database/user/login; create if missing (no apt/install)
+  --mysql-only       MySQL + database/user + application tables
+  --init-db-only     Create scheduler/dashboard tables only (needs MySQL + schema file or venv)
+  --check-mysql      Check database/user/login/tables; fix if missing
   --skip-mysql       Skip MySQL steps
   --skip-clone       Skip git clone/pull
   --skip-venv        Skip Python venv + pip install
   --skip-env         Skip .env MySQL block update
-  --skip-init-db     Skip --init-db / schema load
+  --skip-init-db     Skip table creation (signals, snapshots, option_chain, json_artifacts)
   --skip-systemd     Skip systemd unit install
   --with-firewall    Open ports 22 and 8000 via ufw
   -h, --help         Show this help
 
+Tables created (IF NOT EXISTS):
+  signals, market_snapshots, option_chain_rows, json_artifacts
+  (see scripts/init_mysql_schema.sql — same as: python -m intraday_engine.cli.main --init-db)
+
 Environment:
-  REPO_DIR, GITHUB_REPO, GIT_BRANCH
+  REPO_DIR, GITHUB_REPO, GIT_BRANCH, SCHEMA_SQL
   MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD
   MYSQL_ROOT_PASSWORD   (if root needs password; else uses socket auth)
 EOF
@@ -84,8 +98,18 @@ parse_args() {
         DO_CLONE=0
         DO_VENV=0
         DO_ENV=0
-        DO_INIT_DB=0
+        DO_INIT_DB=1
         DO_SYSTEMD=0
+        ;;
+      --init-db-only|--tables-only)
+        any=1
+        DO_PACKAGES=0
+        DO_CLONE=0
+        DO_VENV=0
+        DO_ENV=0
+        DO_SYSTEMD=0
+        DO_INIT_DB=1
+        DO_MYSQL=1
         ;;
       --check-mysql)
         any=1
@@ -94,7 +118,7 @@ parse_args() {
         DO_CLONE=0
         DO_VENV=0
         DO_ENV=0
-        DO_INIT_DB=0
+        DO_INIT_DB=1
         DO_SYSTEMD=0
         ;;
       --skip-mysql) DO_MYSQL=0 ;;
@@ -170,6 +194,93 @@ mysql_user_exists() {
 mysql_app_login_ok() {
   mysql -u "$MYSQL_USER" --password="${MYSQL_PASSWORD}" "$MYSQL_DATABASE" \
     --batch --skip-column-names -e "SELECT 1" >/dev/null 2>&1
+}
+
+run_mysql_app() {
+  mysql -u "$MYSQL_USER" --password="${MYSQL_PASSWORD}" "$MYSQL_DATABASE" "$@"
+}
+
+schema_sql_path() {
+  local candidates=()
+  [[ -n "${SCHEMA_SQL:-}" ]] && candidates+=("$SCHEMA_SQL")
+  candidates+=(
+    "${REPO_DIR}/scripts/init_mysql_schema.sql"
+    "${SCRIPT_DIR}/init_mysql_schema.sql"
+  )
+  local p
+  for p in "${candidates[@]}"; do
+    [[ -n "$p" && -f "$p" ]] || continue
+    printf '%s' "$p"
+    return 0
+  done
+  return 1
+}
+
+mysql_table_exists() {
+  local table="$1" count
+  count="$(run_mysql_app --batch --skip-column-names -e \
+    "SELECT COUNT(*) FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = '$(sql_escape "$MYSQL_DATABASE")'
+       AND TABLE_NAME = '$(sql_escape "$table")';")"
+  [[ "${count:-0}" -gt 0 ]]
+}
+
+check_mysql_tables() {
+  log "Checking application tables…"
+  local t missing=0
+  for t in "${REQUIRED_TABLES[@]}"; do
+    if mysql_table_exists "$t"; then
+      printf '  table    %-24s OK\n' "$t"
+    else
+      printf '  table    %-24s MISSING\n' "$t"
+      missing=1
+    fi
+  done
+  [[ "$missing" -eq 0 ]]
+}
+
+ensure_mysql_tables_via_sql() {
+  local sql_file
+  sql_file="$(schema_sql_path)" || die "init_mysql_schema.sql not found — clone repo or set SCHEMA_SQL"
+  log "Creating tables from ${sql_file}…"
+  run_mysql_app <"$sql_file"
+}
+
+ensure_mysql_tables_via_python() {
+  local py="${REPO_DIR}/.venv/bin/python" env_file="${REPO_DIR}/.env"
+  [[ -x "$py" ]] || die "Python venv not found at ${py}"
+  [[ -f "$env_file" ]] || die ".env not found at ${env_file}"
+  log "Creating tables via --init-db (Python)…"
+  cd "$REPO_DIR"
+  set -a
+  # shellcheck disable=SC1091
+  source "$env_file"
+  set +a
+  PYTHONPATH=src "$py" -m intraday_engine.cli.main --init-db
+}
+
+ensure_mysql_tables() {
+  log "Ensuring MySQL tables for scheduler + dashboard…"
+  if ! mysql_app_login_ok; then
+    die "Cannot connect as '${MYSQL_USER}' — run MySQL user setup first"
+  fi
+  if check_mysql_tables; then
+    log "All required tables already exist"
+    run_mysql_app -e "SHOW TABLES;"
+    return 0
+  fi
+
+  if schema_sql_path >/dev/null 2>&1; then
+    ensure_mysql_tables_via_sql
+  elif [[ -x "${REPO_DIR}/.venv/bin/python" && -f "${REPO_DIR}/.env" ]]; then
+    ensure_mysql_tables_via_python
+  else
+    die "Cannot create tables: need scripts/init_mysql_schema.sql or ${REPO_DIR}/.venv + .env"
+  fi
+
+  check_mysql_tables || die "Table creation incomplete — expected: ${REQUIRED_TABLES[*]}"
+  run_mysql_app -e "SHOW TABLES;"
+  log "MySQL schema ready for scheduler and dashboard"
 }
 
 install_mysql_server() {
@@ -293,19 +404,20 @@ ensure_env_mysql_block() {
   chmod 600 "$env_file"
 
   set_env_kv() {
-    local key="$1" val="$2" file="$3" tmp="${file}.tmp.$$"
-    touch "$file"
-    if grep -q "^${key}=" "$file" 2>/dev/null; then
+    local key="$1" val="$2" env_path="$3"
+    local tmp="${env_path}.tmp.$$"
+    touch "$env_path"
+    if grep -q "^${key}=" "$env_path" 2>/dev/null; then
       KEY="$key" VAL="$val" awk -F= '
         BEGIN { OFS = "=" }
         $1 == ENVIRON["KEY"] { print ENVIRON["KEY"], ENVIRON["VAL"]; next }
         { print }
-      ' "$file" >"$tmp"
+      ' "$env_path" >"$tmp"
     else
-      cp "$file" "$tmp"
+      cp "$env_path" "$tmp"
       printf '%s=%s\n' "$key" "$val" >>"$tmp"
     fi
-    mv "$tmp" "$file"
+    mv "$tmp" "$env_path"
   }
 
   set_env_kv "MYSQL_HOST" "localhost" "$env_file"
@@ -322,20 +434,12 @@ ensure_env_mysql_block() {
 }
 
 run_init_db() {
-  log "Running --init-db to create application tables…"
-  cd "$REPO_DIR"
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
-  PYTHONPATH=src python -m intraday_engine.cli.main --init-db
-  mysql -u "$MYSQL_USER" --password="${MYSQL_PASSWORD}" "$MYSQL_DATABASE" -e "SHOW TABLES;"
+  ensure_mysql_tables
 }
 
 install_systemd_services() {
   log "Installing systemd units (algo-scheduler, algo-dashboard)…"
+  ensure_mysql_tables
   local py="${REPO_DIR}/.venv/bin/python"
   [[ -x "$py" ]] || die "Python venv not found at ${py} — run without --skip-venv first"
 
@@ -350,6 +454,7 @@ Type=simple
 User=root
 WorkingDirectory=${REPO_DIR}
 Environment=PYTHONPATH=src
+Environment=TZ=Asia/Kolkata
 EnvironmentFile=${REPO_DIR}/.env
 ExecStart=${py} -m intraday_engine.cli.main --session-scheduler --storage write_to_db
 Restart=always
@@ -372,6 +477,7 @@ Type=simple
 User=root
 WorkingDirectory=${REPO_DIR}
 Environment=PYTHONPATH=src
+Environment=TZ=Asia/Kolkata
 EnvironmentFile=${REPO_DIR}/.env
 ExecStart=${py} -m intraday_engine.cli.main --dashboard --read-only --host 0.0.0.0 --port ${DASHBOARD_PORT}
 Restart=always
@@ -424,13 +530,14 @@ main() {
   log "Algo_Trading VPS setup — repo=${REPO_DIR}"
 
   if [[ "$CHECK_ONLY" -eq 1 ]]; then
-    if check_mysql_status; then
-      log "All MySQL checks passed"
+    if check_mysql_status && check_mysql_tables; then
+      log "All MySQL checks passed (database, user, tables)"
       exit 0
     fi
     log "Some checks failed — attempting to create/fix…"
     ensure_mysql_database_and_user
     check_mysql_status
+    ensure_mysql_tables
     exit 0
   fi
 
@@ -448,6 +555,10 @@ main() {
     check_mysql_status || true
     ensure_mysql_database_and_user
     check_mysql_status
+    # --mysql-only / --init-db-only: schema file lives next to this script
+    if [[ "$DO_INIT_DB" -eq 1 && ( "$MYSQL_ONLY" -eq 1 || "$DO_CLONE" -eq 0 ) ]]; then
+      ensure_mysql_tables
+    fi
   fi
 
   if [[ "$DO_CLONE" -eq 1 && "$MYSQL_ONLY" -eq 0 ]]; then

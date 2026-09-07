@@ -26,6 +26,7 @@ from intraday_engine.utils.nse_session import (
     seconds_to_next_interval_within_session,
     session_label,
     sleep_until_next_interval,
+    today_ist,
     wait_until_nse_session_open,
 )
 
@@ -61,7 +62,7 @@ def maybe_run_market_overview(data_dir: Path, *, trade_date: date | None = None)
     Safe to call repeatedly — no-ops after the first successful run that day.
     """
     global _market_overview_ran_date
-    td = trade_date or date.today()
+    td = trade_date or today_ist()
     now = now_ist()
     if not is_weekday(now):
         return None
@@ -93,7 +94,7 @@ def run_session_cycle(
       1. Option chain capture (multi-strike ladder → option_chain.csv)
       2. Index pipeline per underlying (Index_Analysis/Signals → options-trading scan)
     """
-    td = trade_date or date.today()
+    td = trade_date or today_ist()
     targets = underlyings or _session_underlyings()
     started = datetime.now()
 

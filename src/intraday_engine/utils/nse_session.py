@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, time as dt_time, timedelta
+from datetime import date, datetime, time as dt_time, timedelta
 from typing import Callable
 from zoneinfo import ZoneInfo
 
@@ -24,6 +24,11 @@ MARKET_OVERVIEW_RUN = dt_time(9, 5, 0)
 
 def now_ist() -> datetime:
     return datetime.now(IST)
+
+
+def today_ist() -> date:
+    """NSE trade calendar date in IST (not VPS local timezone)."""
+    return now_ist().date()
 
 
 def is_weekday(d: datetime) -> bool:
